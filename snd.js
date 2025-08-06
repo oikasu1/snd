@@ -142,7 +142,8 @@ function p(e, lang, url) {
             audioCurrentTime = 0;
             audioLeftTime = 0;
 			
-            return `https://sutian.moe.edu.tw/media/subak/${holoNoNo}.mp3`;
+			//return `https://oikasu1.github.io/snd/mp3holo/${holoNo}.mp3`;			
+            return `https://sutian.moe.edu.tw/media/senn/mp3/imtong/subak/${holoNoNo}.mp3`;
         } else if (/\bkasu|ka|k\b/.test(lang)) {
             audioRate = 1;
             audioCurrentTime = 0;
