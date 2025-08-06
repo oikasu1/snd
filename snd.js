@@ -46,9 +46,11 @@ var audioLeftTime = 0; // 略過剩餘幾秒
 
 
 function holo(e, url) {
+	url = tailuoToZvsxfl(url);
 	p(e, "holo", url) 
 }
 function kasu(e, url) {
+	url = replaceToneToZvsxf(url);
 	p(e, "kasu", url) 
 }
 function k(e, url) {
@@ -141,9 +143,6 @@ function p(e, lang, url) {
             audioLeftTime = 0;
 			
             return `https://sutian.moe.edu.tw/media/subak/${holoNoNo}.mp3`;
-			'https://sutian.moe.edu.tw/media/senn/mp3/imtong/subak/3/3305.wav
-			'https://oikasu1.github.io/snd/mp3holo/123.mp3
-			'https://oikasu1.github.io/snd/mp3holo/tshus.mp3
         } else if (/\bkasu|ka|k\b/.test(lang)) {
             audioRate = 1;
             audioCurrentTime = 0;
