@@ -1,0 +1,324 @@
+/* 明亮、清新、活潑風格 */
+:root {
+  --bg: #f9fafb;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #10b981; /* mint green */
+  --accent-2: #f59e0b; /* fresh orange */
+  --chip: #eef2ff;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial;
+}
+.container {
+  max-width: 1000px;
+  margin: 32px auto;
+  padding: 0 16px;
+}
+
+.header {
+  margin-bottom: 16px;
+  text-align: center;
+}
+.header h1 {
+  margin: 0 0 6px 0;
+  font-size: 24px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+  margin-bottom: 16px;
+}
+.row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+.row.wrap {
+  flex-wrap: wrap;
+}
+.field {
+  flex: 1;
+  min-width: 240px;
+}
+.label {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.select,
+.textarea,
+.num {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+}
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Textarea 容器和清除按鈕 */
+.textarea-container {
+  position: relative;
+}
+
+.textarea-clear-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--muted);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.textarea-container:hover .textarea-clear-btn,
+.textarea:focus + .textarea-clear-btn,
+.textarea-clear-btn:focus {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.textarea-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+.btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn.primary {
+  background: linear-gradient(180deg, #ecfeff, #e0f2fe);
+  border-color: #bae6fd;
+  color: #0c4a6e;
+}
+.btn:hover {
+  filter: brightness(1.03);
+}
+.btn.mini {
+  padding: 6px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  line-height: 1;
+}
+.btn.ghost {
+  background: transparent;
+}
+
+/* 禁用狀態的按鈕 */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* 標題列：左側標題＋右側控制（全部保存 / 全部清除） */
+.section-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.title-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.title-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* 解析結果列表容器：每筆解析結果一個 result-item，最新在最上面（prepend） */
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+/* 單筆解析結果 */
+.result-item {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #f8fafc;
+  position: relative;
+}
+.entry-row {
+  display: block;
+  position: relative;
+}
+.entry-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.entry-tail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 編輯模式樣式 */
+.token.editing {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+  outline: none;
+  cursor: text;
+}
+
+.token.editing:focus {
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+.result-item.edit-mode .token {
+  cursor: text;
+}
+
+.result-item.edit-mode .token:hover {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+/* 播放按鈕獨立一行 */
+.btn.entry-play {
+  margin-bottom: 4px;
+}
+
+/* Token 樣式：可點擊、可高亮 */
+.token {
+  display: inline-block;
+  background: var(--chip);
+  border: 1px solid #e0e7ff;
+  color: #3730a3;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  margin: 2px 0;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.token:hover {
+  filter: brightness(1.03);
+}
+.token.playing {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15) inset;
+}
+
+.footer {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 10px;
+}
+
+/* 摺疊卡片樣式 */
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.collapse-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.collapse-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.collapse-icon {
+  transition: transform 0.2s ease;
+}
+
+.card.collapsed .collapse-icon {
+  transform: rotate(90deg);
+}
+
+.card.collapsed .card-content {
+  display: none;
+}
+
+/* 調整 section-title 在摺疊標題中的樣式 */
+.card-header .section-title {
+  flex: 1;
+  margin-bottom: 0;
+}

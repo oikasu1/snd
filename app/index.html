@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>烏衣行🥷聲聲不息</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>烏衣行🥷聲聲不息</h1>
+    </header>
+
+    <section class="card" id="input-card">
+      <div class="card-header">
+        <button type="button" class="collapse-btn" data-target="input-card">
+          <span class="collapse-icon">−</span>
+        </button>
+        <h2 class="card-title">輸入設定</h2>
+      </div>
+      <div class="card-content">
+        <div class="row">
+          <div class="field">
+            <select id="lang" class="select">
+              <option value="holo">閩南語 holo</option>
+              <option value="kasu">詔安客語 kasu寫什麼就念什麼</option>
+              <option value="en">English</option>
+              <option value="zhao">zhao無連字號，自動變調</option>
+              <option value="zhaoan">zhaoan有連字號，自動變調</option>
+              <option value="xiien">xiien無連字號，自動變調</option>
+              <option value="sixian">sixian有連字號，自動變調</option>
+              <option value="hoiliug">hoiliug無連字號，自動變調</option>
+              <option value="hailu">hailu有連字號，自動變調</option>
+              <option value="taipu">taipu無連字號，自動變調</option>
+              <option value="dapu">dapu有連字號，自動變調</option>
+              <option value="ngiaupin">ngiaupin無連字號，自動變調</option>
+              <option value="raoping">raoping有連字號，自動變調</option>
+              <option value="no">No（直接以原始 URL 播放）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field textarea-field">
+          <div class="textarea-container">
+            <textarea id="input" class="textarea" placeholder="範例：
+holo：a e i ah ai ak am an
+kasu：ab-gimv ab-gungv ab-mas
+en：hello world"></textarea>
+            <button type="button" id="btnInputClear" class="textarea-clear-btn" title="清空輸入" aria-label="清空輸入">✕</button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btnPlay" class="btn primary">🔊 播放</button>
+          <button id="btnResolve" class="btn">解析</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="results-card">
+      <div class="card-header">
+        <button type="button" class="collapse-btn" data-target="results-card">
+          <span class="collapse-icon">−</span>
+        </button>
+        <div class="section-title">
+          <div class="title-left">
+            <strong>解析結果</strong>
+            <span class="pill">Tokens</span>
+          </div>
+          <div class="title-actions">
+            <button type="button" id="saveAll" class="btn mini ghost">全部保存</button>
+            <button type="button" id="clearAll" class="btn mini ghost">全部清除</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-content">
+        <div id="results" class="list" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>在其他專案引入 <code>seeds.js</code> 與 <code>app.js</code> 後，使用 <code>window.PinyinAudio</code> API 即可。</p>
+    </footer>
+  </main>
+
+  <script src="./seeds.js"></script>
+  <script src="./app.js"></script>
+  <script src="./ui.js"></script>
+</body>
+</html>
