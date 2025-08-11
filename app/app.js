@@ -399,7 +399,7 @@
     return (tokens || []).map((txt) => {
       return RE.multi.test(txt)
         ? `https://oikasu1.github.io/snd/mp3kasu/${txt}.mp3`
-        : `https://oikasu1.github.io/snd/mp3/${txt}.mp3`
+        : `https://oikasu1.github.io/snd/mp3all/${txt}.mp3`
     })
   }
 
@@ -543,12 +543,12 @@
         if (useOrigins) {
           return origins[i] === ORIGIN_DIALECT
             ? `https://oikasu1.github.io/snd/mp3${dialectBase}/${txt}.mp3`
-            : `https://oikasu1.github.io/snd/mp3hakka/${txt}.mp3`
+            : `https://oikasu1.github.io/snd/mp3all/${txt}.mp3`  //`https://oikasu1.github.io/snd/mp3hakka/${txt}.mp3`
         }
         // 後備：若無 origins（理論上不會發生），以舊啟發式處理
         return RE.multi.test(txt)
           ? `https://oikasu1.github.io/snd/mp3${dialectBase}/${txt}.mp3`
-          : `https://oikasu1.github.io/snd/mp3hakka/${txt}.mp3`
+          : `https://oikasu1.github.io/snd/mp3all/${txt}.mp3` //`https://oikasu1.github.io/snd/mp3hakka/${txt}.mp3`
       })
     }
     return {
@@ -680,7 +680,7 @@
           const folder = convertNumber(num)
           if (!folder) {
             if (opts && opts.skipUnknown) continue
-            urls.push("https://oikasu1.github.io/snd/mp3/no-snd.mp3")
+            urls.push("https://oikasu1.github.io/snd/mp3all/no-snd.mp3")
           } else {
             urls.push(`https://sutian.moe.edu.tw/media/senn/mp3/imtong/subak/${folder}.mp3`)
           }
@@ -871,7 +871,7 @@
       rate = 1,
       skipStart = 0,
       skipEnd = 0,
-      fallbackUrl = "https://oikasu1.github.io/snd/mp3/no-snd.mp3",
+      fallbackUrl = "https://oikasu1.github.io/snd/mp3all/no-snd.mp3",
     } = {}) {
       this.rate = rate
       this.skipStart = skipStart
