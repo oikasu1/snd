@@ -89,7 +89,9 @@
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3 ml-auto hidden" id="selectionActions">
                             <button id="selectAll" class="px-3 py-1 bg-blue-700 rounded hover:bg-blue-800 transition-colors">全部勾選</button>
-                            <button id="deselectAll" class="px-3 py-1 bg-blue-700 rounded hover:bg-blue-800 transition-colors">全部取消</button>
+							<button id="deselectAll" class="px-3 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded transition-colors text-sm" onclick="clearAllSelections()">全部取消</button>
+
+
                             <button id="learnSelected" class="px-4 py-2 bg-green-500 rounded-lg hover:bg-green-600 transition-colors font-semibold">
                                 <span id="learnSelectedText">學習已勾選 0 個</span>
                             </button>

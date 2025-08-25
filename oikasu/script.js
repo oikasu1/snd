@@ -212,64 +212,155 @@ function selectSearchResult(type, data) {
   }
 }
 
+
+
+// 表情符號對應表
+const myEmoji = `
+天氣	☀️
+問好	👋
+相遇	🤝
+道別	👋
+行禮	🙇
+感謝	🙏
+等候	⏳
+問姓名	❓
+問年紀	🎂
+問生肖	🐭
+問年級	📚
+問身份	🧑‍💼
+問星期	📅
+問日期	🗓️
+問幾點	⏰
+趕時間	🏃
+遲到	⏱️
+問處所	📍
+問去向	➡️
+距離	📏
+問路	🗺️
+座位	🪑
+問意願	🤔
+問擁有	💰
+問方式	❓
+問原因	❓
+事實確認	✅
+認知確認	🧠
+能力確認	💪
+溝通確認	🗣️
+就寢	😴
+洗衣服	🧺
+用餐	🍽️
+味道	👃
+感冒	🤧
+視力檢查	👓
+去廁所	🚽
+剪頭髮	💇
+看電影	🎬
+音樂	🎶
+打球	🏀
+猜拳	✊
+散步	🚶
+拍照	📸
+付錢	💳
+換錢	💱
+買車票	🎫
+買門票	🎟️
+加汽油	⛽
+遺失	😟
+找東西	👀
+語言能力	🗣️
+語言翻譯	🌐
+數學加減	➕
+數學數量	🔢
+大小	↔️
+點名	🙋
+排隊	🚶
+手動作	🖐️
+腳動作	🦶
+畢業	🎓
+`;
+
+const emojiMap = myEmoji.trim().split('\n').reduce((acc, line) => {
+    const parts = line.trim().split(/\s+/);
+    if (parts.length >= 2) {
+        acc[parts[0]] = parts[parts.length - 1];
+    }
+    return acc;
+}, {});
+
+function getCategoryEmoji(categoryName) {
+    const cleanName = categoryName.replace(/[0-9\s]+/g, '');
+    return emojiMap[cleanName] || '📚';
+}
+
+
+
+// 渲染分類列表
 // 渲染分類列表
 function renderCategoryList() {
-  const categoryList = document.getElementById("categoryList")
-  categoryList.innerHTML = ""
+    const categoryList = document.getElementById("categoryList");
+    categoryList.innerHTML = "";
 
-  if (currentViewMode === "card") {
-    categoryList.className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-    Object.keys(categories).forEach((category) => {
-      const isSelected = selectedCategories.has(category)
-      const categoryCard = document.createElement("div")
-      categoryCard.className = `category-card bg-white rounded-xl p-6 cursor-pointer shadow-sm hover:shadow-md ${isSelected ? "checkbox-selected" : ""}`
-      categoryCard.innerHTML = `
+    if (currentViewMode === "card") {
+        categoryList.className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4";
+        Object.keys(categories).forEach((category) => {
+            const isSelected = selectedCategories.has(category);
+            const emoji = getCategoryEmoji(category);
+            const categoryCard = document.createElement("div");
+            categoryCard.className = `category-card bg-white rounded-xl p-6 cursor-pointer shadow-sm hover:shadow-md ${isSelected ? "checkbox-selected" : ""}`;
+            categoryCard.innerHTML = `
                 <div class="flex items-start justify-between mb-4">
-                    <div class="text-3xl">📚</div>
+                    <div class="text-3xl">${emoji}</div>
                     <input type="checkbox" class="category-checkbox w-5 h-5 text-blue-600 rounded" 
                            ${isSelected ? "checked" : ""} 
                            onchange="toggleCategorySelection('${category}', this.checked)"
                            onclick="event.stopPropagation()">
                 </div>
                 <h3 class="text-lg font-bold mb-2">${category} (${categories[category].length})</h3>
-            `
-      categoryCard.onclick = (e) => {
-        if (!e.target.classList.contains("category-checkbox")) {
-          showCategoryDetail(category)
-        }
-      }
-      categoryList.appendChild(categoryCard)
-    })
-  } else {
-    categoryList.className = "space-y-2"
-    Object.keys(categories).forEach((category) => {
-      const isSelected = selectedCategories.has(category)
-      const categoryItem = document.createElement("div")
-      categoryItem.className = `category-card bg-white rounded-lg p-4 cursor-pointer hover:shadow-md transition-all flex items-center justify-between ${isSelected ? "checkbox-selected" : ""}`
-      categoryItem.innerHTML = `
+            `;
+            categoryCard.onclick = (e) => {
+                if (!e.target.classList.contains("category-checkbox")) {
+                    showCategoryDetail(category);
+                }
+            };
+            categoryList.appendChild(categoryCard);
+        });
+    } else {
+        categoryList.className = "space-y-2";
+        Object.keys(categories).forEach((category) => {
+            const isSelected = selectedCategories.has(category);
+            const emoji = getCategoryEmoji(category);
+            const categoryItem = document.createElement("div");
+            categoryItem.className = `category-card bg-white rounded-lg p-4 cursor-pointer hover:shadow-md transition-all flex items-center justify-between ${isSelected ? "checkbox-selected" : ""}`;
+            categoryItem.innerHTML = `
                 <div class="flex items-center">
                     <input type="checkbox" class="category-checkbox w-5 h-5 text-blue-600 rounded mr-4" 
                        ${isSelected ? "checked" : ""} 
                        onchange="toggleCategorySelection('${category}', this.checked)"
                        onclick="event.stopPropagation()">
-                    <span class="text-2xl mr-4">📚</span>
+                    <span class="text-2xl mr-4">${emoji}</span>
                     <div>
                         <h3 class="text-lg font-bold">${category} (${categories[category].length})</h3>
                     </div>
                 </div>
-            `
-      categoryItem.onclick = (e) => {
-        if (!e.target.classList.contains("category-checkbox")) {
-          showCategoryDetail(category)
-        }
-      }
-      categoryList.appendChild(categoryItem)
-    })
-  }
+            `;
+            categoryItem.onclick = (e) => {
+                if (!e.target.classList.contains("category-checkbox")) {
+                    showCategoryDetail(category);
+                }
+            };
+            categoryList.appendChild(categoryItem);
+        });
+    }
 
-  updateSelectionToolbar()
+    updateSelectionToolbar();
 }
 
+// 清除所有勾選的分類
+function clearAllSelections() {
+  selectedCategories.clear();
+  saveSelectedCategories();
+  renderCategoryList();
+}
 // 切換分類選取
 function toggleCategorySelection(category, checked) {
   if (checked) {
@@ -281,6 +372,8 @@ function toggleCategorySelection(category, checked) {
   updateSelectionToolbar()
   renderCategoryList()
 }
+
+
 
 // 更新選取工具條
 function updateSelectionToolbar() {
@@ -351,6 +444,7 @@ function showCategoryDetail(category) {
   // 預設顯示學習模式並重置選單文字
   showLearningView()
   updateCurrentMode("學習")
+  window.scrollTo(0, 0);
 }
 
 // 更新當前模式顯示
@@ -2506,6 +2600,9 @@ function setupEventListeners() {
   document.getElementById("closeResult").onclick = () => {
     document.getElementById("resultModal").classList.add("hidden")
   }
+	document.getElementById("deselectAll").addEventListener("click", () => {
+		clearAllSelections();
+	});
 }
 
 // 停止所有計時器
