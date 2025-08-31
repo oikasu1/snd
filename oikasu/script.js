@@ -512,8 +512,6 @@ function playAudio(filename, iconElement = null) {
   // 3. 建立新的 Audio 物件
   currentAudio = new Audio(`https://oikasu1.github.io/kasuexam/snd/oikasu/${filename}`);
 
-
-
   // 4. 如果有傳入圖示元素，就更新它的狀態
   if (iconElement) {
     currentPlayingIcon = iconElement;
@@ -569,57 +567,97 @@ function showCelebration(element) {
 }
 
 
+// 新增此函式
+function updateSelectAllButtonState() {
+    const button = document.getElementById("learningSelectAll");
+    if (!button) return;
+    
+    const icon = button.querySelector(".material-icons");
+    const totalCount = categories[currentCategory]?.length || 0;
+    const selectedCount = selectedSentences.size;
+
+    if (totalCount === 0) { // 處理沒有句子的情況
+        icon.textContent = "check_box_outline_blank";
+        button.title = "全選";
+        button.disabled = true;
+    } else if (selectedCount === 0) {
+        icon.textContent = "check_box_outline_blank";
+        button.title = "全選";
+        button.disabled = false;
+    } else if (selectedCount === totalCount) {
+        icon.textContent = "check_box";
+        button.title = "取消全選";
+        button.disabled = false;
+    } else {
+        icon.textContent = "indeterminate_check_box";
+        button.title = "全選";
+        button.disabled = false;
+    }
+}
+
 // 學習模式
 function showLearningView() {
   const contentArea = document.getElementById("contentArea")
-  const sentences = categories[currentCategory]
 
-  const isWideScreen = window.innerWidth >= 1024
+  // 確保 layout 屬性存在，並處理舊的 compactMode 設定
+  if (userSettings.compactMode) {
+      userSettings.layout = 'compact';
+      delete userSettings.compactMode; // 刪除舊屬性
+      saveUserSettings();
+  } else if (!userSettings.layout) {
+      userSettings.layout = 'double';
+  }
   
   contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
-            <div class="bg-gray-50 rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
-                <div class="flex flex-wrap items-center gap-1">
-                    <button id="learningSelectAll" title="全選" class="px-3 py-1.5 text-sm rounded-md hover:bg-gray-200 transition-colors">全選</button>
-                    <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button id="compactToggle" title="精簡模式" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">unfold_less</span>
-                    </button>
-                    ${
-                      isWideScreen
-                        ? `<button id="layoutToggle" class="p-2 rounded-md hover:bg-gray-200 transition-colors" title="${userSettings.layout === "single" ? "切換為雙欄" : "切換為單欄"}">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">${userSettings.layout === "single" ? "view_column" : "view_agenda"}</span>
-                        </button>`
-                        : ""
-                    }
-                    <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button id="hideHakka" title="客語顯示/隱藏" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                    </button>
-                    <button id="hidePinyin" title="拼音顯示/隱藏" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                    </button>
-                    <button id="hideChinese" title="華語顯示/隱藏" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                    </button>
-                    <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button onclick="adjustFontSize(-1, 'learning')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
-                    </button>
-                    <button onclick="adjustFontSize(1, 'learning')" title="放大字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
-                    </button>
+            <div class="bg-white rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    
+                    <div class="flex items-center gap-1">
+                        <button id="learningSelectAll" title="全選/取消全選" class="p-2 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2">
+                            <span class="material-icons text-gray-600 !text-xl align-middle">check_box</span>
+                        </button>
+                        <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                        <button id="hideHakka" title="客語顯示/隱藏" class="px-3 py-1.5 text-sm rounded-md hover:bg-gray-200 transition-colors flex items-center gap-1.5">
+                            <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
+                            <span>客語</span>
+                        </button>
+                        <button id="hidePinyin" title="拼音顯示/隱藏" class="px-3 py-1.5 text-sm rounded-md hover:bg-gray-200 transition-colors flex items-center gap-1.5">
+                            <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
+                            <span>拼音</span>
+                        </button>
+                        <button id="hideChinese" title="華語顯示/隱藏" class="px-3 py-1.5 text-sm rounded-md hover:bg-gray-200 transition-colors flex items-center gap-1.5">
+                            <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
+                            <span>華語</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-1">
+                        <button id="layoutToggle" class="p-2 rounded-md hover:bg-gray-200 transition-colors" title="切換版面">
+                            <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
+                        </button>
+                        <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                        <button onclick="adjustFontSize(-1, 'learning')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
+                            <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
+                        </button>
+                        <button onclick="adjustFontSize(1, 'learning')" title="放大字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
+                            <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
+                        </button>
+                    </div>
                 </div>
             </div>
             
-            <div id="sentenceContainer" class="${isWideScreen && userSettings.layout === "double" ? "grid grid-cols-1 lg:grid-cols-2" : "grid grid-cols-1"} gap-4"></div>
+            <div id="sentenceContainer"></div>
         </div>
     `
 
   renderSentences()
   setupLearningControls()
-  updateCompactToggleButton()
 }
+
+
+
+
 
 // 精簡按鈕狀態的函數
 function updateCompactToggleButton() {
@@ -634,84 +672,119 @@ function updateCompactToggleButton() {
 }
 
 function renderSentences() {
-  const container = document.getElementById("sentenceContainer")
-  const sentences = categories[currentCategory]
-  container.innerHTML = ""
+  const container = document.getElementById("sentenceContainer");
+  const sentences = categories[currentCategory];
+  
+  // 根據版面模式設定容器的樣式
+  if (userSettings.layout === "double" && window.innerWidth >= 1024) {
+      container.className = "grid grid-cols-1 lg:grid-cols-2 gap-4";
+  } else if (userSettings.layout === "single" || (userSettings.layout === "double" && window.innerWidth < 1024)) {
+      container.className = "grid grid-cols-1 gap-4";
+  } else { // compact layout
+      container.className = "bg-white rounded-xl shadow-sm border";
+  }
+
+  container.innerHTML = ""; // 清除舊內容
 
   sentences.forEach((sentence, index) => {
-    const isSelected = selectedSentences.has(index)
-    const sentenceCard = document.createElement("div")
-    sentenceCard.className = "sentence-card bg-white rounded-xl shadow-sm p-6"
-    const isCompact = userSettings.compactMode || false
+    const isSelected = selectedSentences.has(index);
+    const sentenceItem = document.createElement("div");
 
-    if (isCompact) {
-      sentenceCard.className = "sentence-card bg-white rounded-lg shadow-sm p-3 mb-2"
-      sentenceCard.innerHTML = `
+    if (userSettings.layout === 'compact') {
+        sentenceItem.className = "flex items-center gap-3 p-3 border-b last:border-b-0";
+        // 【修改重點】下方的 <div> 結構移除了 flex-basis，讓文字內容能自然緊靠
+        sentenceItem.innerHTML = `
+            <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded flex-shrink-0" 
+                   ${isSelected ? "checked" : ""} 
+                   onchange="toggleSentenceSelection(${index}, this.checked)">
+            <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-500 hover:text-gray-800 p-1.5 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0">
+                <span class="material-icons text-lg">volume_up</span>
+            </button>
+            <span class="text-sm text-gray-500 font-mono flex-shrink-0">${index + 1}</span>
+            <div class="flex-1 min-w-0 flex items-baseline gap-4">
+                <span class="hakka-text font-bold text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</span>
+                <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</span>
+                <span class="chinese-text text-gray-800 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</span>
+            </div>
+        `;
+    } else { // Card view (single or double)
+        sentenceItem.className = "sentence-card bg-white rounded-xl shadow-sm p-6";
+        sentenceItem.innerHTML = `
+            <div class="flex items-start justify-between mb-4">
                 <div class="flex items-center gap-3">
-                    <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-800 hover:bg-gray-100 p-1 rounded transition-colors flex-shrink-0">
-                        <span class="material-icons text-base">volume_up</span>
+                    <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-800 hover:bg-gray-100 p-1.5 rounded transition-colors">
+                        <span class="material-icons text-lg">volume_up</span>
                     </button>
-                    <span class="text-sm text-gray-500 font-mono flex-shrink-0">${index + 1}</span>
-                    <div class="hakka-text font-bold text-blue-800 flex-1 truncate" 
-                         style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</div>
-                    <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded flex-shrink-0" 
-                           ${isSelected ? "checked" : ""} 
-                           onchange="toggleSentenceSelection(${index}, this.checked)">
+                    <span class="text-sm text-gray-500 font-mono">${index + 1}</span>
                 </div>
-            `
-    } else {
-      sentenceCard.innerHTML = `
-                <div class="flex items-start justify-between mb-4">
-                    <div class="flex items-center gap-3">
-                        <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-800 hover:bg-gray-100 p-1.5 rounded transition-colors">
-                            <span class="material-icons text-lg">volume_up</span>
-                        </button>
-                        <span class="text-sm text-gray-500 font-mono">${index + 1}</span>
-                    </div>
-                    <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
-                           ${isSelected ? "checked" : ""} 
-                           onchange="toggleSentenceSelection(${index}, this.checked)">
-                </div>
-                <div class="space-y-3">
-                    <div class="hakka-text font-bold text-blue-800 line-spacing-tight" 
-                         style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</div>
-                    <div class="pinyin-text text-gray-600 line-spacing-tight" 
-                         style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</div>
-                    <div class="chinese-text text-gray-800 line-spacing-tight" 
-                         style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</div>
-                </div>
-            `
+                <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
+                       ${isSelected ? "checked" : ""} 
+                       onchange="toggleSentenceSelection(${index}, this.checked)">
+            </div>
+            <div class="space-y-3">
+                <div class="hakka-text font-bold text-blue-800 line-spacing-tight" 
+                     style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</div>
+                <div class="pinyin-text text-gray-600 line-spacing-tight" 
+                     style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</div>
+                <div class="chinese-text text-gray-800 line-spacing-tight" 
+                     style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</div>
+            </div>
+        `;
     }
-    container.appendChild(sentenceCard)
-  })
+    container.appendChild(sentenceItem);
+  });
+  
+  // 渲染完畢後，更新「全選」按鈕的狀態
+  updateSelectAllButtonState();
 }
+
 
 function setupLearningControls() {
   const hideStates = { hakka: "show", pinyin: "show", chinese: "show" }
 
   // 全選句子
   document.getElementById("learningSelectAll").onclick = () => {
-    selectedSentences.clear()
-    categories[currentCategory].forEach((_, index) => selectedSentences.add(index))
-    renderSentences()
-  }
-
-  // 精簡模式切換
-  document.getElementById("compactToggle").onclick = () => {
-    userSettings.compactMode = !userSettings.compactMode
-    saveUserSettings()
-    renderSentences()
-    updateCompactToggleButton()
-  }
-
-  // 排版切換
-  const layoutToggle = document.getElementById("layoutToggle")
-  if (layoutToggle) {
-    layoutToggle.onclick = () => {
-      userSettings.layout = userSettings.layout === "single" ? "double" : "single"
-      saveUserSettings()
-      showLearningView()
+    const totalCount = categories[currentCategory].length;
+    const selectedCount = selectedSentences.size;
+    
+    // 如果已選的小於總數（部分選取或零選取），則全選。否則（已全選），則取消全選。
+    if (selectedCount < totalCount) {
+        selectedSentences.clear();
+        categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
+    } else {
+        selectedSentences.clear();
     }
+    renderSentences(); // 重新渲染會自動更新勾選狀態和「全選」按鈕
+  };
+
+  // 排版切換 (三段循環)
+  const layoutToggle = document.getElementById("layoutToggle");
+  if (layoutToggle) {
+    const layouts = ["double", "single", "compact"];
+    const icon = layoutToggle.querySelector(".material-icons");
+    // 根據當前版面，設定下一個版面的圖示與提示文字
+    switch (userSettings.layout) {
+        case "double":
+            icon.textContent = "view_agenda"; // 下一個是 single
+            layoutToggle.title = "切換為單欄";
+            break;
+        case "single":
+            icon.textContent = "view_list"; // 下一個是 compact
+            layoutToggle.title = "切換為精簡列表";
+            break;
+        case "compact":
+            icon.textContent = "view_column"; // 下一個是 double
+            layoutToggle.title = "切換為雙欄";
+            break;
+    }
+
+    layoutToggle.onclick = () => {
+      const currentIndex = layouts.indexOf(userSettings.layout);
+      const nextIndex = (currentIndex + 1) % layouts.length;
+      userSettings.layout = layouts[nextIndex];
+      saveUserSettings();
+      showLearningView(); // 重新渲染整個學習介面
+    };
   }
 
 
@@ -720,50 +793,48 @@ function setupLearningControls() {
     const button = document.getElementById(buttonId);
     if (!button) return;
 
-    const baseClasses = "p-2 rounded-md transition-colors";
-    const iconBaseClasses = "material-icons !text-xl align-middle";
+    const icon = button.querySelector(".material-icons");
     
     button.onclick = () => {
-      const states = ["show", "blur", "hide"]
-      const currentIndex = states.indexOf(hideStates[type])
-      hideStates[type] = states[(currentIndex + 1) % states.length]
+      const states = ["show", "blur", "hide"];
+      const currentIndex = states.indexOf(hideStates[type]);
+      hideStates[type] = states[(currentIndex + 1) % states.length];
 
-      const elements = document.querySelectorAll(`.${textClass}`)
-      const icon = button.querySelector(".material-icons")
-
+      const elements = document.querySelectorAll(`.${textClass}`);
+      
       elements.forEach((el) => {
-        el.classList.remove("blur-text", "hidden-text")
-      })
+        el.classList.remove("blur-text", "hidden-text");
+      });
 
+      // 清除舊的顏色樣式
+      button.classList.remove("bg-yellow-100", "text-yellow-700", "bg-red-100", "text-red-700");
+      
       switch (hideStates[type]) {
         case "show":
-          button.className = `${baseClasses} hover:bg-gray-200`
-          button.title = `${label}顯示`
-          icon.textContent = "visibility"
-          icon.className = `${iconBaseClasses} text-gray-600`
-          break
+          button.title = `${label}顯示`;
+          icon.textContent = "visibility";
+          break;
         case "blur":
-          elements.forEach((el) => el.classList.add("blur-text"))
-          button.className = `${baseClasses} bg-yellow-100 hover:bg-yellow-200`
-          button.title = `${label}模糊`
-          icon.textContent = "blur_on"
-          icon.className = `${iconBaseClasses} text-yellow-700`
-          break
+          elements.forEach((el) => el.classList.add("blur-text"));
+          button.classList.add("bg-yellow-100", "text-yellow-700");
+          button.title = `${label}模糊`;
+          icon.textContent = "blur_on";
+          break;
         case "hide":
-          elements.forEach((el) => el.classList.add("hidden-text"))
-          button.className = `${baseClasses} bg-red-100 hover:bg-red-200`
-          button.title = `${label}隱藏`
-          icon.textContent = "visibility_off"
-          icon.className = `${iconBaseClasses} text-red-700`
-          break
+          elements.forEach((el) => el.classList.add("hidden-text"));
+          button.classList.add("bg-red-100", "text-red-700");
+          button.title = `${label}隱藏`;
+          icon.textContent = "visibility_off";
+          break;
       }
     }
   }
 
-  setupHideButton("hideHakka", "hakka-text", "hakka", "客語")
-  setupHideButton("hidePinyin", "pinyin-text", "pinyin", "拼音")
-  setupHideButton("hideChinese", "chinese-text", "chinese", "華語")
+  setupHideButton("hideHakka", "hakka-text", "hakka", "客語");
+  setupHideButton("hidePinyin", "pinyin-text", "pinyin", "拼音");
+  setupHideButton("hideChinese", "chinese-text", "chinese", "華語");
 }
+
 
 // 切換句子選取
 function toggleSentenceSelection(index, checked) {
@@ -772,12 +843,14 @@ function toggleSentenceSelection(index, checked) {
   } else {
     selectedSentences.delete(index)
   }
+  // 在每次勾選後，更新「全選」按鈕的狀態
+  updateSelectAllButtonState();
 }
 
 // 字體大小調整
 function adjustFontSize(change, mode = "learning") {
   const fontSizes =
-    mode === "flashcard" ? [20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60] : [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40]
+    mode === "flashcard" ? [24, 28, 32, 36, 40, 44, 48, 52, 56, 60] : [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40]
 
   const settingKey = mode === "flashcard" ? "flashcardFontSize" : "fontSize"
   const currentIndex = fontSizes.indexOf(userSettings[settingKey])
@@ -812,7 +885,6 @@ function showFlashcardView() {
     return;
   }
 
-  // 更新閃示卡介面結構
   contentArea.innerHTML = `
     <div class="max-w-5xl mx-auto pt-8">
         <div id="flashcardContainer" class="bg-white rounded-xl shadow-lg p-8 mb-4 relative overflow-hidden">
@@ -826,21 +898,12 @@ function showFlashcardView() {
                             <button id="hideHakkaFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>客語</button>
                             <button id="hidePinyinFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>拼音</button>
                             <button id="hideChineseFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>華語</button>
-                            <div class="border-t my-1"></div>
-                            <div class="flex items-center justify-center px-3 py-1">
-                                <button onclick="event.stopPropagation(); adjustFontSize(-1, 'flashcard')" class="setting-btn flex-1 justify-center" title="縮小字體">
-                                    <span class="material-icons">text_decrease</span>
-                                </button>
-                                <div class="w-px h-5 bg-gray-200 mx-2"></div>
-                                <button onclick="event.stopPropagation(); adjustFontSize(1, 'flashcard')" class="setting-btn flex-1 justify-center" title="放大字體">
-                                    <span class="material-icons">text_increase</span>
-                                </button>
-                            </div>
                         </div>
                     </div>
-                    <button id="autoPlayAudioToggleBtn" class="control-btn !p-2" title="自動播音">
-                        <span class="material-icons">volume_up</span>
-                    </button>
+                     <label for="flashcardAutoPlayAudio" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-200 cursor-pointer" title="自動播音">
+                        <input type="checkbox" id="flashcardAutoPlayAudio" class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-gray-300">
+                        <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
+                    </label>
                 </div>
             </div>
 
@@ -849,6 +912,13 @@ function showFlashcardView() {
             </div>
 
             <div class="absolute top-4 right-4 flex items-center gap-1 z-10">
+                 <button onclick="adjustFontSize(-1, 'flashcard')" class="setting-btn" title="縮小字體">
+                    <span class="material-icons">text_decrease</span>
+                </button>
+                <button onclick="adjustFontSize(1, 'flashcard')" class="setting-btn" title="放大字體">
+                    <span class="material-icons">text_increase</span>
+                </button>
+                <div class="w-px h-4 bg-gray-300 mx-1"></div>
                 <button id="starCard" class="control-btn !p-2" title="設為星號">
                     <span id="starIcon" class="material-icons text-3xl text-gray-400">star_border</span>
                 </button>
@@ -899,10 +969,8 @@ function showFlashcardView() {
         </div>
     </div>
     `;
-
   setupFlashcardView();
 }
-
 
 function updateFlashcard() {
   if (flashcardSentences.length === 0) {
@@ -959,7 +1027,6 @@ function setupFlashcardControls() {
     const hideStates = { "客語": "show", "拼音": "show", "華語": "show" };
     let currentInterval = 3;
 
-    // --- 更新獲取的元素 ---
     const shuffleButton = document.getElementById("shuffleCards");
     const starButton = document.getElementById("starCard");
     const prevButton = document.getElementById("prevCard");
@@ -972,33 +1039,21 @@ function setupFlashcardControls() {
     const filterPopup = document.getElementById("filterCardsPopup");
     const allSettingsButton = document.getElementById("allSettingsBtn");
     const allSettingsPopup = document.getElementById("allSettingsPopup");
-    // 【新增】獲取新的自動播音切換按鈕
-    const autoPlayAudioToggleBtn = document.getElementById("autoPlayAudioToggleBtn");
-
-    // --- 【新增】自動播音圖示按鈕的邏輯 ---
-    function updateAutoPlayAudioBtnUI() {
-        if (!autoPlayAudioToggleBtn) return;
-        const icon = autoPlayAudioToggleBtn.querySelector('.material-icons');
-        if (userSettings.flashcardAutoPlayAudio) {
-            icon.textContent = 'volume_up';
-            autoPlayAudioToggleBtn.classList.add('active');
-            autoPlayAudioToggleBtn.title = '自動播音 (已啟用)';
-        } else {
-            icon.textContent = 'volume_off';
-            autoPlayAudioToggleBtn.classList.remove('active');
-            autoPlayAudioToggleBtn.title = '自動播音 (已停用)';
-        }
-    }
     
-    if (autoPlayAudioToggleBtn) {
-        autoPlayAudioToggleBtn.onclick = () => {
-            userSettings.flashcardAutoPlayAudio = !userSettings.flashcardAutoPlayAudio;
+    // 【修改】獲取新的核取方塊元素
+    const autoPlayAudioCheckbox = document.getElementById("flashcardAutoPlayAudio");
+
+    // 【修改】自動播音核取方塊的邏輯
+    if (autoPlayAudioCheckbox) {
+        // 根據使用者設定初始化核取方塊的狀態
+        autoPlayAudioCheckbox.checked = userSettings.flashcardAutoPlayAudio;
+        // 監聽變更事件
+        autoPlayAudioCheckbox.onchange = () => {
+            userSettings.flashcardAutoPlayAudio = autoPlayAudioCheckbox.checked;
             saveUserSettings();
-            updateAutoPlayAudioBtnUI();
         };
     }
     
-    // --- 彈出式選單通用邏輯 ---
     const popups = [
         { btn: autoPlayButton, menu: autoPlayPopup },
         { btn: filterButton, menu: filterPopup },
@@ -1022,15 +1077,13 @@ function setupFlashcardControls() {
         });
     });
 
-    // --- 篩選功能 ---
     function updateFilterPopup() {
-        if (!filterPopup) return; // Add guard clause
+        if (!filterPopup) return;
         const allSentences = getSelectedSentences();
         const allCount = allSentences.length;
         const starredCount = allSentences.filter(s => starredCards.has(s["ID"] || `${s["分類"]}_${s["華語"]}`)).length;
         const unstarredCount = allCount - starredCount;
         
-        //為每個按鈕添加圖示
         filterPopup.innerHTML = `
             <button data-mode="all" class="practice-mode-btn w-full text-left px-3 py-2 flex justify-between items-center hover:bg-gray-100 ${flashcardPracticeMode === 'all' ? 'active' : ''}">
                 <span class="flex items-center"><span class="material-icons text-base mr-2">apps</span>全部</span> 
@@ -1078,7 +1131,6 @@ function setupFlashcardControls() {
         }
     }
 
-    // --- 自動播放功能 ---
     function stopAutoPlay() {
         if (autoPlayTimer) {
             clearInterval(autoPlayTimer);
@@ -1126,7 +1178,6 @@ function setupFlashcardControls() {
     const defaultIntervalBtn = autoPlayPopup.querySelector(`[data-interval="3"]`);
     if(defaultIntervalBtn) defaultIntervalBtn.classList.add('bg-gray-200');
 
-    // --- 主要按鈕事件綁定 ---
     shuffleButton.onclick = () => {
         isFlashcardShuffled = !isFlashcardShuffled;
         const icon = shuffleButton.querySelector('.material-icons');
@@ -1134,13 +1185,11 @@ function setupFlashcardControls() {
             flashcardSentences.sort(() => Math.random() - 0.5);
             shuffleButton.classList.add('active');
             shuffleButton.title = "恢復依序排序";
-            // 啟用時改變圖示
             icon.textContent = 'shuffle_on';
         } else {
             flashcardSentences = [...originalFlashcardOrder];
             shuffleButton.classList.remove('active');
             shuffleButton.title = "亂數排序";
-            // 停用時恢復圖示
             icon.textContent = 'shuffle';
         }
         currentCardIndex = 0;
@@ -1177,7 +1226,6 @@ function setupFlashcardControls() {
         updateFilterPopup();
     };
 
-    // --- 鍵盤事件 ---
     if (flashcardKeyHandler) { document.removeEventListener('keydown', flashcardKeyHandler); }
     flashcardKeyHandler = (event) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
@@ -1189,7 +1237,6 @@ function setupFlashcardControls() {
     };
     document.addEventListener('keydown', flashcardKeyHandler);
 
-    // --- 顯示/隱藏控制 ---
     const setupHideButton = (buttonId, textId, type) => {
         const button = document.getElementById(buttonId);
         if(!button) return;
@@ -1217,11 +1264,8 @@ function setupFlashcardControls() {
     setupHideButton("hidePinyinFlash", "pinyinText", "拼音");
     setupHideButton("hideChineseFlash", "chineseText", "華語");
     
-    // --- 初始化 ---
-    updateAutoPlayAudioBtnUI(); // 初始化自動播音按鈕狀態
     updateFilterPopup();
 }
-
 
 
 let flashcardPracticeMode = "all"
@@ -1316,6 +1360,7 @@ function getSelectedSentences() {
   return Array.from(selectedSentences).map((index) => allSentences[index])
 }
 
+
 function showMatchingGame() {
   const contentArea = document.getElementById("contentArea");
   const sentences = getSelectedSentences();
@@ -1327,101 +1372,234 @@ function showMatchingGame() {
 
   contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
-            <div class="bg-gray-50 rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
-                <div class="flex flex-wrap items-center gap-2">
-                    <select id="matchingType" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="hakka-chinese">客語 ↔ 華語</option>
-                        <option value="pinyin-chinese">拼音 ↔ 華語</option>
-                        <option value="hakka-pinyin">客語 ↔ 拼音</option>
-                        <option value="audio-hakka">音檔 ↔ 客語</option>
-                        <option value="audio-pinyin">音檔 ↔ 拼音</option>
-                        <option value="audio-chinese">音檔 ↔ 華語</option>
-                    </select>
-                    <select id="matchingPairs" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="2">2組</option>
-                        <option value="3">3組</option>
-                        <option value="4" selected>4組</option>
-                        <option value="5">5組</option>
-                        <option value="6">6組</option>
-                    </select>
-                    <select id="matchingCondition" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="time60">60秒</option>
-                        <option value="time100">100秒</option>
-                        <option value="time180">180秒</option>
-                        <option value="round1">1關</option>
-                        <option value="round2">2關</option>
-                        <option value="round3">3關</option>
-                        <option value="round5">5關</option>
-                        <option value="round8">8關</option>
-                        <option value="unlimited" selected>不限時間</option>
-                    </select>
-                    <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                    <label for="matchingPlaySound" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-200 cursor-pointer" title="配對成功時播放音效">
-                        <input type="checkbox" id="matchingPlaySound" class="w-4 h-4 text-orange-600 rounded focus:ring-orange-500 border-gray-300" checked>
-                        <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
-                    </label>
-                    <div class="flex-grow"></div> <button id="matchingLayoutToggle" class="p-2 rounded-md hover:bg-gray-200 transition-colors" title="切換排版">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">view_column</span>
-                    </button>
-                    <button onclick="adjustFontSize(-1, 'matching')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
-                    </button>
-                    <button onclick="adjustFontSize(1, 'matching')" title="放大字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
-                    </button>
-                </div>
-            </div>
-
             <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
                     <div id="matchingTimerBar" class="timer-bar bg-orange-500 h-full rounded-full" style="width: 100%"></div>
                 </div>
 
-                <div class="flex items-center justify-between flex-wrap gap-4 p-4 md:p-5 border-b border-gray-200">
-                    <div class="flex items-center gap-3">
-                        <button id="startMatching" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base">
+                <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-3 p-4 md:p-5 border-b border-gray-200">
+                    <div class="flex items-center flex-wrap gap-2">
+                        <button id="startMatching" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
                             開始配對
                         </button>
-                        <div id="matchingTimer" class="text-lg font-mono font-bold text-gray-700 w-28">準備開始</div>
+                        
+                        <div id="matchingOptions" class="flex items-center flex-wrap gap-2">
+                             <div class="w-px h-5 bg-gray-300 mx-1 hidden sm:block"></div>
+                             <select id="matchingType" class="bg-gray-100 border-gray-300 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md p-1.5 transition-colors">
+                                <option value="hakka-chinese">客語 ↔ 華語</option>
+                                <option value="pinyin-chinese">拼音 ↔ 華語</option>
+                                <option value="hakka-pinyin">客語 ↔ 拼音</option>
+                                <option value="audio-hakka">音檔 ↔ 客語</option>
+                                <option value="audio-pinyin">音檔 ↔ 拼音</option>
+                                <option value="audio-chinese">音檔 ↔ 華語</option>
+                            </select>
+                            <select id="matchingPairs" class="bg-gray-100 border-gray-300 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md p-1.5 transition-colors">
+                                <option value="2">2組</option>
+                                <option value="3">3組</option>
+                                <option value="4" selected>4組</option>
+                                <option value="5">5組</option>
+                                <option value="6">6組</option>
+                            </select>
+                            <select id="matchingCondition" class="bg-gray-100 border-gray-300 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md p-1.5 transition-colors">
+                                <option value="time60">60秒</option>
+                                <option value="time100">100秒</option>
+                                <option value="time180">180秒</option>
+                                <option value="round1">1關</option>
+                                <option value="round2">2關</option>
+                                <option value="round3">3關</option>
+                                <option value="round5">5關</option>
+                                <option value="round8">8關</option>
+                                <option value="unlimited" selected>無限</option>
+                            </select>
+                            <div id="matchingTimer" class="text-lg font-mono text-gray-700 min-w-[5rem] text-center">00:00</div>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-4 md:gap-6">
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">分數</div>
-                            <div id="matchingScore" class="text-xl font-bold text-orange-600">0</div>
+
+                    <div class="flex items-center gap-x-3 gap-y-2 flex-wrap justify-end">
+                        <div class="flex items-center gap-1">
+                            <label for="matchingPlaySound" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-100 cursor-pointer" title="配對成功時播放音效">
+                                <input type="checkbox" id="matchingPlaySound" class="w-4 h-4 text-orange-600 rounded focus:ring-orange-500 border-gray-300" checked>
+                                <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
+                            </label>
+                            <button id="matchingLayoutToggle" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換排版">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
+                            </button>
+                            <button onclick="adjustFontSize(-1, 'matching')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
+                            </button>
+                            <button onclick="adjustFontSize(1, 'matching')" title="放大字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
+                            </button>
                         </div>
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">步數</div>
-                            <div id="matchingSteps" class="text-xl font-bold text-gray-600">0</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">關卡</div>
-                            <div id="matchingRound" class="text-xl font-bold text-gray-600">1</div>
+                        <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                        <div class="flex items-center gap-4 md:gap-6">
+                            <div class="text-center" title="分數">
+                                <div id="matchingScore" class="text-xl font-bold text-blue-600">0</div>
+                            </div>
+                            <div class="text-center" title="步數">
+                                <div id="matchingSteps" class="text-xl font-bold text-gray-600">0</div>
+                            </div>
+                            <div class="text-center" title="關卡">
+                                <div id="matchingRound" class="text-xl font-bold text-gray-600">1</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-
                 <div id="matchingArea" class="p-4 md:p-8 hidden grid grid-cols-2 gap-4 md:gap-8 min-h-[300px]">
                     <div id="leftColumnContainer" class="grid grid-cols-1 gap-3"></div>
                     <div id="rightColumnContainer" class="grid grid-cols-1 gap-3"></div>
                 </div>
-                
                 <div id="matchingStartNotice" class="text-center py-20 text-gray-500">
-                    <p>請點擊左上角按鈕開始遊戲</p>
+                    <p>請點擊按鈕開始遊戲</p>
                 </div>
             </div>
-            
             <div id="matchingResults" class="hidden mt-6 bg-white rounded-xl shadow-sm p-6">
                 <h3 class="text-xl font-bold mb-4 text-center">配對結果</h3>
                 <div id="matchingResultsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             </div>
         </div>
     `;
-
   setupMatchingGame();
 }
 
+function showQuizGame() {
+  stopAllTimers()
+  updateCurrentMode("測驗")
+
+  const total = selectedSentences.size
+  const sentencesArray = Array.from(selectedSentences).map(
+    (index) => categories[currentCategory][index]
+  )
+  const isRandom = document.getElementById("quizRandom").checked
+  const isPinyin = document.getElementById("quizShowPinyin").checked
+  const maxOptions = 4 // 固定為4個選項
+  const quizMode = document.getElementById("quizModeSelect").value
+  const showHakka = document.getElementById("quizShowHakka").checked
+
+  quizGameState = {
+    originalSentences: sentencesArray,
+    currentQuestions: [],
+    questionIndex: 0,
+    correctCount: 0,
+    totalQuestions: total,
+    mode: quizMode,
+    isPinyin: isPinyin,
+    showHakka: showHakka,
+    timerInterval: null,
+    time: 0,
+  }
+
+  // 根據選擇模式準備題目
+  if (quizGameState.mode === "chooseMeaning") {
+    // 華語找客語
+    quizGameState.currentQuestions = quizGameState.originalSentences.map(
+      (s, index) => ({
+        ...s,
+        index,
+        options: generateQuizOptions(s, sentencesArray, "華語", maxOptions),
+      })
+    )
+  } else {
+    // 客語找華語
+    quizGameState.currentQuestions = quizGameState.originalSentences.map(
+      (s, index) => ({
+        ...s,
+        index,
+        options: generateQuizOptions(s, sentencesArray, "客語", maxOptions),
+      })
+    )
+  }
+
+  if (isRandom) {
+    quizGameState.currentQuestions = shuffleArray(
+      quizGameState.currentQuestions
+    )
+  }
+
+  const contentArea = document.getElementById("contentArea")
+  contentArea.innerHTML = `
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white rounded-lg shadow-sm px-4 py-3 mb-6 border border-gray-200">
+                <div class="flex flex-wrap items-center justify-between gap-3 md:gap-4">
+                    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold">
+                        <span class="material-icons !text-lg text-green-600">check_circle</span>
+                        <div id="quizScore">0 / ${quizGameState.totalQuestions}</div>
+                    </div>
+                    <div class="flex-1 text-center font-semibold text-blue-600">
+                        <span id="quizModeDisplay"></span>
+                    </div>
+                    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold">
+                        <span class="material-icons !text-lg text-blue-600">timer</span>
+                        <div id="quizTimer">00:00</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="quizQuestionContainer"></div>
+        </div>
+    `
+
+  // 渲染第一道題目
+  renderQuizQuestion()
+  // 開始計時
+  startQuizTimer()
+}
+
+function showSortingGame() {
+  stopAllTimers()
+  updateCurrentMode("排序")
+
+  const sentencesArray = shuffleArray(
+    Array.from(selectedSentences).map(
+      (index) => categories[currentCategory][index]
+    )
+  )
+  const isRandom = document.getElementById("sortingRandom").checked
+  const showPinyin = document.getElementById("sortingShowPinyin").checked
+  const showChinese = document.getElementById("sortingShowChinese").checked
+
+  sortingGameState = {
+    originalSentences: sentencesArray,
+    currentQuestionIndex: 0,
+    currentWords: [],
+    correctCount: 0,
+    totalQuestions: sentencesArray.length,
+    isRandom: isRandom,
+    showPinyin: showPinyin,
+    showChinese: showChinese,
+    timerInterval: null,
+    time: 0,
+  }
+
+  const contentArea = document.getElementById("contentArea")
+  contentArea.innerHTML = `
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white rounded-lg shadow-sm px-4 py-3 mb-6 border border-gray-200">
+                <div class="flex flex-wrap items-center justify-between gap-3 md:gap-4">
+                    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold">
+                        <span class="material-icons !text-lg text-green-600">check_circle</span>
+                        <div id="sortingScore">0 / ${sortingGameState.totalQuestions}</div>
+                    </div>
+                    <div class="flex-1 text-center font-semibold text-blue-600">
+                        句子排序
+                    </div>
+                    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold">
+                        <span class="material-icons !text-lg text-blue-600">timer</span>
+                        <div id="sortingTimer">00:00</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sortingQuestionContainer" class="space-y-4"></div>
+        </div>
+    `
+  renderSortingQuestion()
+  startSortingTimer()
+}
 
 function setupMatchingGame() {
+  const isMobile = window.innerWidth < 768;
+  
   matchingGameState = {
     isPlaying: false,
     selectedItems: [],
@@ -1433,38 +1611,34 @@ function setupMatchingGame() {
     timeLeft: 0,
     timerInterval: null,
     gameData: [],
-    // 將排版邏輯改為控制每邊的欄數，並預設為 2
-    columnsPerSide: userSettings.matchingColumns || 2,
+    // 【修改】根據螢幕寬度設定預設欄數，手機版為1，電腦版為2
+    columnsPerSide: isMobile ? 1 : (userSettings.matchingColumns || 2),
   }
 
-  // 根據新的排版邏輯，初始化按鈕圖示
   const layoutToggleButton = document.getElementById("matchingLayoutToggle");
   if (layoutToggleButton) {
+      // 【修改】統一圖示邏輯
       const icon = layoutToggleButton.querySelector(".material-icons");
-      icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'window';
+      icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'view_agenda';
   }
 
-  // 移除對 startMatchingCenter 的事件綁定，因為該按鈕已不存在
   document.getElementById("startMatching").onclick = startMatchingGame;
   
-  // 更新排版切換按鈕的邏輯
   layoutToggleButton.onclick = () => {
-      // 在 1 和 2 之間切換
       matchingGameState.columnsPerSide = matchingGameState.columnsPerSide === 1 ? 2 : 1;
       
       const icon = layoutToggleButton.querySelector(".material-icons");
-      icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'window';
+      // 【修改】統一圖示邏輯
+      icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'view_agenda';
 
       userSettings.matchingColumns = matchingGameState.columnsPerSide;
       saveUserSettings();
       
-      // 如果遊戲正在進行，則立即重新渲染以應用新版面
       if (matchingGameState.isPlaying) {
           renderMatchingItems(); 
       }
   }
 
-  // 設定變更時重新生成遊戲
   ;["matchingType", "matchingPairs", "matchingCondition"].forEach((id) => {
     document.getElementById(id).onchange = () => {
       if (!matchingGameState.isPlaying) {
@@ -1474,6 +1648,13 @@ function setupMatchingGame() {
   });
 
   generateMatchingData();
+}
+
+function stopMatchingGame() {
+    if (matchingGameState.timerInterval) {
+        clearInterval(matchingGameState.timerInterval);
+    }
+    endMatchingGame("遊戲已中止");
 }
 
 function generateMatchingData() {
@@ -1693,8 +1874,8 @@ function checkMatch() {
 function startMatchingGame() {
   const condition = document.getElementById("matchingCondition").value
   const button = document.getElementById("startMatching")
+  const optionsContainer = document.getElementById("matchingOptions");
 
-  // 開始前先清除可能存在的舊計時器
   if (matchingGameState.timerInterval) {
     clearInterval(matchingGameState.timerInterval)
   }
@@ -1705,33 +1886,37 @@ function startMatchingGame() {
   matchingGameState.steps = 0
   matchingGameState.matchedPairs = []
 
-  // 將「重新開始」按鈕改為圖示，並調整樣式
-  button.innerHTML = `<span class="material-icons">replay</span>`;
-  button.title = "重新開始";
-  button.className = "bg-orange-500 hover:bg-orange-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-  button.onclick = restartMatchingGame
+  button.innerHTML = `<span class="material-icons">close</span>`;
+  button.title = "停止遊戲";
+  button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
+  button.onclick = stopMatchingGame;
+
+  // 【修改】只禁用 select 元素
+  optionsContainer.querySelectorAll('select').forEach(el => {
+      el.classList.add('opacity-50', 'pointer-events-none');
+      el.disabled = true;
+  });
+  if (window.innerWidth < 768) {
+      optionsContainer.classList.add('hidden');
+  }
+
 
   document.getElementById("matchingScore").textContent = "0"
   document.getElementById("matchingSteps").textContent = "0"
   document.getElementById("matchingRound").textContent = "1"
   document.getElementById("matchingResults").classList.add("hidden")
   
-  // 顯示遊戲區域，隱藏提示文字
   document.getElementById("matchingArea").classList.remove("hidden");
   document.getElementById("matchingStartNotice").classList.add("hidden");
 
-
-  // --- 修改後的計時器設定 ---
   if (condition.startsWith("time")) {
     const timeLimit = Number.parseInt(condition.replace("time", ""))
     matchingGameState.timeLeft = timeLimit
     startMatchingTimer()
   } else if (condition.startsWith("round") || condition === "unlimited") {
-    // 對於「n關計時」和「不限時間」模式，都啟用一個累加計時器
     const timerElement = document.getElementById("matchingTimer");
     matchingGameState.startTime = Date.now();
     
-    // 立即顯示 00:00
     timerElement.textContent = "00:00";
 
     matchingGameState.timerInterval = setInterval(() => {
@@ -1760,7 +1945,9 @@ function startMatchingTimer() {
 
   matchingGameState.timerInterval = setInterval(() => {
     matchingGameState.timeLeft--
-    timerElement.textContent = ` ${matchingGameState.timeLeft}`
+    const minutes = Math.floor(matchingGameState.timeLeft / 60).toString().padStart(2, '0');
+    const seconds = (matchingGameState.timeLeft % 60).toString().padStart(2, '0');
+    timerElement.textContent = `${minutes}:${seconds}`;
 
     const percentage = (matchingGameState.timeLeft / timeLimit) * 100
     timerBar.style.width = percentage + "%"
@@ -1768,6 +1955,50 @@ function startMatchingTimer() {
     if (matchingGameState.timeLeft <= 0) {
       clearInterval(matchingGameState.timerInterval)
       endMatchingGame("時間到！")
+    }
+  }, 1000)
+}
+
+function startQuizTimer() {
+  const timerElement = document.getElementById("quizTimer")
+  const timerBar = document.getElementById("quizTimerBar")
+  const condition = document.getElementById("quizCondition").value
+  const timeLimit = Number.parseInt(condition.replace("time", ""))
+
+  quizGameState.timerInterval = setInterval(() => {
+    quizGameState.timeLeft--
+    const minutes = Math.floor(quizGameState.timeLeft / 60).toString().padStart(2, '0');
+    const seconds = (quizGameState.timeLeft % 60).toString().padStart(2, '0');
+    timerElement.textContent = `${minutes}:${seconds}`;
+
+    const percentage = (quizGameState.timeLeft / timeLimit) * 100
+    timerBar.style.width = percentage + "%"
+
+    if (quizGameState.timeLeft <= 0) {
+      clearInterval(quizGameState.timerInterval)
+      endQuizGame("時間到！")
+    }
+  }, 1000)
+}
+
+function startSortingTimer() {
+  const timerElement = document.getElementById("sortingTimer")
+  const timerBar = document.getElementById("sortingTimerBar")
+  const condition = document.getElementById("sortingCondition").value
+  const timeLimit = Number.parseInt(condition.replace("time", ""))
+
+  sortingGameState.timerInterval = setInterval(() => {
+    sortingGameState.timeLeft--
+    const minutes = Math.floor(sortingGameState.timeLeft / 60).toString().padStart(2, '0');
+    const seconds = (sortingGameState.timeLeft % 60).toString().padStart(2, '0');
+    timerElement.textContent = `${minutes}:${seconds}`;
+
+    const percentage = (sortingGameState.timeLeft / timeLimit) * 100
+    timerBar.style.width = percentage + "%"
+
+    if (sortingGameState.timeLeft <= 0) {
+      clearInterval(sortingGameState.timerInterval)
+      endSortingGame("時間到！")
     }
   }, 1000)
 }
@@ -1814,32 +2045,39 @@ function checkRoundComplete() {
 
 function endMatchingGame(message, finalTime = null) {
   matchingGameState.isPlaying = false;
+  const button = document.getElementById("startMatching");
+  const optionsContainer = document.getElementById("matchingOptions");
 
   if (matchingGameState.timerInterval) {
     clearInterval(matchingGameState.timerInterval);
   }
   
-  // 【新增】遊戲結束後，將重玩圖示按鈕恢復為文字按鈕
-  const button = document.getElementById("startMatching");
   if (button) {
     button.innerHTML = "重新開始";
-    button.title = "";
+    button.title = "重新開始";
     button.className = "bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base";
+    button.onclick = restartMatchingGame; 
   }
 
-  // 【新增】在 n 關模式下，更新最終時間顯示
+  // 【修改】只啟用 select 元素
+  optionsContainer.querySelectorAll('select').forEach(el => {
+      el.classList.remove('opacity-50', 'pointer-events-none');
+      el.disabled = false;
+  });
+  if (window.innerWidth < 768) {
+      optionsContainer.classList.remove('hidden');
+  }
+
   const timerElement = document.getElementById("matchingTimer");
   if (timerElement && finalTime !== null) {
     timerElement.textContent = ` ${finalTime}`;
   }
   
-  // 【新增】將進度條填滿
   const timerBar = document.getElementById("matchingTimerBar");
   if (timerBar) {
     timerBar.style.width = "100%";
   }
 
-  // 顯示結果
   showMatchingResults();
   showResult(
     "🎉",
@@ -1882,77 +2120,79 @@ function showQuizGame() {
 
   contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
-            <div class="bg-gray-50 rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
-                <div class="flex flex-wrap items-center gap-2">
-                    <select id="quizType" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="hakka-chinese">客語 → 華語</option>
-                        <option value="chinese-hakka">華語 → 客語</option>
-                        <option value="pinyin-chinese">拼音 → 華語</option>
-                        <option value="chinese-pinyin">華語 → 拼音</option>
-                        <option value="hakka-pinyin">客語 → 拼音</option>
-                        <option value="pinyin-hakka">拼音 → 客語</option>
-                    </select>
-                    <select id="quizOptions" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="2">2個選項</option>
-                        <option value="3">3個選項</option>
-                        <option value="4" selected>4個選項</option>
-                        <option value="5">5個選項</option>
-                        <option value="6">6個選項</option>
-                    </select>
-                    <select id="quizCondition" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="time60">60秒</option>
-                        <option value="time100">100秒</option>
-                        <option value="time180">180秒</option>
-                        <option value="unlimited" selected>不限時間</option>
-                        <option value="correct10">答對10題</option>
-                        <option value="correct20">答對20題</option>
-                        <option value="correct30">答對30題</option>
-                        <option value="correct100">答對100題</option>
-                    </select>
-                    <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                    <label for="autoPlayAudio" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-200 cursor-pointer" title="自動播放題目音效">
-                        <input type="checkbox" id="autoPlayAudio" class="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-gray-300">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
-                    </label>
-                    <button id="blurQuizText" class="p-2 rounded-md hover:bg-gray-200 transition-colors" title="模糊題目文字">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">blur_on</span>
-                    </button>
-                    <div class="flex-grow"></div> <button id="quizLayoutToggle" class="p-2 rounded-md hover:bg-gray-200 transition-colors" title="切換排版">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">view_column</span>
-                    </button>
-                    <button onclick="adjustFontSize(-1, 'quiz')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
-                    </button>
-                    <button onclick="adjustFontSize(1, 'quiz')" title="放大字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
-                    </button>
-                </div>
-            </div>
-            
             <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
                     <div id="quizTimerBar" class="timer-bar bg-red-500 h-full rounded-full" style="width: 100%"></div>
                 </div>
                 
-                <div class="flex items-center justify-between flex-wrap gap-4 p-4 md:p-5 border-b border-gray-200">
-                     <div class="flex items-center gap-3">
-                        <button id="startQuiz" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base">
+                <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-3 p-4 md:p-5 border-b border-gray-200">
+                     <div class="flex items-center flex-wrap gap-2">
+                        <button id="startQuiz" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
                             開始測驗
                         </button>
-                        <div id="quizTimer" class="text-lg font-mono font-bold text-gray-700 w-28">準備開始</div>
+                        
+
+                        <div id="quizOptionsContainer" class="flex items-center flex-wrap gap-2">
+                            
+                            <select id="quizType" class="bg-gray-100 border-gray-300 focus:ring-red-500 focus:border-red-500 text-sm rounded-md p-1.5 transition-colors">
+                                <option value="hakka-chinese">客語 → 華語</option>
+                                <option value="chinese-hakka">華語 → 客語</option>
+                                <option value="pinyin-chinese">拼音 → 華語</option>
+                                <option value="chinese-pinyin">華語 → 拼音</option>
+                                <option value="hakka-pinyin">客語 → 拼音</option>
+                                <option value="pinyin-hakka">拼音 → 客語</option>
+                            </select>
+                            <select id="quizOptions" class="bg-gray-100 border-gray-300 focus:ring-red-500 focus:border-red-500 text-sm rounded-md p-1.5 transition-colors">
+                                <option value="2">2項</option>
+                                <option value="3">3項</option>
+                                <option value="4" selected>4項</option>
+                                <option value="5">5項</option>
+                                <option value="6">6項</option>
+                                <option value="7">7項</option>
+                                <option value="8">8項</option>
+                            </select>
+                            <select id="quizCondition" class="bg-gray-100 border-gray-300 focus:ring-red-500 focus:border-red-500 text-sm rounded-md p-1.5 transition-colors">
+                                <option value="time60">60秒</option>
+                                <option value="time100">100秒</option>
+                                <option value="time180">180秒</option>
+                                <option value="unlimited" selected>無限</option>
+                                <option value="correct5">5題</option>
+                                <option value="correct10">10題</option>
+                                <option value="correct15">15題</option>
+                                <option value="correct20">20題</option>
+                                <option value="correct30">30題</option>
+                            </select>
+                        </div>
+						<div id="quizTimer" class="text-lg font-mono font-bold text-gray-700 min-w-[5rem]"></div>
                     </div>
-                    <div class="flex items-center gap-4 md:gap-6">
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">正確</div>
-                            <div id="quizCorrect" class="text-xl font-bold text-green-600">0</div>
+
+                    <div class="flex items-center gap-x-3 gap-y-2 flex-wrap justify-end">
+                        <div class="flex items-center gap-1">
+                            <label for="autoPlayAudio" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-100 cursor-pointer" title="自動播放題目音效">
+                                <input type="checkbox" id="autoPlayAudio" class="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-gray-300">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
+                            </label>
+                            <button id="blurQuizText" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="模糊題目文字">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">blur_on</span>
+                            </button>
+                            <button id="quizLayoutToggle" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換排版">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
+                            </button>
+                            <button onclick="adjustFontSize(-1, 'quiz')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
+                            </button>
+                            <button onclick="adjustFontSize(1, 'quiz')" title="放大字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
+                            </button>
                         </div>
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">錯誤</div>
-                            <div id="quizIncorrect" class="text-xl font-bold text-red-600">0</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">題數</div>
-                            <div id="quizTotal" class="text-xl font-bold text-gray-600">0</div>
+                        <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                        <div class="flex items-center gap-4 md:gap-6">
+                            <div class="text-center" title="正確">
+                                <div id="quizCorrect" class="text-xl font-bold text-green-600">0</div>
+                            </div>
+                            <div class="text-center" title="錯誤">
+                                <div id="quizIncorrect" class="text-xl font-bold text-red-600">0</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1960,19 +2200,17 @@ function showQuizGame() {
                 <div id="quizArea" class="p-4 md:p-8 hidden min-h-[300px]"></div>
 
                 <div id="quizStartNotice" class="text-center py-20 text-gray-500">
-                    <p>請點擊左上角按鈕開始遊戲</p>
+                    <p>請點擊按鈕開始遊戲</p>
                 </div>
             </div>
         </div>
     `;
-
   setupQuizGame();
 }
 
-
 function setupQuizGame() {
-  // 從 userSettings 初始化 quizLayout
-  quizLayout = userSettings.quizLayout || 'horizontal';
+  const isMobile = window.innerWidth < 768;
+  quizLayout = userSettings.quizLayout || (isMobile ? 'vertical' : 'horizontal');
 
   quizGameState = {
     isPlaying: false,
@@ -1989,38 +2227,32 @@ function setupQuizGame() {
     isAnswered: false,
   }
 
-  // 移除對 startQuizCenter 的事件綁定
   document.getElementById("startQuiz").onclick = startQuizGame;
 
-  // --- 修改排版切換邏輯 ---
   const layoutToggleButton = document.getElementById("quizLayoutToggle");
   const layoutIcon = layoutToggleButton.querySelector('.material-icons');
   
-  // 根據儲存的設定，初始化圖示
-  layoutIcon.textContent = quizLayout === 'horizontal' ? 'view_column' : 'view_agenda';
+  layoutIcon.textContent = quizLayout === 'vertical' ? 'view_column' : 'view_agenda';
 
   layoutToggleButton.onclick = () => {
     quizLayout = quizLayout === "horizontal" ? "vertical" : "horizontal";
     
-    // 更新圖示
-    layoutIcon.textContent = quizLayout === 'horizontal' ? 'view_column' : 'view_agenda';
+    layoutIcon.textContent = quizLayout === 'vertical' ? 'view_column' : 'view_agenda';
 
-    // 儲存設定
     userSettings.quizLayout = quizLayout;
     saveUserSettings();
 
-    // 如果遊戲正在進行，則立即重新渲染題目以應用新排版
     if (quizGameState.isPlaying) {
       renderQuizQuestion();
     }
   }
 
-  // 模糊題目
   let isBlurred = false
   const blurButton = document.getElementById("blurQuizText")
   blurButton.onclick = () => {
     isBlurred = !isBlurred
-    const questionElement = document.getElementById("quizQuestion")
+    // 【修改】只選取題目文字的 span
+    const questionElement = document.querySelector("#quizArea .question-text")
     
     if (questionElement) {
       if (isBlurred) {
@@ -2034,10 +2266,12 @@ function setupQuizGame() {
   }
 }
 
+
 function startQuizGame() {
   const sentences = getSelectedSentences()
   const condition = document.getElementById("quizCondition").value
   const button = document.getElementById("startQuiz")
+  const optionsContainer = document.getElementById("quizOptionsContainer");
 
   quizGameState.isPlaying = true
   quizGameState.correct = 0
@@ -2046,32 +2280,56 @@ function startQuizGame() {
   quizGameState.currentIndex = 0
   quizGameState.questions = [...sentences].sort(() => Math.random() - 0.5)
 
-  // 將「重新開始」按鈕改為圖示，並調整樣式
-  button.innerHTML = `<span class="material-icons">replay</span>`;
-  button.title = "重新開始";
-  button.className = "bg-red-500 hover:bg-red-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-  button.onclick = restartQuizGame
+  button.innerHTML = `<span class="material-icons">close</span>`;
+  button.title = "停止遊戲";
+  button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
+  button.onclick = stopQuizGame;
+
+  optionsContainer.querySelectorAll('select').forEach(el => {
+      el.classList.add('opacity-50', 'pointer-events-none');
+      el.disabled = true;
+  });
+  if (window.innerWidth < 768) {
+      optionsContainer.classList.add('hidden');
+  }
 
   document.getElementById("quizCorrect").textContent = "0"
   document.getElementById("quizIncorrect").textContent = "0"
-  document.getElementById("quizTotal").textContent = "0"
+  // 【移除】下面這一行程式碼
+  // document.getElementById("quizTotal").textContent = "0" 
 
-  // 顯示遊戲區域，隱藏提示文字
   document.getElementById("quizArea").classList.remove("hidden");
   document.getElementById("quizStartNotice").classList.add("hidden");
 
-  // 設定計時器
   if (condition.startsWith("time")) {
     const timeLimit = Number.parseInt(condition.replace("time", ""))
     quizGameState.timeLeft = timeLimit
     startQuizTimer()
   } else {
-    document.getElementById("quizTimer").textContent = "不限時間"
+    const timerElement = document.getElementById("quizTimer");
+    quizGameState.startTime = Date.now();
+    
+    timerElement.textContent = "00:00";
+
+    quizGameState.timerInterval = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - quizGameState.startTime) / 1000);
+        const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+        const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+        timerElement.textContent = `${minutes}:${seconds}`;
+    }, 1000);
   }
 
   generateQuizQuestion()
 }
 
+
+
+function stopQuizGame() {
+    if (quizGameState.timerInterval) {
+        clearInterval(quizGameState.timerInterval);
+    }
+    endQuizGame("遊戲已中止");
+}
 
 function restartQuizGame() {
   if (quizGameState.timerInterval) {
@@ -2180,6 +2438,7 @@ function generateQuizQuestion() {
 function renderQuizQuestion() {
   const quizArea = document.getElementById("quizArea")
   const isVertical = quizLayout === "vertical"
+  const questionNumber = quizGameState.currentIndex + 1;
 
   quizArea.innerHTML = `
         <div class="text-center mb-8">
@@ -2189,7 +2448,7 @@ function renderQuizQuestion() {
                     <span class="material-icons">volume_up</span>
                 </button>
                 <div id="quizQuestion" class="text-2xl font-bold text-red-800" style="font-size: ${userSettings.fontSize + 4}px">
-                    ${quizGameState.currentQuestion}
+                    <span class="question-number">${questionNumber}. </span><span class="question-text">${quizGameState.currentQuestion}</span>
                 </div>
             </div>
         </div>
@@ -2209,17 +2468,16 @@ function renderQuizQuestion() {
         </div>
     `
 }
-
 function selectQuizOption(selectedAnswer, element) {
   if (quizGameState.isAnswered) return
 
   quizGameState.isAnswered = true
   quizGameState.total++
-  document.getElementById("quizTotal").textContent = quizGameState.total
+  // 【移除】下面這一行程式碼
+  // document.getElementById("quizTotal").textContent = quizGameState.total
 
   const isCorrect = selectedAnswer === quizGameState.correctAnswer
 
-  // 標記所有選項為已回答
   document.querySelectorAll(".quiz-option").forEach((option) => {
     option.classList.add("quiz-answered")
     option.textContent = option.textContent.trim()
@@ -2242,7 +2500,6 @@ function selectQuizOption(selectedAnswer, element) {
     document.getElementById("quizIncorrect").textContent = quizGameState.incorrect
   }
 
-  // 檢查過關條件
   const condition = document.getElementById("quizCondition").value
   if (condition.startsWith("correct")) {
     const target = Number.parseInt(condition.replace("correct", ""))
@@ -2252,27 +2509,35 @@ function selectQuizOption(selectedAnswer, element) {
     }
   }
 
-  // 下一題
   setTimeout(() => {
     quizGameState.currentIndex++
     generateQuizQuestion()
   }, 1500)
 }
 
-
 function endQuizGame(message) {
   quizGameState.isPlaying = false;
+  const button = document.getElementById("startQuiz");
+  const optionsContainer = document.getElementById("quizOptionsContainer");
 
   if (quizGameState.timerInterval) {
     clearInterval(quizGameState.timerInterval);
   }
   
-  // 【新增】遊戲結束後，將重玩圖示按鈕恢復為文字按鈕
-  const button = document.getElementById("startQuiz");
   if (button) {
     button.innerHTML = "重新開始";
-    button.title = "";
+    button.title = "重新開始";
     button.className = "bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
+    button.onclick = restartQuizGame;
+  }
+
+  // 【修改】只啟用 select 元素
+  optionsContainer.querySelectorAll('select').forEach(el => {
+      el.classList.remove('opacity-50', 'pointer-events-none');
+      el.disabled = false;
+  });
+  if (window.innerWidth < 768) {
+      optionsContainer.classList.remove('hidden');
   }
 
   const accuracy = quizGameState.total > 0 ? Math.round((quizGameState.correct / quizGameState.total) * 100) : 0;
@@ -2330,75 +2595,78 @@ function showSortingGame() {
 
   contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
-             <div class="bg-gray-50 rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
-                <div class="flex flex-wrap items-center gap-2">
-                    <select id="sortingType" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="hakka-pinyin">客語 ↔ 拼音</option>
-                        <option value="chinese-pinyin">華語 ↔ 拼音</option>
-                        <option value="pinyin-hakka">拼音 ↔ 客語</option>
-                        <option value="chinese-hakka">華語 ↔ 客語</option>
-                    </select>
-                    <select id="sortingCondition" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="time60">60秒</option>
-                        <option value="time100">100秒</option>
-                        <option value="time180">180秒</option>
-                        <option value="unlimited" selected>不限時間</option>
-                        <option value="correct5">答對5題</option>
-                        <option value="correct10">答對10題</option>
-                        <option value="correct15">答對15題</option>
-                        <option value="correct20">答對20題</option>
-                    </select>
-                    <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                    <label for="sortingPlaySound" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-200 cursor-pointer" title="自動播放題目音效">
-                        <input type="checkbox" id="sortingPlaySound" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300" checked>
-                        <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
-                    </label>
-                    <div class="flex-grow"></div> <button onclick="adjustFontSize(-1, 'sorting')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
-                    </button>
-                    <button onclick="adjustFontSize(1, 'sorting')" title="放大字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
-                    </button>
-                </div>
-            </div>
-            
             <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
                      <div id="sortingTimerBar" class="timer-bar bg-indigo-500 h-full rounded-full" style="width: 100%"></div>
                 </div>
 
-                <div class="flex items-center justify-between flex-wrap gap-4 p-4 md:p-5 border-b border-gray-200">
-                    <div class="flex items-center gap-3">
-                        <button id="startSorting" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base">
+                <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-3 p-4 md:p-5 border-b border-gray-200">
+                    <div class="flex items-center flex-wrap gap-2">
+                        <button id="startSorting" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
                             開始排序
                         </button>
-                        <div id="sortingTimer" class="text-lg font-mono font-bold text-gray-700 w-28">準備開始</div>
+                        
+                        
+                        <div id="sortingOptions" class="flex items-center flex-wrap gap-2">
+       
+                            <select id="sortingType" class="bg-gray-100 border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm rounded-md p-1.5 transition-colors">
+                                <option value="hakka-pinyin">客語 ↔ 拼音</option>
+                                <option value="chinese-pinyin">華語 ↔ 拼音</option>
+                                <option value="pinyin-hakka">拼音 ↔ 客語</option>
+                                <option value="chinese-hakka">華語 ↔ 客語</option>
+                            </select>
+                            <select id="sortingCondition" class="bg-gray-100 border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm rounded-md p-1.5 transition-colors">
+                                <option value="time60">60秒</option>
+                                <option value="time100">100秒</option>
+                                <option value="time180">180秒</option>
+                                <option value="unlimited" selected>無限</option>
+                                <option value="correct5">5題</option>
+                                <option value="correct10">10題</option>
+                                <option value="correct15">15題</option>
+                                <option value="correct20">20題</option>
+                                <option value="correct30">30題</option>
+                            </select>
+                        </div>
+                        <div id="sortingTimer" class="text-lg font-mono font-bold text-gray-700 min-w-[5rem]"></div>
                     </div>
-                    <div class="flex items-center gap-4 md:gap-6">
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">分數</div>
-                            <div id="sortingScore" class="text-xl font-bold text-indigo-600">0</div>
+
+                    <div class="flex items-center gap-x-3 gap-y-2 flex-wrap justify-end">
+                        <div class="flex items-center gap-1">
+                            <label for="sortingPlaySound" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-100 cursor-pointer" title="自動播放題目音效">
+                                <input type="checkbox" id="sortingPlaySound" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300" checked>
+                                <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
+                            </label>
+                            <button id="blurSortingText" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="模糊題目文字">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">blur_on</span>
+                            </button>
+                            <button onclick="adjustFontSize(-1, 'sorting')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
+                            </button>
+                            <button onclick="adjustFontSize(1, 'sorting')" title="放大字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
+                            </button>
                         </div>
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">正確</div>
-                            <div id="sortingCorrect" class="text-xl font-bold text-green-600">0</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm text-gray-500">錯誤</div>
-                            <div id="sortingIncorrect" class="text-xl font-bold text-red-600">0</div>
+                        <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                        <div class="flex items-center gap-4 md:gap-6">
+                            <div class="text-center" title="分數">
+                                <div id="sortingScore" class="text-xl font-bold text-indigo-600">0</div>
+                            </div>
+                            <div class="text-center" title="正確">
+                                <div id="sortingCorrect" class="text-xl font-bold text-green-600">0</div>
+                            </div>
+                            <div class="text-center" title="錯誤">
+                                <div id="sortingIncorrect" class="text-xl font-bold text-red-600">0</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-
                 <div id="sortingArea" class="p-4 md:p-8 hidden min-h-[300px]"></div>
-
                 <div id="sortingStartNotice" class="text-center py-20 text-gray-500">
-                    <p>請點擊左上角按鈕開始遊戲</p>
+                    <p>請點擊按鈕開始遊戲</p>
                 </div>
             </div>
         </div>
     `;
-
   setupSortingGame();
 }
 
@@ -2419,52 +2687,96 @@ function setupSortingGame() {
     sentences: [],
     usedSentences: [],
     availableSentences: [],
+    total: 0 
   }
-
-  // 確保只為存在的「開始排序」按鈕綁定事件
-  document.getElementById("startSorting").onclick = startSortingGame;
   
-  // 舊的 startSortingCenter 按鈕及其綁定邏輯已被完全移除，修正錯誤
+  document.getElementById("startSorting").onclick = startSortingGame;
+
+  // 【新增】模糊題目按鈕的邏輯
+  let isBlurred = false;
+  const blurButton = document.getElementById("blurSortingText");
+  blurButton.onclick = () => {
+    isBlurred = !isBlurred;
+    const questionElement = document.querySelector("#sortingArea .question-text");
+    
+    if (questionElement) {
+      if (isBlurred) {
+        questionElement.classList.add("blur-text");
+        blurButton.classList.add("bg-blue-100", "text-blue-700");
+      } else {
+        questionElement.classList.remove("blur-text");
+        blurButton.classList.remove("bg-blue-100", "text-blue-700");
+      }
+    }
+  };
+}
+
+
+function stopSortingGame() {
+    if (sortingGameState.timerInterval) {
+        clearInterval(sortingGameState.timerInterval);
+    }
+    endSortingGame("遊戲已中止");
 }
 
 function startSortingGame() {
   const sentences = getSelectedSentences()
   const condition = document.getElementById("sortingCondition").value
   const button = document.getElementById("startSorting")
+  const optionsContainer = document.getElementById("sortingOptions");
 
   sortingGameState.isPlaying = true
   sortingGameState.correct = 0
   sortingGameState.incorrect = 0
   sortingGameState.score = 0
+  sortingGameState.total = 0; // 【修改】重設題號
   sortingGameState.sentences = sentences
   sortingGameState.usedSentences = []
   sortingGameState.availableSentences = [...sentences].sort(() => Math.random() - 0.5)
 
-  // 將「重新開始」按鈕改為圖示，並調整樣式
-  button.innerHTML = `<span class="material-icons">replay</span>`;
-  button.title = "重新開始";
-  button.className = "bg-indigo-500 hover:bg-indigo-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-  button.onclick = restartSortingGame
+  button.innerHTML = `<span class="material-icons">close</span>`;
+  button.title = "停止遊戲";
+  button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
+  button.onclick = stopSortingGame
+
+  optionsContainer.querySelectorAll('select').forEach(el => {
+      el.classList.add('opacity-50', 'pointer-events-none');
+      el.disabled = true;
+  });
+  if (window.innerWidth < 768) {
+      optionsContainer.classList.add('hidden');
+  }
 
   document.getElementById("sortingScore").textContent = "0"
   document.getElementById("sortingCorrect").textContent = "0"
   document.getElementById("sortingIncorrect").textContent = "0"
   
-  // 顯示遊戲區域，隱藏提示文字
   document.getElementById("sortingArea").classList.remove("hidden");
   document.getElementById("sortingStartNotice").classList.add("hidden");
 
-  // 設定計時器
+  // 【修改】設定計時器
   if (condition.startsWith("time")) {
     const timeLimit = Number.parseInt(condition.replace("time", ""))
     sortingGameState.timeLeft = timeLimit
     startSortingTimer()
   } else {
-    document.getElementById("sortingTimer").textContent = "不限時間"
+    // 對於「n關計時」和「不限時間」模式，都啟用一個累加計時器
+    const timerElement = document.getElementById("sortingTimer");
+    sortingGameState.startTime = Date.now();
+    
+    timerElement.textContent = "00:00";
+
+    sortingGameState.timerInterval = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - sortingGameState.startTime) / 1000);
+        const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+        const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+        timerElement.textContent = `${minutes}:${seconds}`;
+    }, 1000);
   }
 
   generateSortingQuestion()
 }
+
 
 function restartSortingGame() {
   if (sortingGameState.timerInterval) {
@@ -2500,13 +2812,15 @@ function generateSortingQuestion() {
     sortingGameState.usedSentences = []
   }
 
+  sortingGameState.total++; // 【新增】累加題號
+
   // 取出下一個題目
   const sentence = sortingGameState.availableSentences.shift()
   sortingGameState.usedSentences.push(sentence)
   const type = document.getElementById("sortingType").value
 
   let questionText, answerText
-  let isPinyinAnswer = false; // 用於判斷答案是否為拼音
+  let isPinyinAnswer = false; 
 
   switch (type) {
     case "hakka-pinyin":
@@ -2529,34 +2843,26 @@ function generateSortingQuestion() {
       break
   }
 
-  // --- 修改後的分割邏輯 ---
   let words
   
   if (isPinyinAnswer) {
-    // 處理拼音的分割邏輯
-    // 1. 優先嘗試用一個或多個空格來分割
     let tempWords = answerText.split(/\s+/).filter((w) => w.trim() !== "")
 
-    // 2. 如果按空格分割後只有一個元素，且該元素包含連字號 (-)
     if (tempWords.length === 1 && tempWords[0].includes('-')) {
         let hyphenSplitWords = tempWords[0].split(/-+/).filter((w) => w.trim() !== "");
         
-        // 3. 只有當按連字號分割後，產生了多個元素，才採用此分割結果
         if (hyphenSplitWords.length > 1) {
             words = hyphenSplitWords;
         } else {
-            words = tempWords; // 若分割後仍只有一個，則保持原樣
+            words = tempWords;
         }
     } else {
-        words = tempWords; // 採用空格分割的結果
+        words = tempWords;
     }
   } else {
-    // 處理客語（非拼音）的分割邏輯
-    // 使用 Array.from 確保能正確分割中文字元
     words = Array.from(answerText).filter((char) => char.trim() !== "")
   }
 
-  // 如果超過6個字詞，前面的固定
   let fixedWords = []
   let shuffleWords = words
   if (words.length > 6) {
@@ -2572,11 +2878,10 @@ function generateSortingQuestion() {
   sortingGameState.originalWords = words
   sortingGameState.fixedWords = fixedWords
   sortingGameState.shuffledWords = shuffledWords
-  sortingGameState.userOrder = [...fixedWords] // 預填固定字詞
+  sortingGameState.userOrder = [...fixedWords] 
 
   renderSortingQuestion()
   
-  // 檢查是否需要自動播放音檔
   if (document.getElementById('sortingPlaySound').checked) {
       playAudio(sentence["音檔"]);
   }
@@ -2585,6 +2890,7 @@ function generateSortingQuestion() {
 function renderSortingQuestion() {
   const sortingArea = document.getElementById("sortingArea")
   const canCheck = sortingGameState.userOrder.length === sortingGameState.originalWords.length
+  const questionNumber = sortingGameState.total + 1;
 
   sortingArea.innerHTML = `
         <div class="text-center mb-8">
@@ -2594,18 +2900,17 @@ function renderSortingQuestion() {
                     <span class="material-icons">volume_up</span>
                 </button>
                 <div class="text-2xl font-bold text-indigo-800" style="font-size: ${userSettings.fontSize + 4}px">
-                    ${sortingGameState.questionText}
+                    <span class="question-number">${questionNumber}. </span><span class="question-text">${sortingGameState.questionText}</span>
                 </div>
             </div>
             
-            <!-- 答案區域 -->
             <div class="bg-gray-100 rounded-lg p-4 mb-6 min-h-16">
                 <div id="sortingTarget" class="flex gap-2 flex-wrap justify-center min-h-12">
                     ${sortingGameState.userOrder
                       .map((word, index) => {
                         const isFixed = index < sortingGameState.fixedWords.length
                         return `
-                            <div class="sorting-word ${isFixed ? "bg-gray-400 cursor-not-allowed" : "bg-indigo-500 cursor-pointer"} text-white px-4 py-2 rounded-lg" 
+                            <div class="sorting-word ${isFixed ? "bg-green-600 cursor-not-allowed" : "bg-indigo-500 cursor-pointer"} text-white px-4 py-2 rounded-lg" 
                                  style="font-size: ${userSettings.fontSize}px"
                                  ${!isFixed ? `onclick="removeFromTarget(${index})"` : ""}>
                                 ${word}
@@ -2617,7 +2922,6 @@ function renderSortingQuestion() {
                 </div>
             </div>
             
-            <!-- 選項區域 -->
             <div class="flex gap-3 flex-wrap justify-center mb-6 min-h-16">
                 <div class="min-h-12 flex gap-3 flex-wrap justify-center">
                     ${sortingGameState.shuffledWords
@@ -2635,7 +2939,6 @@ function renderSortingQuestion() {
                 </div>
             </div>
             
-            <!-- 控制按鈕 -->
             <div class="flex gap-4 justify-center">
                 <button onclick="checkSortingAnswer()" 
                         class="px-6 py-2 rounded-lg font-semibold transition-colors ${canCheck ? "bg-green-500 hover:bg-green-600 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}"
@@ -2728,14 +3031,32 @@ function checkSortingAnswer() {
 }
 
 function endSortingGame(message) {
-  sortingGameState.isPlaying = false
+  sortingGameState.isPlaying = false;
+  const button = document.getElementById("startSorting");
+  const optionsContainer = document.getElementById("sortingOptions");
 
   if (sortingGameState.timerInterval) {
-    clearInterval(sortingGameState.timerInterval)
+    clearInterval(sortingGameState.timerInterval);
   }
 
-  const totalQuestions = sortingGameState.correct + sortingGameState.incorrect
-  const accuracy = totalQuestions > 0 ? Math.round((sortingGameState.correct / totalQuestions) * 100) : 0
+  if(button) {
+      button.innerHTML = "重新開始";
+      button.title = "重新開始";
+      button.className = "bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
+      button.onclick = restartSortingGame;
+  }
+
+  // 【修改】只啟用 select 元素
+  optionsContainer.querySelectorAll('select').forEach(el => {
+      el.classList.remove('opacity-50', 'pointer-events-none');
+      el.disabled = false;
+  });
+  if (window.innerWidth < 768) {
+      optionsContainer.classList.remove('hidden');
+  }
+
+  const totalQuestions = sortingGameState.correct + sortingGameState.incorrect;
+  const accuracy = totalQuestions > 0 ? Math.round((sortingGameState.correct / totalQuestions) * 100) : 0;
 
   showResult(
     "🎯",
@@ -2744,8 +3065,8 @@ function endSortingGame(message) {
       `最終分數：${sortingGameState.score}\n` +
       `答對題數：${sortingGameState.correct}\n` +
       `答錯題數：${sortingGameState.incorrect}\n` +
-      `正確率：${accuracy}%`,
-  )
+      `正確率：${accuracy}%`
+  );
 }
 
 // 顯示結果視窗

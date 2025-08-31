@@ -14,17 +14,17 @@
 
     <div id="app" class="min-h-screen">
 
-        <div id="mainMenu" class="min-h-screen">
+<div id="mainMenu" class="min-h-screen">
             
             <header class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
-                <div class="max-w-7xl mx-auto px-4 py-3">
+                <div class="container mx-auto px-4 py-3">
                     <div class="flex items-center justify-between gap-4">
                         
                         <div id="mainTitle" class="flex-shrink-0">
                             <h1 class="text-2xl font-bold text-blue-600">客語學習遊戲</h1>
                         </div>
                         
-                        <div class="search-container flex-1 max-w-md">
+                        <div class="search-container flex-1 max-w-sm">
                             <div class="relative flex items-center w-full gap-2">
                                 <button id="searchToggle" class="md:hidden bg-gray-100 hover:bg-white p-2 rounded-lg transition-colors" aria-label="開啟搜尋">
                                     <span class="material-icons text-gray-600">search</span>
@@ -116,14 +116,14 @@
             </main>
         </div>
 
-        <div id="categoryDetail" class="hidden min-h-screen bg-gray-50">
-            <header id="topNav" class="bg-white border-b border-gray-200 sticky top-0 z-20">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <button id="goHome" class="text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-100 rounded-lg transition-colors" title="首頁" aria-label="返回主選單">
-                                <span class="material-icons">home</span>
-                            </button>
+		<div id="categoryDetail" class="hidden min-h-screen bg-gray-50">
+		    <header id="topNav" class="bg-white border-b border-gray-200 top-0 z-20">
+		        <div class="container mx-auto px-4 py-4">
+		            <div class="flex items-center justify-between">
+		                <div class="flex items-center space-x-4">
+		                    <button id="goHome" class="text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-100 rounded-lg transition-colors" title="返回" aria-label="返回主選單">
+		                        <span class="material-icons">arrow_back</span>
+		                    </button>
                             
                             <div class="relative bg-gray-100 rounded-lg">
                                 <button id="menuToggle" class="flex items-center space-x-2 px-4 py-2 text-gray-800 hover:bg-gray-200 rounded-lg transition-colors">
