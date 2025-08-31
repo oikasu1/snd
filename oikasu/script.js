@@ -510,8 +510,7 @@ function playAudio(filename, iconElement = null) {
   if (!filename) return;
 
   // 3. 建立新的 Audio 物件
-  //currentAudio = new Audio(`https://oikasu1.github.io/kasuexam/kasu/audio/${filename}`);
-  currentAudio = new Audio(`${filename}`);
+  currentAudio = new Audio(`https://oikasu1.github.io/kasuexam/kasu/audio/${filename}`);
 
   // 4. 如果有傳入圖示元素，就更新它的狀態
   if (iconElement) {
@@ -822,34 +821,35 @@ function showFlashcardView() {
     return;
   }
 
-  // 【修改】更新閃示卡介面結構
+  // 更新閃示卡介面結構
   contentArea.innerHTML = `
     <div class="max-w-5xl mx-auto pt-8">
         <div id="flashcardContainer" class="bg-white rounded-xl shadow-lg p-8 mb-4 relative overflow-hidden">
-            <div class="absolute top-4 left-4 z-20">
-                <button id="allSettingsBtn" class="control-btn !p-2" title="設定">
-                    <span class="material-icons">settings</span>
-                </button>
-                <div id="allSettingsPopup" class="hidden absolute left-0 mt-2 w-56 bg-white rounded-md shadow-lg border z-20 py-1">
-                    <button id="hideHakkaFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>客語</button>
-                    <button id="hidePinyinFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>拼音</button>
-                    <button id="hideChineseFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>華語</button>
-                    <div class="border-t my-1"></div>
-                    <label for="flashcardAutoPlayAudio" class="setting-menu-item cursor-pointer flex items-center">
-                        <span class="material-icons text-base mr-2">volume_up</span>
-                        <span>自動播音</span>
-                        <input type="checkbox" id="flashcardAutoPlayAudio" class="ml-auto w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
-                    </label>
-                    <div class="border-t my-1"></div>
-                    <div class="flex items-center justify-center px-3 py-1">
-                        <button onclick="event.stopPropagation(); adjustFontSize(-1, 'flashcard')" class="setting-btn flex-1 justify-center" title="縮小字體">
-                            <span class="material-icons">text_decrease</span>
+            <div class="absolute top-4 left-4 z-10">
+                <div class="flex items-center gap-1">
+                    <div class="relative">
+                        <button id="allSettingsBtn" class="control-btn !p-2" title="設定">
+                            <span class="material-icons">settings</span>
                         </button>
-                        <div class="w-px h-5 bg-gray-200 mx-2"></div>
-                        <button onclick="event.stopPropagation(); adjustFontSize(1, 'flashcard')" class="setting-btn flex-1 justify-center" title="放大字體">
-                            <span class="material-icons">text_increase</span>
-                        </button>
+                        <div id="allSettingsPopup" class="hidden absolute left-0 mt-2 w-56 bg-white rounded-md shadow-lg border z-20 py-1">
+                            <button id="hideHakkaFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>客語</button>
+                            <button id="hidePinyinFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>拼音</button>
+                            <button id="hideChineseFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>華語</button>
+                            <div class="border-t my-1"></div>
+                            <div class="flex items-center justify-center px-3 py-1">
+                                <button onclick="event.stopPropagation(); adjustFontSize(-1, 'flashcard')" class="setting-btn flex-1 justify-center" title="縮小字體">
+                                    <span class="material-icons">text_decrease</span>
+                                </button>
+                                <div class="w-px h-5 bg-gray-200 mx-2"></div>
+                                <button onclick="event.stopPropagation(); adjustFontSize(1, 'flashcard')" class="setting-btn flex-1 justify-center" title="放大字體">
+                                    <span class="material-icons">text_increase</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
+                    <button id="autoPlayAudioToggleBtn" class="control-btn !p-2" title="自動播音">
+                        <span class="material-icons">volume_up</span>
+                    </button>
                 </div>
             </div>
 
@@ -965,10 +965,10 @@ function updateFlashcard() {
 
 
 function setupFlashcardControls() {
-    const hideStates = { hakka: "show", pinyin: "show", chinese: "show" };
+    const hideStates = { "客語": "show", "拼音": "show", "華語": "show" };
     let currentInterval = 3;
 
-    // 更新獲取的元素
+    // --- 更新獲取的元素 ---
     const shuffleButton = document.getElementById("shuffleCards");
     const starButton = document.getElementById("starCard");
     const prevButton = document.getElementById("prevCard");
@@ -981,20 +981,32 @@ function setupFlashcardControls() {
     const filterPopup = document.getElementById("filterCardsPopup");
     const allSettingsButton = document.getElementById("allSettingsBtn");
     const allSettingsPopup = document.getElementById("allSettingsPopup");
-    // 【新增】獲取自動播音核取方塊
-    const autoPlayAudioCheckbox = document.getElementById("flashcardAutoPlayAudio");
+    // 【新增】獲取新的自動播音切換按鈕
+    const autoPlayAudioToggleBtn = document.getElementById("autoPlayAudioToggleBtn");
 
-    // --- 【新增】自動播音選項的事件綁定 ---
-    if (autoPlayAudioCheckbox) {
-        // 根據儲存的設定，初始化勾選狀態
-        autoPlayAudioCheckbox.checked = userSettings.flashcardAutoPlayAudio;
-        // 當勾選狀態改變時，更新並儲存設定
-        autoPlayAudioCheckbox.onchange = () => {
-            userSettings.flashcardAutoPlayAudio = autoPlayAudioCheckbox.checked;
+    // --- 【新增】自動播音圖示按鈕的邏輯 ---
+    function updateAutoPlayAudioBtnUI() {
+        if (!autoPlayAudioToggleBtn) return;
+        const icon = autoPlayAudioToggleBtn.querySelector('.material-icons');
+        if (userSettings.flashcardAutoPlayAudio) {
+            icon.textContent = 'volume_up';
+            autoPlayAudioToggleBtn.classList.add('active');
+            autoPlayAudioToggleBtn.title = '自動播音 (已啟用)';
+        } else {
+            icon.textContent = 'volume_off';
+            autoPlayAudioToggleBtn.classList.remove('active');
+            autoPlayAudioToggleBtn.title = '自動播音 (已停用)';
+        }
+    }
+    
+    if (autoPlayAudioToggleBtn) {
+        autoPlayAudioToggleBtn.onclick = () => {
+            userSettings.flashcardAutoPlayAudio = !userSettings.flashcardAutoPlayAudio;
             saveUserSettings();
+            updateAutoPlayAudioBtnUI();
         };
     }
-
+    
     // --- 彈出式選單通用邏輯 ---
     const popups = [
         { btn: autoPlayButton, menu: autoPlayPopup },
@@ -1021,17 +1033,30 @@ function setupFlashcardControls() {
 
     // --- 篩選功能 ---
     function updateFilterPopup() {
+        if (!filterPopup) return; // Add guard clause
         const allSentences = getSelectedSentences();
         const allCount = allSentences.length;
         const starredCount = allSentences.filter(s => starredCards.has(s["ID"] || `${s["分類"]}_${s["華語"]}`)).length;
         const unstarredCount = allCount - starredCount;
-
+        
+        //為每個按鈕添加圖示
         filterPopup.innerHTML = `
-            <button data-mode="all" class="practice-mode-btn w-full text-left px-3 py-2 flex justify-between items-center hover:bg-gray-100 ${flashcardPracticeMode === 'all' ? 'active' : ''}"><span>全部</span> <span>${allCount}</span></button>
-            <button data-mode="starred" class="practice-mode-btn w-full text-left px-3 py-2 flex justify-between items-center hover:bg-gray-100 ${flashcardPracticeMode === 'starred' ? 'active' : ''}" ${starredCount === 0 ? 'disabled' : ''}><span>星號</span> <span>${starredCount}</span></button>
-            <button data-mode="unstarred" class="practice-mode-btn w-full text-left px-3 py-2 flex justify-between items-center hover:bg-gray-100 ${flashcardPracticeMode === 'unstarred' ? 'active' : ''}" ${unstarredCount === 0 ? 'disabled' : ''}><span>無星號</span> <span>${unstarredCount}</span></button>
+            <button data-mode="all" class="practice-mode-btn w-full text-left px-3 py-2 flex justify-between items-center hover:bg-gray-100 ${flashcardPracticeMode === 'all' ? 'active' : ''}">
+                <span class="flex items-center"><span class="material-icons text-base mr-2">apps</span>全部</span> 
+                <span>${allCount}</span>
+            </button>
+            <button data-mode="starred" class="practice-mode-btn w-full text-left px-3 py-2 flex justify-between items-center hover:bg-gray-100 ${flashcardPracticeMode === 'starred' ? 'active' : ''}" ${starredCount === 0 ? 'disabled' : ''}>
+                <span class="flex items-center"><span class="material-icons text-base mr-2">star</span>星號</span> 
+                <span>${starredCount}</span>
+            </button>
+            <button data-mode="unstarred" class="practice-mode-btn w-full text-left px-3 py-2 flex justify-between items-center hover:bg-gray-100 ${flashcardPracticeMode === 'unstarred' ? 'active' : ''}" ${unstarredCount === 0 ? 'disabled' : ''}>
+                <span class="flex items-center"><span class="material-icons text-base mr-2">star_border</span>無星號</span> 
+                <span>${unstarredCount}</span>
+            </button>
             <div class="border-t my-1"></div>
-            <button id="clearStarsBtn" class="practice-mode-btn w-full text-left px-3 py-2 text-red-600 hover:bg-red-50" ${starredCount === 0 ? 'disabled' : ''}>清除全部星號</button>
+            <button id="clearStarsBtn" class="practice-mode-btn w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 flex items-center" ${starredCount === 0 ? 'disabled' : ''}>
+                <span class="material-icons text-base mr-2">delete_sweep</span>清除全部星號
+            </button>
         `;
 
         filterPopup.querySelectorAll('.practice-mode-btn[data-mode]').forEach(btn => {
@@ -1113,14 +1138,19 @@ function setupFlashcardControls() {
     // --- 主要按鈕事件綁定 ---
     shuffleButton.onclick = () => {
         isFlashcardShuffled = !isFlashcardShuffled;
+        const icon = shuffleButton.querySelector('.material-icons');
         if (isFlashcardShuffled) {
             flashcardSentences.sort(() => Math.random() - 0.5);
             shuffleButton.classList.add('active');
             shuffleButton.title = "恢復依序排序";
+            // 啟用時改變圖示
+            icon.textContent = 'shuffle_on';
         } else {
             flashcardSentences = [...originalFlashcardOrder];
             shuffleButton.classList.remove('active');
             shuffleButton.title = "亂數排序";
+            // 停用時恢復圖示
+            icon.textContent = 'shuffle';
         }
         currentCardIndex = 0;
         updateFlashcard();
@@ -1128,12 +1158,11 @@ function setupFlashcardControls() {
     
     playAudioButton.onclick = playCurrentAudio;
 
-    // 【修改】上一張與下一張按鈕的點擊事件
     prevButton.onclick = () => {
         if (currentCardIndex > 0) {
             currentCardIndex--;
             updateFlashcard();
-            if (userSettings.flashcardAutoPlayAudio) { // 檢查設定
+            if (userSettings.flashcardAutoPlayAudio) {
                 playCurrentAudio();
             }
         }
@@ -1142,7 +1171,7 @@ function setupFlashcardControls() {
         if (currentCardIndex < flashcardSentences.length - 1) {
             currentCardIndex++;
             updateFlashcard();
-            if (userSettings.flashcardAutoPlayAudio) { // 檢查設定
+            if (userSettings.flashcardAutoPlayAudio) {
                 playCurrentAudio();
             }
         }
@@ -1198,6 +1227,7 @@ function setupFlashcardControls() {
     setupHideButton("hideChineseFlash", "chineseText", "華語");
     
     // --- 初始化 ---
+    updateAutoPlayAudioBtnUI(); // 初始化自動播音按鈕狀態
     updateFilterPopup();
 }
 
@@ -1295,15 +1325,13 @@ function getSelectedSentences() {
   return Array.from(selectedSentences).map((index) => allSentences[index])
 }
 
-// 配對遊戲
-// 配對遊戲
 function showMatchingGame() {
-  const contentArea = document.getElementById("contentArea")
-  const sentences = getSelectedSentences()
+  const contentArea = document.getElementById("contentArea");
+  const sentences = getSelectedSentences();
 
   if (sentences.length < 2) {
-    contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">至少需要2個句子才能進行配對遊戲</div>'
-    return
+    contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">至少需要2個句子才能進行配對遊戲</div>';
+    return;
   }
 
   contentArea.innerHTML = `
@@ -1351,44 +1379,43 @@ function showMatchingGame() {
                     </button>
                 </div>
             </div>
-            
-            <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <button id="startMatching" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors">
+
+            <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
+                    <div id="matchingTimerBar" class="timer-bar bg-orange-500 h-full rounded-full" style="width: 100%"></div>
+                </div>
+
+                <div class="flex items-center justify-between flex-wrap gap-4 p-4 md:p-5 border-b border-gray-200">
+                    <div class="flex items-center gap-3">
+                        <button id="startMatching" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base">
                             開始配對
                         </button>
-                        <div id="matchingTimer" class="text-lg font-bold text-gray-700">準備開始</div>
-                        <div class="bg-gray-200 rounded-full h-2 w-32">
-                            <div id="matchingTimerBar" class="timer-bar bg-orange-500 h-2 rounded-full" style="width: 100%"></div>
-                        </div>
+                        <div id="matchingTimer" class="text-lg font-mono font-bold text-gray-700 w-28">準備開始</div>
                     </div>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4 md:gap-6">
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">分數</div>
+                            <div class="text-sm text-gray-500">分數</div>
                             <div id="matchingScore" class="text-xl font-bold text-orange-600">0</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">步數</div>
+                            <div class="text-sm text-gray-500">步數</div>
                             <div id="matchingSteps" class="text-xl font-bold text-gray-600">0</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">關卡</div>
-                            <div id="matchingRound" class="text-xl font-bold text-orange-600">1</div>
+                            <div class="text-sm text-gray-500">關卡</div>
+                            <div id="matchingRound" class="text-xl font-bold text-gray-600">1</div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div id="matchingArea" class="hidden grid grid-cols-2 gap-4 md:gap-8">
-                <div id="leftColumnContainer" class="grid grid-cols-1 gap-3"></div>
-                <div id="rightColumnContainer" class="grid grid-cols-1 gap-3"></div>
-            </div>
-            
-            <div id="matchingStartButton" class="text-center py-12">
-                <button id="startMatchingCenter" class="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-colors">
-                    開始配對遊戲
-                </button>
+
+                <div id="matchingArea" class="p-4 md:p-8 hidden grid grid-cols-2 gap-4 md:gap-8 min-h-[300px]">
+                    <div id="leftColumnContainer" class="grid grid-cols-1 gap-3"></div>
+                    <div id="rightColumnContainer" class="grid grid-cols-1 gap-3"></div>
+                </div>
+                
+                <div id="matchingStartNotice" class="text-center py-20 text-gray-500">
+                    <p>請點擊左上角按鈕開始遊戲</p>
+                </div>
             </div>
             
             <div id="matchingResults" class="hidden mt-6 bg-white rounded-xl shadow-sm p-6">
@@ -1396,9 +1423,9 @@ function showMatchingGame() {
                 <div id="matchingResultsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             </div>
         </div>
-    `
+    `;
 
-  setupMatchingGame()
+  setupMatchingGame();
 }
 
 
@@ -1414,50 +1441,47 @@ function setupMatchingGame() {
     timeLeft: 0,
     timerInterval: null,
     gameData: [],
-    layout: userSettings.matchingLayout || '1col' // 修改：從 userSettings 讀取設定
+    // 將排版邏輯改為控制每邊的欄數，並預設為 2
+    columnsPerSide: userSettings.matchingColumns || 2,
   }
 
-  // 根據儲存的設定，初始化按鈕圖示
+  // 根據新的排版邏輯，初始化按鈕圖示
   const layoutToggleButton = document.getElementById("matchingLayoutToggle");
   if (layoutToggleButton) {
       const icon = layoutToggleButton.querySelector(".material-icons");
-      icon.textContent = matchingGameState.layout === '1col' ? 'view_column' : 'window';
+      icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'window';
   }
 
-  document.getElementById("startMatching").onclick = startMatchingGame
-  document.getElementById("startMatchingCenter").onclick = () => {
-    document.getElementById("matchingStartButton").classList.add("hidden")
-    document.getElementById("matchingArea").classList.remove("hidden")
-    startMatchingGame()
-  }
+  // 移除對 startMatchingCenter 的事件綁定，因為該按鈕已不存在
+  document.getElementById("startMatching").onclick = startMatchingGame;
   
-  // 修改：版面切換按鈕的事件
+  // 更新排版切換按鈕的邏輯
   layoutToggleButton.onclick = () => {
-      // 更新當前遊戲狀態
-      matchingGameState.layout = matchingGameState.layout === '1col' ? '2col' : '1col';
+      // 在 1 和 2 之間切換
+      matchingGameState.columnsPerSide = matchingGameState.columnsPerSide === 1 ? 2 : 1;
       
-      // 更新按鈕圖示
       const icon = layoutToggleButton.querySelector(".material-icons");
-      icon.textContent = matchingGameState.layout === '1col' ? 'view_column' : 'window';
+      icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'window';
 
-      // 新增：將新設定存入 userSettings 並儲存
-      userSettings.matchingLayout = matchingGameState.layout;
+      userSettings.matchingColumns = matchingGameState.columnsPerSide;
       saveUserSettings();
       
-      // 重新渲染以應用新版面
-      renderMatchingItems(); 
+      // 如果遊戲正在進行，則立即重新渲染以應用新版面
+      if (matchingGameState.isPlaying) {
+          renderMatchingItems(); 
+      }
   }
 
   // 設定變更時重新生成遊戲
   ;["matchingType", "matchingPairs", "matchingCondition"].forEach((id) => {
     document.getElementById(id).onchange = () => {
       if (!matchingGameState.isPlaying) {
-        generateMatchingData()
+        generateMatchingData();
       }
     }
-  })
+  });
 
-  generateMatchingData()
+  generateMatchingData();
 }
 
 function generateMatchingData() {
@@ -1524,23 +1548,23 @@ function renderMatchingItems() {
   const rightContainer = document.getElementById("rightColumnContainer");
   const { leftItems, rightItems } = matchingGameState.gameData;
 
-  leftContainer.innerHTML = ""
-  rightContainer.innerHTML = ""
+  leftContainer.innerHTML = "";
+  rightContainer.innerHTML = "";
 
-  // 根據遊戲狀態設定 CSS class
-  const columnClass = matchingGameState.layout === '2col' ? 'grid-cols-2' : 'grid-cols-1';
+  // 根據 columnsPerSide 狀態設定 CSS class
+  const columnClass = matchingGameState.columnsPerSide === 2 ? 'grid-cols-2' : 'grid-cols-1';
   leftContainer.className = `grid ${columnClass} gap-3`;
   rightContainer.className = `grid ${columnClass} gap-3`;
 
   leftItems.forEach((item) => {
-    const element = createMatchingItem(item, "left")
-    leftContainer.appendChild(element)
-  })
+    const element = createMatchingItem(item, "left");
+    leftContainer.appendChild(element);
+  });
 
   rightItems.forEach((item) => {
-    const element = createMatchingItem(item, "right")
-    rightContainer.appendChild(element)
-  })
+    const element = createMatchingItem(item, "right");
+    rightContainer.appendChild(element);
+  });
 }
 
 function createMatchingItem(item, side) {
@@ -1684,13 +1708,21 @@ function startMatchingGame() {
   matchingGameState.steps = 0
   matchingGameState.matchedPairs = []
 
-  button.textContent = "重新開始"
+  // 將「重新開始」按鈕改為圖示，並調整樣式
+  button.innerHTML = `<span class="material-icons">replay</span>`;
+  button.title = "重新開始";
+  button.className = "bg-orange-500 hover:bg-orange-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
   button.onclick = restartMatchingGame
 
   document.getElementById("matchingScore").textContent = "0"
   document.getElementById("matchingSteps").textContent = "0"
   document.getElementById("matchingRound").textContent = "1"
   document.getElementById("matchingResults").classList.add("hidden")
+  
+  // 顯示遊戲區域，隱藏提示文字
+  document.getElementById("matchingArea").classList.remove("hidden");
+  document.getElementById("matchingStartNotice").classList.add("hidden");
+
 
   // 設定計時器
   if (condition.startsWith("time")) {
@@ -1736,40 +1768,69 @@ function startMatchingTimer() {
 }
 
 function checkRoundComplete() {
-  const condition = document.getElementById("matchingCondition").value
+  const condition = document.getElementById("matchingCondition").value;
 
   if (condition.startsWith("round")) {
     if (matchingGameState.currentRound < matchingGameState.totalRounds) {
       // 進入下一關
-      matchingGameState.currentRound++
-      matchingGameState.matchedPairs = []
-      document.getElementById("matchingRound").textContent = matchingGameState.currentRound
-      generateMatchingData()
+      matchingGameState.currentRound++;
+      matchingGameState.matchedPairs = [];
+      document.getElementById("matchingRound").textContent = matchingGameState.currentRound;
+      
+      // 【新增】根據完成的關卡數，更新進度條
+      const progress = ((matchingGameState.currentRound - 1) / matchingGameState.totalRounds) * 100;
+      const timerBar = document.getElementById("matchingTimerBar");
+      if (timerBar) {
+        timerBar.style.width = progress + "%";
+      }
+
+      generateMatchingData();
     } else {
       // 完成所有關卡
-      const totalTime = Math.floor((Date.now() - matchingGameState.startTime) / 1000)
-      endMatchingGame(`恭喜完成 ${matchingGameState.totalRounds} 關！\n總用時：${totalTime} 秒`)
+      const totalTime = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
+      // 【修改】將 totalTime 傳遞給 endMatchingGame 函式
+      endMatchingGame(`恭喜完成 ${matchingGameState.totalRounds} 關！\n總用時：${totalTime} 秒`, totalTime);
     }
   } else {
     // 單關完成
-    endMatchingGame("恭喜完成配對！")
+    endMatchingGame("恭喜完成配對！");
   }
 }
 
-function endMatchingGame(message) {
-  matchingGameState.isPlaying = false
+function endMatchingGame(message, finalTime = null) {
+  matchingGameState.isPlaying = false;
 
   if (matchingGameState.timerInterval) {
-    clearInterval(matchingGameState.timerInterval)
+    clearInterval(matchingGameState.timerInterval);
+  }
+  
+  // 【新增】遊戲結束後，將重玩圖示按鈕恢復為文字按鈕
+  const button = document.getElementById("startMatching");
+  if (button) {
+    button.innerHTML = "重新開始";
+    button.title = "";
+    button.className = "bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base";
+  }
+
+  // 【新增】在 n 關模式下，更新最終時間顯示
+  const timerElement = document.getElementById("matchingTimer");
+  if (timerElement && finalTime !== null) {
+    timerElement.textContent = `總計 ${finalTime} 秒`;
+  }
+  
+  // 【新增】將進度條填滿
+  const timerBar = document.getElementById("matchingTimerBar");
+  if (timerBar) {
+    timerBar.style.width = "100%";
   }
 
   // 顯示結果
-  showMatchingResults()
+  showMatchingResults();
   showResult(
     "🎉",
     "配對完成",
-    `${message}\n\n最終分數：${matchingGameState.score}\n操作步數：${matchingGameState.steps}`,
-  )
+    `${message}\n\n最終分數：${matchingGameState.score}\n操作步數：${matchingGameState.steps}`
+  );
 }
 
 function showMatchingResults() {
@@ -1793,16 +1854,16 @@ function showMatchingResults() {
 
 // 測驗遊戲
 function showQuizGame() {
-  const contentArea = document.getElementById("contentArea")
-  const sentences = getSelectedSentences()
+  const contentArea = document.getElementById("contentArea");
+  const sentences = getSelectedSentences();
 
   if (sentences.length < 2) {
-    contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">至少需要2個句子才能進行測驗</div>'
-    return
+    contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">至少需要2個句子才能進行測驗</div>';
+    return;
   }
   
-  const isWideScreen = window.innerWidth >= 1024
-  quizLayout = isWideScreen ? "horizontal" : "vertical"
+  const isWideScreen = window.innerWidth >= 1024;
+  quizLayout = isWideScreen ? "horizontal" : "vertical";
 
   contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
@@ -1853,47 +1914,46 @@ function showQuizGame() {
                 </div>
             </div>
             
-            <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <button id="startQuiz" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+            <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
+                    <div id="quizTimerBar" class="timer-bar bg-red-500 h-full rounded-full" style="width: 100%"></div>
+                </div>
+                
+                <div class="flex items-center justify-between flex-wrap gap-4 p-4 md:p-5 border-b border-gray-200">
+                     <div class="flex items-center gap-3">
+                        <button id="startQuiz" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base">
                             開始測驗
                         </button>
-                        <div id="quizTimer" class="text-lg font-bold text-gray-700">準備開始</div>
-                        <div class="bg-gray-200 rounded-full h-2 w-32">
-                            <div id="quizTimerBar" class="timer-bar bg-red-500 h-2 rounded-full" style="width: 100%"></div>
-                        </div>
+                        <div id="quizTimer" class="text-lg font-mono font-bold text-gray-700 w-28">準備開始</div>
                     </div>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4 md:gap-6">
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">正確</div>
+                            <div class="text-sm text-gray-500">正確</div>
                             <div id="quizCorrect" class="text-xl font-bold text-green-600">0</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">錯誤</div>
+                            <div class="text-sm text-gray-500">錯誤</div>
                             <div id="quizIncorrect" class="text-xl font-bold text-red-600">0</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">題數</div>
+                            <div class="text-sm text-gray-500">題數</div>
                             <div id="quizTotal" class="text-xl font-bold text-gray-600">0</div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div id="quizArea" class="bg-white rounded-xl shadow-sm p-8 hidden">
-            </div>
-            
-            <div id="quizStartButton" class="text-center py-12">
-                <button id="startQuizCenter" class="bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-colors">
-                    開始測驗遊戲
-                </button>
+
+                <div id="quizArea" class="p-4 md:p-8 hidden min-h-[300px]"></div>
+
+                <div id="quizStartNotice" class="text-center py-20 text-gray-500">
+                    <p>請點擊左上角按鈕開始遊戲</p>
+                </div>
             </div>
         </div>
-    `
+    `;
 
-  setupQuizGame()
+  setupQuizGame();
 }
+
 
 function setupQuizGame() {
   // 從 userSettings 初始化 quizLayout
@@ -1914,12 +1974,8 @@ function setupQuizGame() {
     isAnswered: false,
   }
 
-  document.getElementById("startQuiz").onclick = startQuizGame
-  document.getElementById("startQuizCenter").onclick = () => {
-    document.getElementById("quizStartButton").classList.add("hidden")
-    document.getElementById("quizArea").classList.remove("hidden")
-    startQuizGame()
-  }
+  // 移除對 startQuizCenter 的事件綁定
+  document.getElementById("startQuiz").onclick = startQuizGame;
 
   // --- 修改排版切換邏輯 ---
   const layoutToggleButton = document.getElementById("quizLayoutToggle");
@@ -1975,12 +2031,19 @@ function startQuizGame() {
   quizGameState.currentIndex = 0
   quizGameState.questions = [...sentences].sort(() => Math.random() - 0.5)
 
-  button.textContent = "重新開始"
+  // 將「重新開始」按鈕改為圖示，並調整樣式
+  button.innerHTML = `<span class="material-icons">replay</span>`;
+  button.title = "重新開始";
+  button.className = "bg-red-500 hover:bg-red-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
   button.onclick = restartQuizGame
 
   document.getElementById("quizCorrect").textContent = "0"
   document.getElementById("quizIncorrect").textContent = "0"
   document.getElementById("quizTotal").textContent = "0"
+
+  // 顯示遊戲區域，隱藏提示文字
+  document.getElementById("quizArea").classList.remove("hidden");
+  document.getElementById("quizStartNotice").classList.add("hidden");
 
   // 設定計時器
   if (condition.startsWith("time")) {
@@ -1993,6 +2056,7 @@ function startQuizGame() {
 
   generateQuizQuestion()
 }
+
 
 function restartQuizGame() {
   if (quizGameState.timerInterval) {
@@ -2180,14 +2244,23 @@ function selectQuizOption(selectedAnswer, element) {
   }, 1500)
 }
 
+
 function endQuizGame(message) {
-  quizGameState.isPlaying = false
+  quizGameState.isPlaying = false;
 
   if (quizGameState.timerInterval) {
-    clearInterval(quizGameState.timerInterval)
+    clearInterval(quizGameState.timerInterval);
+  }
+  
+  // 【新增】遊戲結束後，將重玩圖示按鈕恢復為文字按鈕
+  const button = document.getElementById("startQuiz");
+  if (button) {
+    button.innerHTML = "重新開始";
+    button.title = "";
+    button.className = "bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
   }
 
-  const accuracy = quizGameState.total > 0 ? Math.round((quizGameState.correct / quizGameState.total) * 100) : 0
+  const accuracy = quizGameState.total > 0 ? Math.round((quizGameState.correct / quizGameState.total) * 100) : 0;
 
   showResult(
     "🎯",
@@ -2196,8 +2269,38 @@ function endQuizGame(message) {
       `答對：${quizGameState.correct} 題\n` +
       `答錯：${quizGameState.incorrect} 題\n` +
       `總題數：${quizGameState.total} 題\n` +
-      `正確率：${accuracy}%`,
-  )
+      `正確率：${accuracy}%`
+  );
+}
+
+// 替換 endSortingGame()
+function endSortingGame(message) {
+  sortingGameState.isPlaying = false;
+
+  if (sortingGameState.timerInterval) {
+    clearInterval(sortingGameState.timerInterval);
+  }
+
+  // 【新增】遊戲結束後，將重玩圖示按鈕恢復為文字按鈕
+  const button = document.getElementById("startSorting");
+  if(button) {
+      button.innerHTML = "重新開始";
+      button.title = "";
+      button.className = "bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
+  }
+
+  const totalQuestions = sortingGameState.correct + sortingGameState.incorrect;
+  const accuracy = totalQuestions > 0 ? Math.round((sortingGameState.correct / totalQuestions) * 100) : 0;
+
+  showResult(
+    "🎯",
+    "排序結束",
+    `${message}\n\n` +
+      `最終分數：${sortingGameState.score}\n` +
+      `答對題數：${sortingGameState.correct}\n` +
+      `答錯題數：${sortingGameState.incorrect}\n` +
+      `正確率：${accuracy}%`
+  );
 }
 
 // 排序遊戲
@@ -2244,46 +2347,44 @@ function showSortingGame() {
                 </div>
             </div>
             
-            <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <button id="startSorting" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+            <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
+                     <div id="sortingTimerBar" class="timer-bar bg-indigo-500 h-full rounded-full" style="width: 100%"></div>
+                </div>
+
+                <div class="flex items-center justify-between flex-wrap gap-4 p-4 md:p-5 border-b border-gray-200">
+                    <div class="flex items-center gap-3">
+                        <button id="startSorting" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base">
                             開始排序
                         </button>
-                        <div id="sortingTimer" class="text-lg font-bold text-gray-700">準備開始</div>
-                        <div class="bg-gray-200 rounded-full h-2 w-32">
-                            <div id="sortingTimerBar" class="timer-bar bg-indigo-500 h-2 rounded-full" style="width: 100%"></div>
-                        </div>
+                        <div id="sortingTimer" class="text-lg font-mono font-bold text-gray-700 w-28">準備開始</div>
                     </div>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4 md:gap-6">
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">分數</div>
+                            <div class="text-sm text-gray-500">分數</div>
                             <div id="sortingScore" class="text-xl font-bold text-indigo-600">0</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">正確</div>
+                            <div class="text-sm text-gray-500">正確</div>
                             <div id="sortingCorrect" class="text-xl font-bold text-green-600">0</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-sm text-gray-600">錯誤</div>
+                            <div class="text-sm text-gray-500">錯誤</div>
                             <div id="sortingIncorrect" class="text-xl font-bold text-red-600">0</div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div id="sortingArea" class="bg-white rounded-xl shadow-sm p-8 hidden">
-            </div>
-            
-            <div id="sortingStartButton" class="text-center py-12">
-                <button id="startSortingCenter" class="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-colors">
-                    開始排序遊戲
-                </button>
+
+                <div id="sortingArea" class="p-4 md:p-8 hidden min-h-[300px]"></div>
+
+                <div id="sortingStartNotice" class="text-center py-20 text-gray-500">
+                    <p>請點擊左上角按鈕開始遊戲</p>
+                </div>
             </div>
         </div>
-    `
+    `;
 
-  setupSortingGame()
+  setupSortingGame();
 }
 
 function setupSortingGame() {
@@ -2305,12 +2406,10 @@ function setupSortingGame() {
     availableSentences: [],
   }
 
-  document.getElementById("startSorting").onclick = startSortingGame
-  document.getElementById("startSortingCenter").onclick = () => {
-    document.getElementById("sortingStartButton").classList.add("hidden")
-    document.getElementById("sortingArea").classList.remove("hidden")
-    startSortingGame()
-  }
+  // 確保只為存在的「開始排序」按鈕綁定事件
+  document.getElementById("startSorting").onclick = startSortingGame;
+  
+  // 舊的 startSortingCenter 按鈕及其綁定邏輯已被完全移除，修正錯誤
 }
 
 function startSortingGame() {
@@ -2326,12 +2425,19 @@ function startSortingGame() {
   sortingGameState.usedSentences = []
   sortingGameState.availableSentences = [...sentences].sort(() => Math.random() - 0.5)
 
-  button.textContent = "重新開始"
+  // 將「重新開始」按鈕改為圖示，並調整樣式
+  button.innerHTML = `<span class="material-icons">replay</span>`;
+  button.title = "重新開始";
+  button.className = "bg-indigo-500 hover:bg-indigo-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
   button.onclick = restartSortingGame
 
   document.getElementById("sortingScore").textContent = "0"
   document.getElementById("sortingCorrect").textContent = "0"
   document.getElementById("sortingIncorrect").textContent = "0"
+  
+  // 顯示遊戲區域，隱藏提示文字
+  document.getElementById("sortingArea").classList.remove("hidden");
+  document.getElementById("sortingStartNotice").classList.add("hidden");
 
   // 設定計時器
   if (condition.startsWith("time")) {

@@ -166,8 +166,9 @@
 
 /* 閃示卡頂部彈出式選單內的選項 */
 .setting-menu-item {
-  @apply w-full text-left px-3 py-2 flex items-center text-sm text-gray-700 hover:bg-gray-100;
+  @apply w-full text-left px-4 py-2.5 flex items-center text-sm text-gray-700 hover:bg-gray-100;
 }
+
 .setting-menu-item.active {
   @apply text-purple-700 bg-purple-50;
 }
@@ -210,7 +211,7 @@
 /* 配對遊戲 (Matching Game) */
 .matching-item {
   transition: all 0.2s ease;
-  border: 2px solid transparent;
+  border: 2px solid #d1d5db; /* gray-300 */
   position: relative;
 }
 
