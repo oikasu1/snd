@@ -601,9 +601,6 @@ function showLearningView() {
                         <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
                     </button>
                     <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button id="lineSpacingToggle" title="行距" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <span class="material-icons text-gray-600 !text-xl align-middle">format_line_spacing</span>
-                    </button>
                     <button onclick="adjustFontSize(-1, 'learning')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
                         <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
                     </button>
@@ -674,11 +671,11 @@ function renderSentences() {
                            onchange="toggleSentenceSelection(${index}, this.checked)">
                 </div>
                 <div class="space-y-3">
-                    <div class="hakka-text font-bold text-blue-800 ${userSettings.lineSpacing === "tight" ? "line-spacing-tight" : userSettings.lineSpacing === "normal" ? "line-spacing-normal" : "line-spacing-loose"}" 
+                    <div class="hakka-text font-bold text-blue-800 line-spacing-tight" 
                          style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</div>
-                    <div class="pinyin-text text-gray-600 ${userSettings.lineSpacing === "tight" ? "line-spacing-tight" : userSettings.lineSpacing === "normal" ? "line-spacing-normal" : "line-spacing-loose"}" 
+                    <div class="pinyin-text text-gray-600 line-spacing-tight" 
                          style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</div>
-                    <div class="chinese-text text-gray-800 ${userSettings.lineSpacing === "tight" ? "line-spacing-tight" : userSettings.lineSpacing === "normal" ? "line-spacing-normal" : "line-spacing-loose"}" 
+                    <div class="chinese-text text-gray-800 line-spacing-tight" 
                          style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</div>
                 </div>
             `
@@ -715,14 +712,6 @@ function setupLearningControls() {
     }
   }
 
-  // 行距切換
-  document.getElementById("lineSpacingToggle").onclick = () => {
-    const spacings = ["tight", "normal", "loose"]
-    const currentIndex = spacings.indexOf(userSettings.lineSpacing)
-    userSettings.lineSpacing = spacings[(currentIndex + 1) % spacings.length]
-    saveUserSettings()
-    renderSentences()
-  }
 
   // 隱藏控制
   const setupHideButton = (buttonId, textClass, type, label) => {
