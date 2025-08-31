@@ -2491,14 +2491,18 @@ function generateSortingQuestion() {
   const type = document.getElementById("sortingType").value
 
   let questionText, answerText
+  let isPinyinAnswer = false; // 用於判斷答案是否為拼音
+
   switch (type) {
     case "hakka-pinyin":
       questionText = sentence["客語"]
       answerText = sentence["拼音"]
+      isPinyinAnswer = true;
       break
     case "chinese-pinyin":
       questionText = sentence["華語"]
       answerText = sentence["拼音"]
+      isPinyinAnswer = true;
       break
     case "pinyin-hakka":
       questionText = sentence["拼音"]
@@ -2510,17 +2514,31 @@ function generateSortingQuestion() {
       break
   }
 
-  // 分割答案文字
+  // --- 修改後的分割邏輯 ---
   let words
-  if (answerText.includes(" ")) {
-    // 如果有空格，按空格分割
-    words = answerText.split(" ").filter((word) => word.trim() !== "")
-  } else if (type === "pinyin-hakka" || type === "chinese-hakka") {
-    // 如果答案是客語，使用 Array.from 正確分割
-    words = Array.from(answerText).filter((char) => char.trim() !== "")
+  
+  if (isPinyinAnswer) {
+    // 處理拼音的分割邏輯
+    // 1. 優先嘗試用一個或多個空格來分割
+    let tempWords = answerText.split(/\s+/).filter((w) => w.trim() !== "")
+
+    // 2. 如果按空格分割後只有一個元素，且該元素包含連字號 (-)
+    if (tempWords.length === 1 && tempWords[0].includes('-')) {
+        let hyphenSplitWords = tempWords[0].split(/-+/).filter((w) => w.trim() !== "");
+        
+        // 3. 只有當按連字號分割後，產生了多個元素，才採用此分割結果
+        if (hyphenSplitWords.length > 1) {
+            words = hyphenSplitWords;
+        } else {
+            words = tempWords; // 若分割後仍只有一個，則保持原樣
+        }
+    } else {
+        words = tempWords; // 採用空格分割的結果
+    }
   } else {
-    // 其他情況按字符分割
-    words = answerText.split("").filter((char) => char.trim() !== "")
+    // 處理客語（非拼音）的分割邏輯
+    // 使用 Array.from 確保能正確分割中文字元
+    words = Array.from(answerText).filter((char) => char.trim() !== "")
   }
 
   // 如果超過6個字詞，前面的固定
@@ -2543,7 +2561,7 @@ function generateSortingQuestion() {
 
   renderSortingQuestion()
   
-  // 新增：檢查是否需要自動播放音檔
+  // 檢查是否需要自動播放音檔
   if (document.getElementById('sortingPlaySound').checked) {
       playAudio(sentence["音檔"]);
   }
