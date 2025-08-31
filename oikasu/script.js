@@ -510,7 +510,9 @@ function playAudio(filename, iconElement = null) {
   if (!filename) return;
 
   // 3. 建立新的 Audio 物件
-  currentAudio = new Audio(`https://oikasu1.github.io/kasuexam/kasu/audio/${filename}`);
+  currentAudio = new Audio(`https://oikasu1.github.io/kasuexam/snd/oikasu/${filename}`);
+
+
 
   // 4. 如果有傳入圖示元素，就更新它的狀態
   if (iconElement) {
