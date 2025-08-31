@@ -1354,13 +1354,14 @@ function showMatchingGame() {
                         <option value="6">6組</option>
                     </select>
                     <select id="matchingCondition" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="time60">限時60秒</option>
-                        <option value="time100">限時100秒</option>
-                        <option value="time180">限時180秒</option>
-                        <option value="round1">1關計時</option>
-                        <option value="round3">3關計時</option>
-                        <option value="round5">5關計時</option>
-                        <option value="round8">8關計時</option>
+                        <option value="time60">60秒</option>
+                        <option value="time100">100秒</option>
+                        <option value="time180">180秒</option>
+                        <option value="round1">1關</option>
+                        <option value="round2">2關</option>
+                        <option value="round3">3關</option>
+                        <option value="round5">5關</option>
+                        <option value="round8">8關</option>
                         <option value="unlimited" selected>不限時間</option>
                     </select>
                     <div class="w-px h-5 bg-gray-300 mx-1"></div>
@@ -1702,6 +1703,11 @@ function startMatchingGame() {
   const condition = document.getElementById("matchingCondition").value
   const button = document.getElementById("startMatching")
 
+  // 開始前先清除可能存在的舊計時器
+  if (matchingGameState.timerInterval) {
+    clearInterval(matchingGameState.timerInterval)
+  }
+
   matchingGameState.isPlaying = true
   matchingGameState.currentRound = 1
   matchingGameState.score = 0
@@ -1724,17 +1730,25 @@ function startMatchingGame() {
   document.getElementById("matchingStartNotice").classList.add("hidden");
 
 
-  // 設定計時器
+  // --- 修改後的計時器設定 ---
   if (condition.startsWith("time")) {
     const timeLimit = Number.parseInt(condition.replace("time", ""))
     matchingGameState.timeLeft = timeLimit
     startMatchingTimer()
-  } else if (condition.startsWith("round")) {
-    matchingGameState.timeLeft = 0
-    document.getElementById("matchingTimer").textContent = "計時中..."
-    matchingGameState.startTime = Date.now()
-  } else {
-    document.getElementById("matchingTimer").textContent = "不限時間"
+  } else if (condition.startsWith("round") || condition === "unlimited") {
+    // 對於「n關計時」和「不限時間」模式，都啟用一個累加計時器
+    const timerElement = document.getElementById("matchingTimer");
+    matchingGameState.startTime = Date.now();
+    
+    // 立即顯示 00:00
+    timerElement.textContent = "00:00";
+
+    matchingGameState.timerInterval = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
+        const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+        const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+        timerElement.textContent = `${minutes}:${seconds}`;
+    }, 1000);
   }
 
   generateMatchingData()
@@ -1755,7 +1769,7 @@ function startMatchingTimer() {
 
   matchingGameState.timerInterval = setInterval(() => {
     matchingGameState.timeLeft--
-    timerElement.textContent = `剩餘 ${matchingGameState.timeLeft} 秒`
+    timerElement.textContent = ` ${matchingGameState.timeLeft}`
 
     const percentage = (matchingGameState.timeLeft / timeLimit) * 100
     timerBar.style.width = percentage + "%"
@@ -1769,6 +1783,16 @@ function startMatchingTimer() {
 
 function checkRoundComplete() {
   const condition = document.getElementById("matchingCondition").value;
+
+  // --- 針對「不限時間」模式的新增邏輯 ---
+  if (condition === "unlimited") {
+    // 在「不限時間」模式下，完成後直接進入下一關
+    matchingGameState.currentRound++;
+    matchingGameState.matchedPairs = [];
+    document.getElementById("matchingRound").textContent = matchingGameState.currentRound;
+    generateMatchingData(); // 產生新題目
+    return; // 結束此函數，不執行後續的結束遊戲邏輯
+  }
 
   if (condition.startsWith("round")) {
     if (matchingGameState.currentRound < matchingGameState.totalRounds) {
@@ -1792,7 +1816,7 @@ function checkRoundComplete() {
       endMatchingGame(`恭喜完成 ${matchingGameState.totalRounds} 關！\n總用時：${totalTime} 秒`, totalTime);
     }
   } else {
-    // 單關完成
+    // 單關完成 (此處現在只處理限時模式)
     endMatchingGame("恭喜完成配對！");
   }
 }
@@ -1815,7 +1839,7 @@ function endMatchingGame(message, finalTime = null) {
   // 【新增】在 n 關模式下，更新最終時間顯示
   const timerElement = document.getElementById("matchingTimer");
   if (timerElement && finalTime !== null) {
-    timerElement.textContent = `總計 ${finalTime} 秒`;
+    timerElement.textContent = ` ${finalTime}`;
   }
   
   // 【新增】將進度條填滿
@@ -1885,9 +1909,9 @@ function showQuizGame() {
                         <option value="6">6個選項</option>
                     </select>
                     <select id="quizCondition" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="time60">限時60秒</option>
-                        <option value="time100">限時100秒</option>
-                        <option value="time180">限時180秒</option>
+                        <option value="time60">60秒</option>
+                        <option value="time100">100秒</option>
+                        <option value="time180">180秒</option>
                         <option value="unlimited" selected>不限時間</option>
                         <option value="correct10">答對10題</option>
                         <option value="correct20">答對20題</option>
@@ -2073,7 +2097,7 @@ function startQuizTimer() {
 
   quizGameState.timerInterval = setInterval(() => {
     quizGameState.timeLeft--
-    timerElement.textContent = `剩餘 ${quizGameState.timeLeft} 秒`
+    timerElement.textContent = ` ${quizGameState.timeLeft}`
 
     const percentage = (quizGameState.timeLeft / timeLimit) * 100
     timerBar.style.width = percentage + "%"
@@ -2324,9 +2348,9 @@ function showSortingGame() {
                         <option value="chinese-hakka">華語 ↔ 客語</option>
                     </select>
                     <select id="sortingCondition" class="bg-transparent border-0 focus:ring-0 text-sm rounded-md hover:bg-gray-200 p-1.5 transition-colors appearance-none">
-                        <option value="time60">限時60秒</option>
-                        <option value="time100">限時100秒</option>
-                        <option value="time180">限時180秒</option>
+                        <option value="time60">60秒</option>
+                        <option value="time100">100秒</option>
+                        <option value="time180">180秒</option>
                         <option value="unlimited" selected>不限時間</option>
                         <option value="correct5">答對5題</option>
                         <option value="correct10">答對10題</option>
@@ -2466,7 +2490,7 @@ function startSortingTimer() {
 
   sortingGameState.timerInterval = setInterval(() => {
     sortingGameState.timeLeft--
-    timerElement.textContent = `剩餘 ${sortingGameState.timeLeft} 秒`
+    timerElement.textContent = ` ${sortingGameState.timeLeft}`
 
     const percentage = (sortingGameState.timeLeft / timeLimit) * 100
     timerBar.style.width = percentage + "%"
