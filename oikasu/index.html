@@ -9,62 +9,66 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body class="bg-gray-50">
+
     <div id="app" class="min-h-screen">
-        <!-- 主選單 -->
+
         <div id="mainMenu" class="min-h-screen">
-            <!-- 頂部導航 -->
-            <div class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
-                <div class="max-w-7xl mx-auto px-4 py-3 md:py-3">
+            
+            <header class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
+                <div class="max-w-7xl mx-auto px-4 py-3">
                     <div class="flex items-center justify-between gap-4">
-                        <!-- 左側標題 -->
-                        <div id="mainTitle" class="flex-shrink-0 md:block">
+                        
+                        <div id="mainTitle" class="flex-shrink-0">
                             <h1 class="text-2xl font-bold text-blue-600">客語學習遊戲</h1>
                         </div>
                         
-                        <!-- 中間搜尋框 -->
                         <div class="search-container flex-1 max-w-md">
-                            <div class="relative flex items-center w-full">
-                                <button id="searchToggle" class="md:hidden bg-gray-100 hover:bg-white p-2 rounded-lg transition-colors">
+                            <div class="relative flex items-center w-full gap-2">
+                                <button id="searchToggle" class="md:hidden bg-gray-100 hover:bg-white p-2 rounded-lg transition-colors" aria-label="開啟搜尋">
                                     <span class="material-icons text-gray-600">search</span>
                                 </button>
+                                
                                 <div id="searchBox" class="hidden md:block w-full">
+									<div class="relative">
+										<span class="material-icons absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">search</span>
+										<input type="text" id="searchInput" placeholder="搜尋主題、客語、拼音、華語..." 
+											   class="w-full pl-10 pr-10 py-2 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none transition-colors">
+										<button id="clearSearch" class="hidden absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="清除搜尋">
+											<span class="material-icons">close</span>
+										</button>
+									</div>
+								</div>
+
+                                <div id="mobileSearchBox" class="hidden w-full">
                                     <div class="relative">
-                                        <span class="material-icons absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">search</span>
-                                        <input type="text" id="searchInput" placeholder="搜尋主題、客語、拼音、華語..." 
-                                               class="w-full pl-10 pr-4 py-2 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none transition-colors">
-                                    </div>
-                                </div>
-                                <!-- 手機版展開搜尋框 -->
-                                <div id="mobileSearchBox" class="hidden absolute inset-x-0 -top-2 z-50 px-4">
-                                    <div class="relative">
-                                        <span class="material-icons absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">search</span>
-                                        <input type="text" id="mobileSearchInput" placeholder="搜尋主題、客語、拼音、華語..." 
+                                        <span class="material-icons absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">search</span>
+                                        <input type="text" id="mobileSearchInput" placeholder="搜尋主題..." 
                                                class="w-full pl-10 pr-12 py-2 bg-white border-2 border-blue-500 rounded-lg focus:outline-none h-12 shadow-xl">
-                                        <button id="closeMobileSearch" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                        <button id="closeMobileSearch" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="關閉搜尋">
                                             <span class="material-icons">close</span>
                                         </button>
                                     </div>
                                 </div>
+                                
+                                <button id="viewToggle" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors" title="切換檢視" aria-label="切換檢視模式">
+                                    <span class="material-icons">grid_view</span>
+                                </button>
                             </div>
                             <div id="searchResults" class="search-results hidden"></div>
                         </div>
                         
-                        <!-- 右側用戶區 -->
-                        <div class="flex items-center space-x-3 flex-shrink-0">
+                        <div id="userArea" class="flex items-center space-x-3 flex-shrink-0">
                             <div class="relative">
                                 <button id="userButton" class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                    <div id="userAvatar" class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                                        U
-                                    </div>
+                                    <div id="userAvatar" class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">U</div>
                                     <span id="userName" class="hidden sm:block">訪客</span>
                                 </button>
                                 <div id="userDropdown" class="user-dropdown hidden">
                                     <div class="p-4 border-b">
                                         <div class="flex items-center space-x-3">
-                                            <div id="dropdownAvatar" class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                                                U
-                                            </div>
+                                            <div id="dropdownAvatar" class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">U</div>
                                             <div>
                                                 <div id="dropdownName" class="font-semibold">訪客</div>
                                                 <div id="dropdownId" class="text-sm text-gray-500">#guest</div>
@@ -81,95 +85,87 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </header>
             
-            <!-- 選取工具條 -->
-            <div id="selectionToolbar" class="selection-toolbar bg-blue-600 text-white fixed top-20 left-0 right-0 z-30 show">
-                <div class="container mx-auto px-4 py-3">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3 ml-auto hidden" id="selectionActions">
-                            <button id="selectAll" class="px-3 py-1 bg-blue-700 rounded hover:bg-blue-800 transition-colors">全部勾選</button>
-							<button id="deselectAll" class="px-3 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded transition-colors text-sm" onclick="clearAllSelections()">全部取消</button>
-
-
-                            <button id="learnSelected" class="px-4 py-2 bg-green-500 rounded-lg hover:bg-green-600 transition-colors font-semibold">
-                                <span id="learnSelectedText">學習已勾選 0 個</span>
-                            </button>
-                        </div>
-                        <div class="flex items-center">
-                            <button id="viewToggle" class="p-2 bg-blue-700 hover:bg-blue-800 rounded transition-colors" title="切換檢視">
-                                <span class="material-icons text-white text-sm align-middle">grid_view</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div id="selectionToolbar" class="selection-toolbar bg-blue-600 text-white fixed top-16 left-0 right-0 z-30">
+				<div class="max-w-7xl mx-auto px-4 py-2">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-4">
+							<button id="deselectAll" class="p-2 rounded-full hover:bg-blue-700 transition-colors" title="取消選取" aria-label="取消所有選取">
+								<span class="material-icons">close</span>
+							</button>
+							<span id="selectionCount" class="text-lg font-semibold"></span>
+						</div>
+						<div id="selectionActions" class="hidden">
+							<div class="flex items-center gap-3">
+								<button id="selectAll" class="px-4 py-2 bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors text-sm font-semibold">全部勾選</button>
+								<button id="learnSelected" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-gray-200 transition-colors font-semibold flex items-center gap-2">
+									<span class="material-icons text-base">school</span>
+									<span>學習選取項目</span>
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
             
-            <!-- 主題列表 -->
-            <div class="bg-gray-50 min-h-screen pt-40">
-                <div class="container mx-auto px-4">
+            <main class="bg-gray-50 min-h-screen pt-20 md:pt-24">
+                <section class="container mx-auto px-4 py-8">
                     <div id="categoryList"></div>
-                </div>
-            </div>
+                </section>
+            </main>
         </div>
 
-        <!-- 類別詳情頁 -->
         <div id="categoryDetail" class="hidden min-h-screen bg-gray-50">
-            <!-- 頂部導航 -->
-            <div id="topNav" class="bg-white border-b border-gray-200">
+            <header id="topNav" class="bg-white border-b border-gray-200 sticky top-0 z-20">
                 <div class="container mx-auto px-4 py-4">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-4">
-                            <!-- 首頁按鈕 -->
-                            <button id="goHome" class="text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-100 rounded-lg transition-colors" title="首頁">
+                            <button id="goHome" class="text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-100 rounded-lg transition-colors" title="首頁" aria-label="返回主選單">
                                 <span class="material-icons">home</span>
                             </button>
                             
-                            <!-- 模式選單 -->
                             <div class="relative bg-gray-100 rounded-lg">
                                 <button id="menuToggle" class="flex items-center space-x-2 px-4 py-2 text-gray-800 hover:bg-gray-200 rounded-lg transition-colors">
-                                    <span id="currentMode" class="inline">學習</span>
+                                    <span id="currentMode">學習</span>
                                     <span class="material-icons">expand_more</span>
                                 </button>
                                 <div id="menuDropdown" class="hidden absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border min-w-48 z-50">
                                     <button id="viewSentences" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center space-x-3 border-b">
                                         <span class="material-icons text-blue-600">book</span>
-                                        <span class="text-gray-800">學習</span>
+                                        <span>學習</span>
                                     </button>
                                     <button id="flashcardMode" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center space-x-3 border-b">
                                         <span class="material-icons text-purple-600">style</span>
-                                        <span class="text-gray-800">閃示卡</span>
+                                        <span>閃示卡</span>
                                     </button>
                                     <button id="matchingGame" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center space-x-3 border-b">
                                         <span class="material-icons text-orange-600">extension</span>
-                                        <span class="text-gray-800">配對</span>
+                                        <span>配對</span>
                                     </button>
                                     <button id="quizGame" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center space-x-3 border-b">
                                         <span class="material-icons text-red-600">quiz</span>
-                                        <span class="text-gray-800">測驗</span>
+                                        <span>測驗</span>
                                     </button>
                                     <button id="sortingGame" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center space-x-3">
                                         <span class="material-icons text-indigo-600">sort</span>
-                                        <span class="text-gray-800">排序</span>
+                                        <span>排序</span>
                                     </button>
                                 </div>
                             </div>
                             <h2 id="categoryTitle" class="text-xl font-bold text-gray-800"></h2>
                         </div>
+                        
                         <div class="flex items-center space-x-3 flex-shrink-0">
                             <div class="relative">
                                 <button id="userButtonDetail" class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                    <div id="userAvatarDetail" class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                                        U
-                                    </div>
+                                    <div id="userAvatarDetail" class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">U</div>
                                     <span id="userNameDetail" class="hidden sm:block text-gray-800">訪客</span>
                                 </button>
                                 <div id="userDropdownDetail" class="user-dropdown hidden">
                                     <div class="p-4 border-b">
                                         <div class="flex items-center space-x-3">
-                                            <div id="dropdownAvatarDetail" class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                                                U
-                                            </div>
+                                            <div id="dropdownAvatarDetail" class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">U</div>
                                             <div>
                                                 <div id="dropdownNameDetail" class="font-semibold">訪客</div>
                                                 <div id="dropdownIdDetail" class="text-sm text-gray-500">#guest</div>
@@ -186,27 +182,25 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </header>
             
-            <!-- 內容區域 -->
-            <div id="contentArea" class="container mx-auto px-4 py-4 md:py-6 pt-6"></div>
+            <main id="contentArea" class="container mx-auto px-4 py-6"></main>
         </div>
 
-        <!-- 用戶編輯視窗 -->
-        <div id="userModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div id="userModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
             <div class="bg-white rounded-xl p-6 max-w-md mx-4 w-full">
-                <h3 class="text-xl font-bold mb-4">編輯個人資料</h3>
+                <h3 id="userModalTitle" class="text-xl font-bold mb-4">編輯個人資料</h3>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">姓名</label>
+                        <label for="editName" class="block text-sm font-semibold text-gray-700 mb-2">姓名</label>
                         <input type="text" id="editName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">編號</label>
+                        <label for="editId" class="block text-sm font-semibold text-gray-700 mb-2">編號</label>
                         <input type="text" id="editId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">頭像 (單一字元)</label>
+                        <label for="editAvatar" class="block text-sm font-semibold text-gray-700 mb-2">頭像 (單一字元)</label>
                         <input type="text" id="editAvatar" maxlength="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                     </div>
                 </div>
@@ -217,10 +211,9 @@
             </div>
         </div>
 
-        <!-- 清除資料確認視窗 -->
-        <div id="clearModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div id="clearModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="clearModalTitle">
             <div class="bg-white rounded-xl p-6 max-w-md mx-4 w-full">
-                <h3 class="text-xl font-bold mb-4 text-red-600">清除學習記錄</h3>
+                <h3 id="clearModalTitle" class="text-xl font-bold mb-4 text-red-600">清除學習記錄</h3>
                 <p class="text-gray-600 mb-4">請輸入密碼以確認清除所有學習記錄：</p>
                 <input type="password" id="clearPassword" placeholder="請輸入密碼" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-red-500 focus:outline-none mb-4">
                 <div class="flex space-x-3">
@@ -230,9 +223,8 @@
             </div>
         </div>
 
-        <!-- 結果視窗 -->
-        <div id="resultModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-xl p-6 max-w-md mx-4">
+        <div id="resultModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+            <div class="bg-white rounded-xl p-6 max-w-md mx-4 w-full">
                 <div id="resultContent" class="text-center">
                     <div id="resultIcon" class="text-6xl mb-4"></div>
                     <h3 id="resultTitle" class="text-2xl font-bold mb-4"></h3>

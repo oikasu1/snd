@@ -1,7 +1,9 @@
+/* --- 全域與基本樣式 (Global & Base Styles) --- */
 * {
   font-family: twhei-s, TWHEI, "台灣黑體", tauhu-oo, PingFangTC-Regular, "Microsoft JhengHei", sans-serif;
 }
 
+/* --- 主要佈局容器 (Main Layout Containers) --- */
 .search-container {
   position: relative;
 }
@@ -12,7 +14,7 @@
   left: 0;
   right: 0;
   background: white;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e5e7eb; /* gray-200 */
   border-radius: 0.5rem;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   max-height: 400px;
@@ -25,7 +27,7 @@
   top: 100%;
   right: 0;
   background: white;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e5e7eb; /* gray-200 */
   border-radius: 0.5rem;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   min-width: 200px;
@@ -41,7 +43,11 @@
   transform: translateY(0);
 }
 
+/* --- 卡片元件 (Card Components) --- */
+
+/* 主題卡片 (Category Card) */
 .category-card {
+  position: relative;
   transition: all 0.2s ease;
 }
 
@@ -50,11 +56,60 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.checkbox-selected {
-  background-color: #dbeafe;
-  border-color: #3b82f6;
+.category-card.checkbox-selected {
+  background-color: #dbeafe; /* blue-100 */
+  border-color: #3b82f6; /* blue-500 */
 }
 
+/* 主題卡片標題 (讓標題可點擊) */
+.category-card.checkbox-selected h3 {
+  color: #2563eb; /* blue-600 */
+}
+
+.category-title-link {
+  cursor: pointer;
+  position: relative;
+  z-index: 5;
+}
+.category-title-link:hover {
+  text-decoration: underline;
+}
+
+/* 主題卡片選擇指示器 (打勾圖示) */
+.category-card .category-checkbox {
+  display: none; /* 隱藏原始 checkbox */
+}
+
+.selection-indicator {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #9ca3af; /* gray-400 */
+  opacity: 0;
+  transition: all 0.2s ease-in-out;
+  z-index: 10;
+}
+
+.category-card:hover .selection-indicator {
+  opacity: 1;
+  transform: scale(1.1);
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+.category-card.checkbox-selected .selection-indicator {
+  opacity: 1;
+  transform: scale(1);
+  color: white;
+  background-color: #3b82f6; /* blue-500 */
+}
+
+/* 句子卡片 (Sentence Card) */
 .sentence-card {
   transition: all 0.2s ease;
 }
@@ -63,15 +118,76 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.line-spacing-tight {
-  line-height: 1.2;
+/* --- 按鈕元件 (Button Components) --- */
+
+/* 閃示卡底部控制按鈕 (小) */
+.control-btn {
+  @apply p-3 text-gray-500 rounded-full hover:bg-gray-100 hover:text-gray-800 transition-colors;
 }
-.line-spacing-normal {
-  line-height: 1.5;
+.control-btn .material-icons {
+  @apply text-3xl;
 }
-.line-spacing-loose {
-  line-height: 1.8;
+.control-btn:disabled {
+  @apply text-gray-300 cursor-not-allowed hover:bg-transparent;
 }
+.control-btn.active {
+  @apply text-purple-600 bg-purple-100;
+}
+.control-btn.active .material-icons {
+  font-variation-settings: 'FILL' 1; /* 啟用時圖示填滿 */
+}
+
+/* 閃示卡中間播放按鈕 (大) */
+.control-btn-main {
+  @apply p-5 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition-all transform hover:scale-105;
+}
+.control-btn-main .material-icons {
+  @apply text-4xl;
+}
+
+/* 閃示卡彈出選單內的練習模式按鈕 */
+.practice-mode-btn {
+  @apply w-full px-3 py-1.5 text-sm font-semibold rounded-md transition-colors text-gray-600;
+}
+.practice-mode-btn.active {
+  @apply bg-purple-100 text-purple-700;
+}
+.practice-mode-btn:disabled {
+  @apply text-gray-400 cursor-not-allowed hover:bg-transparent;
+}
+
+/* 閃示卡頂部設定按鈕 */
+.setting-btn {
+  @apply p-2 rounded-md hover:bg-gray-200 text-gray-500 transition-colors flex items-center justify-center;
+}
+.setting-btn .material-icons {
+    @apply text-xl;
+}
+
+/* 閃示卡頂部彈出式選單內的選項 */
+.setting-menu-item {
+  @apply w-full text-left px-3 py-2 flex items-center text-sm text-gray-700 hover:bg-gray-100;
+}
+.setting-menu-item.active {
+  @apply text-purple-700 bg-purple-50;
+}
+
+/* 星號按鈕 */
+.star-button {
+  transition: all 0.2s ease;
+}
+.star-button.starred {
+  color: #fbbf24; /* amber-400 */
+}
+/* 星號按鈕啟用時，讓圖示填滿 */
+#starCard .material-icons.text-yellow-400 {
+    font-variation-settings: 'FILL' 1;
+}
+
+/* --- 文字與排版工具 (Text & Spacing Utilities) --- */
+.line-spacing-tight { line-height: 1.2; }
+.line-spacing-normal { line-height: 1.5; }
+.line-spacing-loose { line-height: 1.8; }
 
 .blur-text {
   filter: blur(8px);
@@ -83,6 +199,15 @@
   display: none;
 }
 
+.invisible-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+
+/* --- 遊戲模式專用樣式 (Game-Specific Styles) --- */
+
+/* 配對遊戲 (Matching Game) */
 .matching-item {
   transition: all 0.2s ease;
   border: 2px solid transparent;
@@ -90,51 +215,65 @@
 }
 
 .matching-selected {
-  border-color: #3b82f6;
-  background-color: #dbeafe;
+  border-color: #3b82f6; /* blue-500 */
+  background-color: #dbeafe; /* blue-100 */
 }
 
 .matching-correct {
-  border-color: #10b981;
-  background-color: #d1fae5;
+  border-color: #10b981; /* green-500 */
+  background-color: #d1fae5; /* green-100 */
 }
 
 .matching-incorrect {
-  border-color: #ef4444;
-  background-color: #fee2e2;
+  border-color: #ef4444; /* red-500 */
+  background-color: #fee2e2; /* red-100 */
 }
 
 .matching-completed {
-  background-color: #f3f4f6;
-  color: #6b7280;
-  border-color: #d1d5db;
+  background-color: #f3f4f6; /* gray-100 */
+  color: #6b7280; /* gray-500 */
+  border-color: #d1d5db; /* gray-300 */
 }
 
+/* 測驗遊戲 (Quiz Game) */
 .quiz-option {
   transition: all 0.2s ease;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #e5e7eb; /* gray-200 */
   box-shadow: none;
 }
 
 .quiz-option:hover:not(.quiz-answered) {
-  border-color: #6b7280;
-  background-color: #f9fafb;
+  border-color: #6b7280; /* gray-500 */
+  background-color: #f9fafb; /* gray-50 */
 }
 
 .quiz-correct {
-  border-color: #10b981;
-  background-color: #d1fae5 !important;
+  border-color: #10b981; /* green-500 */
+  background-color: #d1fae5 !important; /* green-100 */
 }
 
 .quiz-incorrect {
-  border-color: #ef4444;
-  background-color: #fee2e2 !important;
+  border-color: #ef4444; /* red-500 */
+  background-color: #fee2e2 !important; /* red-100 */
 }
 
 .quiz-answered {
   pointer-events: none;
 }
 
+.quiz-vertical .quiz-option {
+  padding: 8px 16px;
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.quiz-horizontal .quiz-option {
+  padding: 16px 24px;
+}
+
+
+/* 排序遊戲 (Sorting Game) */
 .sorting-word {
   transition: all 0.3s ease;
   cursor: grab;
@@ -149,20 +288,21 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* --- 通用進度條 (General Progress Bar) --- */
+.timer-bar {
+  transition: width 1s linear;
+}
+
+/* --- 動畫效果 (Animations) --- */
+
 .celebration {
   animation: celebration 0.8s ease-out;
 }
 
 @keyframes celebration {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 
 .emoji-celebration {
@@ -182,32 +322,4 @@
     opacity: 0;
     transform: translateY(-100px) scale(1.5);
   }
-}
-
-.timer-bar {
-  transition: width 1s linear;
-}
-
-.star-button {
-  transition: all 0.2s ease;
-}
-
-.star-button.starred {
-  color: #fbbf24;
-}
-
-.invisible-placeholder {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.quiz-vertical .quiz-option {
-  padding: 8px 16px;
-  display: block;
-  width: 100%;
-  margin-bottom: 8px;
-}
-
-.quiz-horizontal .quiz-option {
-  padding: 16px 24px;
 }
