@@ -34,14 +34,7 @@
   z-index: 50;
 }
 
-.selection-toolbar {
-  transform: translateY(-100%);
-  transition: transform 0.3s ease;
-}
 
-.selection-toolbar.show {
-  transform: translateY(0);
-}
 
 /* --- 卡片元件 (Card Components) --- */
 
@@ -324,3 +317,44 @@
     transform: translateY(-100px) scale(1.5);
   }
 }
+
+
+
+/* 搜尋遮罩層 */
+#searchOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 35; /* 必須比 header(z-40) 低，比內容高 */
+}
+
+
+/* 針對手機螢幕 (寬度小於 768px) */
+@media (max-width: 767px) {
+  
+  /* 加大手機版搜尋輸入框的文字 */
+  #mobileSearchInput {
+    font-size: 1.1rem; /* 17.6px */
+  }
+
+  /* 調整搜尋結果列表的高度與位置 */
+  .search-results {
+    /* 將頂部位置調整到 header 下方約 70px */
+    top: 70px;
+    /* 計算最大高度，使其距離底部保留 50px */
+    max-height: calc(100vh - 70px - 50px); 
+  }
+
+  /* 加大搜尋結果項目的文字 */
+  .search-result-item .font-semibold {
+     font-size: 1.05rem; /* 16.8px */
+  }
+   .search-result-item .text-sm {
+     font-size: 0.9rem; /* 14.4px */
+  }
+}
+
+

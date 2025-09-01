@@ -153,6 +153,7 @@ function updateUserDisplay() {
 }
 
 // 搜尋功能
+// 搜尋功能
 function handleSearchInput(e) {
   const query = e.target.value.trim().toLowerCase();
   const searchResults = document.getElementById("searchResults");
@@ -205,15 +206,18 @@ function handleSearchInput(e) {
     searchResults.innerHTML = results
       .slice(0, 10)
       .map(
-        (result) => {
+        (result, index) => { // 【修改】增加了 index 參數
           const emoji = result.type === 'category' ? `<span class="text-xl mr-3">${getCategoryEmoji(result.title)}</span>` : '';
           return `
-              <div class="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 flex items-center" 
+              <div class="search-result-item p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 flex items-start" 
                    onclick="selectSearchResult('${result.type}', '${JSON.stringify(result.data).replace(/"/g, "&quot;")}')">
-                  ${emoji}
-                  <div>
-                    <div class="font-semibold text-gray-900">${result.title}</div>
-                    <div class="text-sm text-gray-600">${result.subtitle}</div>
+                  <span class="mr-3 text-gray-500 font-medium pt-0.5">${index + 1}.</span>
+                  <div class="flex items-center flex-1 min-w-0">
+                      ${emoji}
+                      <div class="min-w-0">
+                        <div class="font-semibold text-gray-900 truncate">${result.title}</div>
+                        <div class="text-sm text-gray-600 truncate">${result.subtitle}</div>
+                      </div>
                   </div>
               </div>
           `;
@@ -321,6 +325,7 @@ function getCategoryEmoji(categoryName) {
 
 
 
+
 // 渲染分類列表
 function renderCategoryList() {
     const categoryList = document.getElementById("categoryList");
@@ -346,16 +351,16 @@ function renderCategoryList() {
         if (currentViewMode === "card") {
             // 卡片內部樣式
             categoryItem.innerHTML = `
-                <div class="p-5">
+                <div class="p-2">
                     <div class="selection-indicator">
                         <span class="material-icons text-base">${isSelected ? 'check' : 'radio_button_unchecked'}</span>
                     </div>
-                    <div class="flex items-center space-x-3 pl-6">
+                    <div class="flex items-center space-x-2 pl-8">
                         <div class="text-4xl">
                             ${emoji}
                         </div>
                         <div>
-                            <h3 class="category-title-link text-lg font-bold text-gray-800" onclick="event.stopPropagation(); showCategoryDetail('${safeCategory}')">
+                            <h3 class="category-title-link text-lg text-gray-800" onclick="event.stopPropagation(); showCategoryDetail('${safeCategory}')">
                                 ${category}
                             </h3>
                             <p class="text-sm text-gray-500">${categories[category].length} 句</p>
@@ -370,13 +375,13 @@ function renderCategoryList() {
                 <div class="selection-indicator !left-3 !top-1/2 !-translate-y-1/2">
                     <span class="material-icons text-base">${isSelected ? 'check' : 'radio_button_unchecked'}</span>
                 </div>
-                <div class="pl-6 flex items-center">
-                    <span class="text-2xl mr-3">${emoji}</span>
-                    <div>
+                <div class="pl-8 flex items-center space-x-4">
+                    <span class="text-2xl">${emoji}</span>
+                    <div class="flex items-baseline gap-x-3">
                         <h3 class="category-title-link text-lg font-bold text-gray-800" onclick="event.stopPropagation(); showCategoryDetail('${safeCategory}')">
                             ${category}
                         </h3>
-                        <p class="text-sm text-gray-500">${categories[category].length} 句</p>
+                        <p class="text-sm text-gray-500 flex-shrink-0">${categories[category].length} 句</p>
                     </div>
                 </div>
             `;
@@ -386,6 +391,8 @@ function renderCategoryList() {
 
     updateSelectionToolbar();
 }
+
+
 // 清除所有勾選的分類
 function clearAllSelections() {
   selectedCategories.clear();
@@ -410,22 +417,19 @@ function toggleCategorySelection(category) {
 
 // 更新選取工具條
 function updateSelectionToolbar() {
-    const toolbar = document.getElementById("selectionToolbar");
+    const selectionContent = document.getElementById("selectionContent"); // 改為控制內容容器
     const count = selectedCategories.size;
-    const actions = document.getElementById("selectionActions");
-    const selectionCount = document.getElementById("selectionCount"); // 新的計數元素
+    const selectionCount = document.getElementById("selectionCount");
 
     if (count > 0) {
-        toolbar.classList.add("show");
-        // 更新獨立的計數文字
-        selectionCount.textContent = `已選取 ${count} 個項目`;
-        if (actions) actions.classList.remove("hidden");
+        selectionCount.textContent = `已選 ${count} 個`;
+        if(selectionContent) selectionContent.classList.remove("hidden");
     } else {
-        toolbar.classList.remove("show");
-        selectionCount.textContent = ""; // 清空計數文字
-        if (actions) actions.classList.add("hidden");
+        if(selectionContent) selectionContent.classList.add("hidden");
     }
 }
+
+
 
 // 切換檢視模式
 
@@ -511,7 +515,6 @@ function playAudio(filename, iconElement = null) {
 
   // 3. 建立新的 Audio 物件
   currentAudio = new Audio(`https://oikasu1.github.io/snd/oikasu/${filename}`);
-	
 
   // 4. 如果有傳入圖示元素，就更新它的狀態
   if (iconElement) {
@@ -1388,7 +1391,7 @@ function showMatchingGame() {
                              <div class="w-px h-5 bg-gray-300 mx-1 hidden sm:block"></div>
                              <select id="matchingType" class="bg-gray-100 border-gray-300 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="hakka-chinese">客語 ↔ 華語</option>
-                                <option value="pinyin-chinese">拼音 ↔ 華語</option>
+                                <option value="pinyin-chinese" selected>拼音 ↔ 華語</option>
                                 <option value="hakka-pinyin">客語 ↔ 拼音</option>
                                 <option value="audio-hakka">音檔 ↔ 客語</option>
                                 <option value="audio-pinyin">音檔 ↔ 拼音</option>
@@ -1403,14 +1406,14 @@ function showMatchingGame() {
                             </select>
                             <select id="matchingCondition" class="bg-gray-100 border-gray-300 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="time60">60秒</option>
-                                <option value="time100">100秒</option>
+                                <option value="time100" selected>100秒</option>
                                 <option value="time180">180秒</option>
                                 <option value="round1">1關</option>
                                 <option value="round2">2關</option>
                                 <option value="round3">3關</option>
                                 <option value="round5">5關</option>
                                 <option value="round8">8關</option>
-                                <option value="unlimited" selected>無限</option>
+                                <option value="unlimited">無限</option>
                             </select>
                             <div id="matchingTimer" class="text-lg font-mono text-gray-700 min-w-[5rem] text-center">00:00</div>
                         </div>
@@ -2138,7 +2141,7 @@ function showQuizGame() {
                             <select id="quizType" class="bg-gray-100 border-gray-300 focus:ring-red-500 focus:border-red-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="hakka-chinese">客語 → 華語</option>
                                 <option value="chinese-hakka">華語 → 客語</option>
-                                <option value="pinyin-chinese">拼音 → 華語</option>
+                                <option value="pinyin-chinese" selected>拼音 → 華語</option>
                                 <option value="chinese-pinyin">華語 → 拼音</option>
                                 <option value="hakka-pinyin">客語 → 拼音</option>
                                 <option value="pinyin-hakka">拼音 → 客語</option>
@@ -2154,9 +2157,9 @@ function showQuizGame() {
                             </select>
                             <select id="quizCondition" class="bg-gray-100 border-gray-300 focus:ring-red-500 focus:border-red-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="time60">60秒</option>
-                                <option value="time100">100秒</option>
+                                <option value="time100" selected>100秒</option>
                                 <option value="time180">180秒</option>
-                                <option value="unlimited" selected>無限</option>
+                                <option value="unlimited">無限</option>
                                 <option value="correct5">5題</option>
                                 <option value="correct10">10題</option>
                                 <option value="correct15">15題</option>
@@ -2613,14 +2616,14 @@ function showSortingGame() {
                             <select id="sortingType" class="bg-gray-100 border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="hakka-pinyin">客語 ↔ 拼音</option>
                                 <option value="chinese-pinyin">華語 ↔ 拼音</option>
-                                <option value="pinyin-hakka">拼音 ↔ 客語</option>
+                                <option value="pinyin-hakka" selected>拼音 ↔ 客語</option>
                                 <option value="chinese-hakka">華語 ↔ 客語</option>
                             </select>
                             <select id="sortingCondition" class="bg-gray-100 border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="time60">60秒</option>
-                                <option value="time100">100秒</option>
+                                <option value="time100" selected>100秒</option>
                                 <option value="time180">180秒</option>
-                                <option value="unlimited" selected>無限</option>
+                                <option value="unlimited">無限</option>
                                 <option value="correct5">5題</option>
                                 <option value="correct10">10題</option>
                                 <option value="correct15">15題</option>
@@ -3092,6 +3095,7 @@ function setupEventListeners() {
   const mobileSearchInput = document.getElementById("mobileSearchInput");
   const closeMobileSearch = document.getElementById("closeMobileSearch");
   const clearSearchBtn = document.getElementById("clearSearch");
+  const searchOverlay = document.getElementById("searchOverlay"); // 【新增】獲取遮罩元素
 
   // 將統一的處理函數綁定到電腦版和手機版兩個輸入框
   searchInput.addEventListener("input", handleSearchInput);
@@ -3103,24 +3107,29 @@ function setupEventListeners() {
     mainTitle.classList.add("hidden");
     viewToggle.classList.add("hidden");
     searchToggle.classList.add("hidden");
-    // 桌面搜尋框 (searchBox) 在手機版會由 Tailwind CSS 的 `md:block` 自動隱藏，不需手動操作
-
+    
     mobileSearchBox.classList.remove("hidden");
+    searchOverlay.classList.remove("hidden"); // 【新增】顯示遮罩
     mobileSearchInput.focus();
   };
 
   // 點擊關閉按鈕，收回手機搜尋框
   closeMobileSearch.onclick = () => {
-    // 恢復頂部欄位的預設項目
     mainTitle.classList.remove("hidden");
     viewToggle.classList.remove("hidden");
     searchToggle.classList.remove("hidden");
 
-    // 隱藏手機搜尋框並清空內容
     mobileSearchBox.classList.add("hidden");
+    searchOverlay.classList.add("hidden"); // 【新增】隱藏遮罩
     mobileSearchInput.value = "";
     searchResults.classList.add("hidden");
   };
+
+  // 【新增】點擊遮罩層時，觸發關閉按鈕的功能
+  searchOverlay.onclick = () => {
+    closeMobileSearch.click();
+  };
+
 
   // 桌面版清除按鈕的點擊事件
   clearSearchBtn.addEventListener('click', () => {

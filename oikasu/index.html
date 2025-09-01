@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>客語學習遊戲</title>
+    <title>🥷愛客書</title>
     <link href="https://oikasu1.github.io/kasuexam/kasu/fonts/twhei.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,15 +13,16 @@
 <body class="bg-gray-50">
 
     <div id="app" class="min-h-screen">
+	    <div id="searchOverlay" class="hidden"></div>
 
-<div id="mainMenu" class="min-h-screen">
+        <div id="mainMenu" class="min-h-screen">
             
             <header class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
                 <div class="container mx-auto px-4 py-3">
                     <div class="flex items-center justify-between gap-4">
                         
                         <div id="mainTitle" class="flex-shrink-0">
-                            <h1 class="text-2xl font-bold text-blue-600">客語學習遊戲</h1>
+                            <h1 class="text-2xl font-bold text-blue-600">🥷愛客書</h1>
                         </div>
                         
                         <div class="search-container flex-1 max-w-sm">
@@ -87,24 +88,20 @@
                 </div>
             </header>
             
-            <div id="selectionToolbar" class="selection-toolbar bg-blue-600 text-white fixed top-16 left-0 right-0 z-30">
-				<div class="max-w-7xl mx-auto px-4 py-2">
-					<div class="flex items-center justify-between">
+			<div id="selectionToolbar" class="bg-blue-600 text-white fixed top-16 left-0 right-0 z-30 shadow-md">
+				<div class="container mx-auto px-4 py-2">
+					<div id="selectionContent" class="hidden flex items-center justify-between">
 						<div class="flex items-center gap-4">
 							<button id="deselectAll" class="p-2 rounded-full hover:bg-blue-700 transition-colors" title="取消選取" aria-label="取消所有選取">
 								<span class="material-icons">close</span>
 							</button>
-							<span id="selectionCount" class="text-lg font-semibold"></span>
+							<span id="selectionCount" class="text-base font-semibold"></span>
+							<button id="selectAll" class="px-4 py-1.5 bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors text-sm font-semibold">全選</button>
 						</div>
-						<div id="selectionActions" class="hidden">
-							<div class="flex items-center gap-3">
-								<button id="selectAll" class="px-4 py-2 bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors text-sm font-semibold">全部勾選</button>
-								<button id="learnSelected" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-gray-200 transition-colors font-semibold flex items-center gap-2">
-									<span class="material-icons text-base">school</span>
-									<span>學習選取項目</span>
-								</button>
-							</div>
-						</div>
+						<button id="learnSelected" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-gray-200 transition-colors font-semibold flex items-center gap-2">
+							<span class="material-icons text-base">school</span>
+							<span>學習選取</span>
+						</button>
 					</div>
 				</div>
 			</div>
