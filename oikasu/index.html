@@ -88,20 +88,22 @@
                 </div>
             </header>
             
-			<div id="selectionToolbar" class="bg-blue-600 text-white fixed top-16 left-0 right-0 z-30 shadow-md">
+			<div id="selectionToolbar" class="hidden bg-gray-100 border-b border-gray-300 fixed top-16 left-0 right-0 z-30 shadow-sm">
 				<div class="container mx-auto px-4 py-2">
-					<div id="selectionContent" class="hidden flex items-center justify-between">
+					<div id="selectionContent" class="flex items-center justify-between">
 						<div class="flex items-center gap-4">
-							<button id="deselectAll" class="p-2 rounded-full hover:bg-blue-700 transition-colors" title="取消選取" aria-label="取消所有選取">
+							<button id="deselectAll" class="p-2 rounded-full hover:bg-gray-200 transition-colors text-gray-700" title="取消選取">
 								<span class="material-icons">close</span>
 							</button>
-							<span id="selectionCount" class="text-base font-semibold"></span>
-							<button id="selectAll" class="px-4 py-1.5 bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors text-sm font-semibold">全選</button>
+							<span id="selectionCount" class="text-base font-semibold text-gray-800"></span>
 						</div>
-						<button id="learnSelected" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-gray-200 transition-colors font-semibold flex items-center gap-2">
-							<span class="material-icons text-base">school</span>
-							<span>學習選取</span>
-						</button>
+						<div class="flex items-center gap-4">
+                            <button id="selectAll" class="px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-200 rounded-lg transition-colors">全選</button>
+						    <button id="learnSelected" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center gap-2">
+							    <span class="material-icons text-base">school</span>
+							    <span>學習選取</span>
+						    </button>
+                        </div>
 					</div>
 				</div>
 			</div>

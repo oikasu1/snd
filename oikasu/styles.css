@@ -201,6 +201,11 @@
 
 /* --- 遊戲模式專用樣式 (Game-Specific Styles) --- */
 
+/* 禁用遊戲區域 */
+.game-area-disabled {
+    pointer-events: none; /* 讓元素無法被滑鼠點擊 */
+    opacity: 0.6;         /* 視覺上變淡，表示已禁用 */
+}
 /* 配對遊戲 (Matching Game) */
 .matching-item {
   transition: all 0.2s ease;
@@ -282,6 +287,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+
 /* --- 通用進度條 (General Progress Bar) --- */
 .timer-bar {
   transition: width 1s linear;
@@ -358,3 +364,114 @@
 }
 
 
+/* --- 閃示卡內部樣式微調 (Flashcard Internal Style Tweaks) --- */
+
+/* 讓閃示卡內部的控制按鈕顏色變淡，減少視覺干擾 */
+#flashcardContainer .control-btn,
+#flashcardContainer .setting-btn {
+  color: #9ca3af; /* gray-400 */
+}
+#flashcardContainer .control-btn:hover,
+#flashcardContainer .setting-btn:hover {
+  color: #4b5563; /* gray-600 */
+  background-color: #f3f4f6; /* gray-100 */
+}
+#flashcardContainer .control-btn:disabled,
+#flashcardContainer .setting-btn:disabled {
+  color: #d1d5db; /* gray-300 */
+  background-color: transparent;
+}
+
+
+/* 閃示卡內部的「跳至首張/末張」按鈕樣式 */
+.card-nav-btn {
+  position: absolute;
+  bottom: 1rem; /* 距離底部 16px */
+  opacity: 0; /* 預設隱藏 */
+  transform: translateY(10px);
+  transition: all 0.2s ease-in-out;
+  
+  @apply p-2 text-gray-400 rounded-full hover:bg-gray-100 hover:text-gray-600;
+}
+
+/* 當滑鼠移到閃示卡上時，顯示導航按鈕 */
+#flashcardContainer:hover .card-nav-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.card-nav-btn.left-4 {
+  left: 1rem; /* 距離左側 16px */
+}
+
+.card-nav-btn.right-4 {
+  right: 1rem; /* 距離右側 16px */
+}
+
+.card-nav-btn:disabled {
+  @apply text-gray-300 cursor-not-allowed hover:bg-transparent pointer-events-none;
+}
+
+
+#repeatBtn.active {
+  color: #1f2937; /* gray-800 */
+  background-color: #e5e7eb; /* gray-200 */
+}
+
+/* --- RWD: 工具列響應式調整 (Responsive Toolbars) --- */
+@media (max-width: 767px) {
+  
+  /* 通用工具列調整：縮小整體留白和元件間距 */
+  .mode-toolbar {
+    padding-left: 0.5rem !important;  /* 8px */
+    padding-right: 0.5rem !important; /* 8px */
+    padding-top: 0.5rem !important;    /* 8px */
+    padding-bottom: 0.5rem !important; /* 8px */
+    gap: 0.5rem 0.25rem !important;    /* 垂直間距8px, 水平間距4px */
+  }
+
+  /* 縮小工具列內的按鈕和選單的內距與字級 */
+  .mode-toolbar button,
+  .mode-toolbar select {
+    padding: 0.375rem 0.5rem; /* 6px 8px */
+    font-size: 0.875rem;     /* 14px */
+  }
+  .mode-toolbar select {
+    padding-right: 1.75rem; /* 確保選單箭頭不會被蓋住 */
+  }
+
+  /* 特別處理純圖示按鈕，使其為方形 */
+  .mode-toolbar button.p-2 {
+     padding: 0.375rem; /* 6px */
+  }
+  
+  /* 縮小圖示尺寸 */
+  .mode-toolbar .material-icons {
+    font-size: 1.25rem !important; /* 20px */
+  }
+
+  /* 調整工具列內群組的間距 */
+  .mode-toolbar > div {
+     gap: 0.25rem; /* 4px */
+  }
+  
+  /* 遊戲設定選項群組的間距 */
+  .mode-toolbar #matchingOptions,
+  .mode-toolbar #quizOptionsContainer,
+  .mode-toolbar #sortingOptions {
+    gap: 0.375rem; /* 6px */
+  }
+  
+  /* 學習模式的文字按鈕，縮小左右內距 */
+  .mode-toolbar button.px-3 {
+    padding-left: 0.5rem;  /* 8px */
+    padding-right: 0.5rem; /* 8px */
+  }
+  
+  /* 學習模式中，在小螢幕隱藏按鈕文字，只保留圖示以節省空間 */
+  .mode-toolbar #hideHakka span:last-child,
+  .mode-toolbar #hidePinyin span:last-child,
+  .mode-toolbar #hideChinese span:last-child {
+    display: none;
+  }
+}
