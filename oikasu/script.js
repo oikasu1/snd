@@ -2415,7 +2415,6 @@ function setupQuizGame() {
   }
 }
 
-
 function startQuizGame() {
   const sentences = getSelectedSentences()
   const condition = document.getElementById("quizCondition").value
@@ -2656,8 +2655,6 @@ function selectQuizOption(selectedAnswer, element) {
 
   quizGameState.isAnswered = true
   quizGameState.total++
-  // 【移除】下面這一行程式碼
-  // document.getElementById("quizTotal").textContent = quizGameState.total
 
   const isCorrect = selectedAnswer === quizGameState.correctAnswer
 
