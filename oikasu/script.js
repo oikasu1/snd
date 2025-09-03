@@ -24,18 +24,192 @@ let quizGameState = {}
 let isFlashcardShuffled = false
 let originalFlashcardOrder = []
 let flashcardKeyHandler = null
+let flashcardBlurStates = { hakka: false, pinyin: false, chinese: false };
+let quizIsBlurred = false;
+let sortingIsBlurred = false;
+let catalog = {};
+let currentCatalogTab = "";
+let learnSelectedText;
+
 
 // 慶祝表情符號
 const celebrationEmojis = ["🌈", "🌟", "🎊", "🎉", "✨", "💖", "😍", "🥰"]
 
 // 初始化
 function init() {
-  parseData()
-  loadUserData()
-  loadUserSettings()
-  renderCategoryList()
-  setupEventListeners()
-  updateUserDisplay()
+  parseData();
+  parseCatalog();
+  
+  if (Object.keys(catalog).length > 0) {
+    currentCatalogTab = Object.keys(catalog)[0];
+  }
+
+  loadUserData();
+  loadUserSettings();
+  renderCatalogTabs();
+  renderCategoryList();
+  setupEventListeners();
+  updateUserDisplay();  
+
+  learnSelectedText = document.getElementById("learnSelectedText");
+  document.getElementById("learnSelected").addEventListener("click", startLearning);
+  document.getElementById("currentTabSelectAll").addEventListener("change", toggleCurrentTabSelection);
+  document.getElementById("clearAllSelections").addEventListener("click", clearAllSelections);
+}
+
+// 解析分類群組資料
+function parseCatalog() {
+  const lines = myCatalog.trim().split("\n");
+  lines.forEach(line => {
+    const parts = line.split("\t");
+    if (parts.length === 2) {
+      const key = parts[0].trim();
+      const value = parts[1].split(',').map(item => item.trim());
+      catalog[key] = value;
+    }
+  });
+}
+
+// 【替換】使用新的函數來處理頁籤溢出
+function renderCatalogTabs() {
+    const tabsContainer = document.getElementById("catalogTabs");
+    const moreTabsContainer = document.getElementById("moreTabsContainer");
+    const moreTabsDropdown = document.getElementById("moreTabsDropdown");
+    const container = document.getElementById("catalogTabsContainer");
+
+    if (!tabsContainer || !container) return;
+
+    // 暫時清空
+    tabsContainer.innerHTML = "";
+    moreTabsDropdown.innerHTML = "";
+    moreTabsContainer.classList.add("hidden");
+
+    const allTabs = Object.keys(catalog);
+    let visibleTabs = [];
+    let overflowTabs = [];
+
+    // 先把所有按鈕都創建出來，但不顯示，以便測量寬度
+    const tabElements = allTabs.map(tabName => {
+        const button = document.createElement("button");
+        const isActive = tabName === currentCatalogTab;
+        button.textContent = tabName;
+        button.className = `
+            px-3 py-1 text-sm font-medium rounded-md transition-colors duration-200 flex-shrink-0
+            ${isActive 
+                ? 'bg-blue-100 text-blue-800'
+                : 'text-gray-600 hover:bg-gray-100'
+            }
+        `;
+        button.onclick = () => selectCatalogTab(tabName);
+        return button;
+    });
+
+    // 使用 requestAnimationFrame 確保元素已渲染以進行寬度計算
+    requestAnimationFrame(() => {
+        const viewToggleBtn = document.getElementById("viewToggle");
+        // 計算可用空間 (容器寬度 - 切換檢視按鈕寬度 - 一些間距)
+        const availableWidth = container.offsetWidth - viewToggleBtn.offsetWidth - 20;
+        let currentWidth = 0;
+        let hasOverflow = false;
+
+        tabsContainer.append(...tabElements); // 先全部放入以便計算
+
+        tabElements.forEach(button => {
+            if (hasOverflow) {
+                overflowTabs.push(button);
+                return;
+            }
+            currentWidth += button.offsetWidth + 8; // 8是 gap-2 的大約值
+            if (currentWidth < availableWidth) {
+                visibleTabs.push(button);
+            } else {
+                hasOverflow = true;
+                overflowTabs.push(button);
+            }
+        });
+        
+        // 重新渲染正確的 tabs
+        tabsContainer.innerHTML = "";
+        tabsContainer.append(...visibleTabs);
+
+        if (hasOverflow) {
+            moreTabsContainer.classList.remove("hidden");
+            overflowTabs.forEach(button => {
+                // 為了下拉選單的樣式，我們重新創建元素
+                const dropdownItem = document.createElement("a");
+                const isActive = button.textContent === currentCatalogTab;
+                dropdownItem.textContent = button.textContent;
+                dropdownItem.href = "#";
+                dropdownItem.className = `block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 ${isActive ? 'bg-blue-50' : ''}`;
+                dropdownItem.onclick = (e) => {
+                    e.preventDefault();
+                    selectCatalogTab(button.textContent);
+                    moreTabsDropdown.classList.add('hidden');
+                };
+                moreTabsDropdown.appendChild(dropdownItem);
+            });
+        }
+    });
+}
+
+
+// 切換目前頁籤的全選/取消全選
+function toggleCurrentTabSelection(event) {
+    const isChecked = event.target.checked;
+    const categoriesInCurrentTab = catalog[currentCatalogTab] || [];
+    
+    categoriesInCurrentTab.forEach(category => {
+        if (categories[category]) { // 確保分類存在
+            if (isChecked) {
+                selectedCategories.add(category);
+            } else {
+                selectedCategories.delete(category);
+            }
+        }
+    });
+    renderCategoryList();
+    updateSelectionToolbar();
+}
+
+// 清除所有選取
+function clearAllSelections() {
+    selectedCategories.clear();
+    renderCategoryList();
+    updateSelectionToolbar();
+}
+
+// 更新目前頁籤的全選核取方塊狀態
+function updateSelectionControlsState() {
+    const currentTabSelectAllCheckbox = document.getElementById("currentTabSelectAll");
+    const categoriesInCurrentTab = catalog[currentCatalogTab] || [];
+
+    if (categoriesInCurrentTab.length === 0) {
+        currentTabSelectAllCheckbox.checked = false;
+        currentTabSelectAllCheckbox.indeterminate = false;
+        return;
+    }
+
+    const selectedCountInTab = categoriesInCurrentTab.filter(category => selectedCategories.has(category)).length;
+
+    if (selectedCountInTab === 0) {
+        currentTabSelectAllCheckbox.checked = false;
+        currentTabSelectAllCheckbox.indeterminate = false;
+    } else if (selectedCountInTab === categoriesInCurrentTab.length) {
+        currentTabSelectAllCheckbox.checked = true;
+        currentTabSelectAllCheckbox.indeterminate = false;
+    } else {
+        currentTabSelectAllCheckbox.checked = false; // 或 true，根據偏好。這裡設定為false表示沒有完全選取。
+        currentTabSelectAllCheckbox.indeterminate = true; // 部分選取
+    }
+}
+
+
+// 處理頁籤選擇事件
+function selectCatalogTab(tabName) {
+    currentCatalogTab = tabName;
+    renderCatalogTabs(); 
+    renderCategoryList();
+    updateSelectionControlsState();
 }
 
 // 解析資料
@@ -333,25 +507,32 @@ function renderCategoryList() {
     const categoryList = document.getElementById("categoryList");
     categoryList.innerHTML = "";
 
-    // 【核心修改】調整格線系統的欄位數，讓卡片變窄
+    // 當處於'list'(清單)模式時，讓容器本身變成一個帶有邊框的白色區塊。
+    // 原本的'space-y-2'會被移除。
     const viewModeClass = currentViewMode === "card" 
         ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
-        : "space-y-2";
+        : "bg-white rounded-xl shadow-sm border";
     categoryList.className = viewModeClass;
+    
+    // 根據當前選擇的頁籤，決定要顯示的分類
+    const categoriesToShow = catalog[currentCatalogTab] || Object.keys(categories);
 
-    Object.keys(categories).forEach((category) => {
+    categoriesToShow.forEach((category) => {
+        // 確保分類存在，避免錯誤
+        if (!categories[category]) return; 
+
         const isSelected = selectedCategories.has(category);
         const emoji = getCategoryEmoji(category);
         const categoryItem = document.createElement("div");
 
-        categoryItem.className = `category-card bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md ${isSelected ? "checkbox-selected" : ""}`;
-        
         categoryItem.onclick = () => toggleCategorySelection(category);
 
         const safeCategory = category.replace(/'/g, "\\'");
 
         if (currentViewMode === "card") {
-            // 卡片內部樣式
+            // 卡片檢視模式的樣式保持不變
+            categoryItem.className = `category-card bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md ${isSelected ? "checkbox-selected" : ""}`;
+            
             categoryItem.innerHTML = `
                 <div class="p-2">
                     <div class="selection-indicator">
@@ -371,8 +552,12 @@ function renderCategoryList() {
                 </div>
             `;
         } else {
-            // List view (清單檢視) 樣式
-            categoryItem.className += " p-3 flex items-center space-x-4";
+            // 清單檢視模式的新樣式
+            // 移除了 bg-white, rounded-xl, shadow-sm 等卡片樣式
+            // 新增 border-b (底部邊框) 與 last:border-b-0 (最後一項無邊框) 來製造分隔線效果
+            // 透過 hover:transform-none 和 hover:shadow-none 取消了原有的卡片浮動效果
+            categoryItem.className = `category-card p-3 flex items-center space-x-4 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-gray-50 hover:transform-none hover:shadow-none ${isSelected ? "checkbox-selected" : ""}`;
+
             categoryItem.innerHTML = `
                 <div class="selection-indicator !left-3 !top-1/2 !-translate-y-1/2">
                     <span class="material-icons text-base">${isSelected ? 'check' : 'radio_button_unchecked'}</span>
@@ -392,8 +577,8 @@ function renderCategoryList() {
     });
 
     updateSelectionToolbar();
+    updateSelectionControlsState(); 
 }
-
 
 // 清除所有勾選的分類
 function clearAllSelections() {
@@ -402,57 +587,78 @@ function clearAllSelections() {
   renderCategoryList();    
   updateSelectionToolbar(); 
 }
-// 切換分類選取
 
+
+// 切換分類選取狀態
 function toggleCategorySelection(category) {
-  if (selectedCategories.has(category)) {
-    selectedCategories.delete(category);
-  } else {
-    selectedCategories.add(category);
-  }
-  saveSelectedCategories();
-  renderCategoryList();    
-  updateSelectionToolbar();
+    if (selectedCategories.has(category)) {
+        selectedCategories.delete(category);
+    } else {
+        selectedCategories.add(category);
+    }
+    renderCategoryList();
+    updateSelectionToolbar();
+    updateSelectionControlsState();
 }
 
 
 
 // 更新選取工具條
-// 更新選取工具條
 function updateSelectionToolbar() {
-    const selectionToolbar = document.getElementById("selectionToolbar");
-    const count = selectedCategories.size;
-    const selectionCount = document.getElementById("selectionCount");
     const learnSelectedButton = document.getElementById("learnSelected");
-    const mainContent = document.querySelector("main"); // 獲取 main 元素
+    const selectionControls = document.getElementById("selectionControls");
+    const count = selectedCategories.size;
 
     if (count > 0) {
-        // 更新計數文字
-        selectionCount.textContent = `已選取 ${count} 個項目`;
-        
-        // 顯示工具列
-        selectionToolbar.classList.remove("hidden");
-
-        // 啟用「學習選取」按鈕
+        // 有選取項目：顯示浮動學習按鈕和頂部選取控制項
+        learnSelectedText.textContent = `學習 ${count} 個選取`;
+        learnSelectedButton.classList.remove("hidden");
         learnSelectedButton.disabled = false;
         learnSelectedButton.classList.remove("opacity-50", "cursor-not-allowed");
 
-        // 為工具列騰出空間，將主要內容往下推
-        mainContent.style.paddingTop = '128px'; // 假設 Header 64px + Toolbar 64px
-
+        selectionControls.classList.remove("hidden");
     } else {
-        // 隱藏工具列
-        selectionToolbar.classList.add("hidden");
-
-        // 禁用「學習選取」按鈕
+        // 無選取項目：隱藏浮動學習按鈕和頂部選取控制項
+        learnSelectedButton.classList.add("hidden");
         learnSelectedButton.disabled = true;
         learnSelectedButton.classList.add("opacity-50", "cursor-not-allowed");
-        
-        // 恢復主要內容的原始間距
-        mainContent.style.paddingTop = ''; // 清除 style，恢復 CSS 原設定
+
+        selectionControls.classList.add("hidden");
     }
 }
 
+// 開始學習選取的項目
+function startLearning() {
+  const selectedCount = selectedCategories.size;
+  if (selectedCount === 0) {
+    showResult("⚠️", "提醒", "請先勾選要學習的主題。");
+    return;
+  }
+
+  // 建立一個臨時的分類名稱，用於顯示在詳情頁標題
+  const tempCategoryName = `已選取的 ${selectedCount} 個主題`;
+  let combinedSentences = [];
+
+  // 從所有選取的分類中收集句子
+  selectedCategories.forEach(categoryName => {
+    if (categories[categoryName]) {
+      combinedSentences = combinedSentences.concat(categories[categoryName]);
+    }
+  });
+  
+  // 為了避免重複的臨時分類，先檢查並刪除舊的
+  Object.keys(categories).forEach(key => {
+    if (key.startsWith("已選取的")) {
+      delete categories[key];
+    }
+  });
+
+  // 將合併後的句子加入到一個臨時的分類中
+  categories[tempCategoryName] = combinedSentences;
+
+  // 顯示這個臨時分類的詳情頁面
+  showCategoryDetail(tempCategoryName);
+}
 
 
 // 切換檢視模式
@@ -933,16 +1139,6 @@ function showFlashcardView() {
         <div id="flashcardContainer" class="bg-white rounded-xl shadow-lg p-8 mb-4 relative overflow-hidden">
             <div class="absolute top-4 left-4 z-10">
                 <div class="flex items-center gap-1">
-                    <div class="relative">
-                        <button id="allSettingsBtn" class="control-btn !p-2" title="設定">
-                            <span class="material-icons">settings</span>
-                        </button>
-                        <div id="allSettingsPopup" class="hidden absolute left-0 mt-2 w-56 bg-white rounded-md shadow-lg border z-20 py-1">
-                            <button id="hideHakkaFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>客語</button>
-                            <button id="hidePinyinFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>拼音</button>
-                            <button id="hideChineseFlash" class="setting-menu-item"><span class="material-icons text-base mr-2">visibility</span>華語</button>
-                        </div>
-                    </div>
                      <label for="flashcardAutoPlayAudio" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-200 cursor-pointer" title="自動播音">
                         <input type="checkbox" id="flashcardAutoPlayAudio" class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-gray-300">
                         <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
@@ -975,9 +1171,9 @@ function showFlashcardView() {
             </div>
 
             <div id="flashcardContent" class="text-center space-y-6 min-h-[250px] flex flex-col justify-center items-center pt-8">
-                <div id="hakkaText" class="hakka-text font-bold text-purple-800" style="font-size: ${userSettings.flashcardFontSize}px"></div>
-                <div id="pinyinText" class="pinyin-text text-gray-600" style="font-size: ${Math.floor(userSettings.flashcardFontSize * 0.8)}px"></div>
-                <div id="chineseText" class="chinese-text text-gray-800" style="font-size: ${Math.floor(userSettings.flashcardFontSize * 0.9)}px"></div>
+                <div id="hakkaText" class="hakka-text font-bold text-purple-800 cursor-pointer" style="font-size: ${userSettings.flashcardFontSize}px"></div>
+                <div id="pinyinText" class="pinyin-text text-gray-600 cursor-pointer" style="font-size: ${Math.floor(userSettings.flashcardFontSize * 0.8)}px"></div>
+                <div id="chineseText" class="chinese-text text-gray-800 cursor-pointer" style="font-size: ${Math.floor(userSettings.flashcardFontSize * 0.9)}px"></div>
             </div>
 
             <button id="goToFirstCard" class="card-nav-btn left-4" title="跳至首張 (Home)">
@@ -1025,13 +1221,12 @@ function showFlashcardView() {
   setupFlashcardView();
 }
 
-// 找到舊的 updateFlashcard 函數，並用以下新版本完整替換它
 function updateFlashcard() {
   if (flashcardSentences.length === 0) {
     document.getElementById("flashcardContent").innerHTML = '<div class="text-gray-500">沒有可練習的卡片</div>';
     document.getElementById("cardCounter").textContent = "0 / 0";
     // 禁用所有按鈕
-    const controls = ['prevCard', 'nextCard', 'playCardAudio', 'starCard', 'shuffleCards', 'autoPlayBtn', 'filterCardsBtn', 'allSettingsBtn', 'goToFirstCard', 'goToLastCard', 'repeatBtn'];
+    const controls = ['prevCard', 'nextCard', 'playCardAudio', 'starCard', 'shuffleCards', 'autoPlayBtn', 'filterCardsBtn', 'goToFirstCard', 'goToLastCard', 'repeatBtn'];
     controls.forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = true;
@@ -1039,7 +1234,7 @@ function updateFlashcard() {
     return;
   } else {
     // 啟用按鈕 (除了 repeatBtn，它由 autoplay 控制)
-    const controls = ['prevCard', 'nextCard', 'playCardAudio', 'starCard', 'shuffleCards', 'autoPlayBtn', 'filterCardsBtn', 'allSettingsBtn', 'goToFirstCard', 'goToLastCard'];
+    const controls = ['prevCard', 'nextCard', 'playCardAudio', 'starCard', 'shuffleCards', 'autoPlayBtn', 'filterCardsBtn', 'goToFirstCard', 'goToLastCard'];
     controls.forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = false;
@@ -1049,10 +1244,20 @@ function updateFlashcard() {
   const sentence = flashcardSentences[currentCardIndex];
   const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
   
-  document.getElementById("hakkaText").textContent = sentence["客語"];
-  document.getElementById("pinyinText").textContent = sentence["拼音"];
-  document.getElementById("chineseText").textContent = sentence["華語"];
+  const hakkaTextEl = document.getElementById("hakkaText");
+  const pinyinTextEl = document.getElementById("pinyinText");
+  const chineseTextEl = document.getElementById("chineseText");
+
+  hakkaTextEl.textContent = sentence["客語"];
+  pinyinTextEl.textContent = sentence["拼音"];
+  chineseTextEl.textContent = sentence["華語"];
   document.getElementById("cardCounter").textContent = `${currentCardIndex + 1} / ${flashcardSentences.length}`;
+
+  // 根據模糊狀態來切換 class
+  hakkaTextEl.classList.toggle('blur-text', flashcardBlurStates.hakka);
+  pinyinTextEl.classList.toggle('blur-text', flashcardBlurStates.pinyin);
+  chineseTextEl.classList.toggle('blur-text', flashcardBlurStates.chinese);
+
 
   const starIcon = document.getElementById("starIcon");
   if (starredCards.has(sentenceId)) {
@@ -1078,14 +1283,13 @@ function updateFlashcard() {
   document.getElementById("goToFirstCard").disabled = isAtFirst;
   document.getElementById("goToLastCard").disabled = isAtLast;
 
-  document.getElementById("hakkaText").style.fontSize = userSettings.flashcardFontSize + "px";
-  document.getElementById("pinyinText").style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.8) + "px";
-  document.getElementById("chineseText").style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.9) + "px";
+  hakkaTextEl.style.fontSize = userSettings.flashcardFontSize + "px";
+  pinyinTextEl.style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.8) + "px";
+  chineseTextEl.style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.9) + "px";
 }
 
 
 function setupFlashcardControls() {
-    const hideStates = { "客語": "show", "拼音": "show", "華語": "show" };
     let currentInterval = 3;
     let isAutoplayLooping = false;
 
@@ -1099,14 +1303,38 @@ function setupFlashcardControls() {
     const autoPlayPopup = document.getElementById("autoPlayPopup");
     const filterButton = document.getElementById("filterCardsBtn");
     const filterPopup = document.getElementById("filterCardsPopup");
-    const allSettingsButton = document.getElementById("allSettingsBtn");
-    const allSettingsPopup = document.getElementById("allSettingsPopup");
     
     const repeatButton = document.getElementById("repeatBtn");
     const goToFirstButton = document.getElementById("goToFirstCard");
     const goToLastButton = document.getElementById("goToLastCard");
     
     const autoPlayAudioCheckbox = document.getElementById("flashcardAutoPlayAudio");
+    
+    // --- 新增：取得句子元素並設定點擊事件 ---
+    const hakkaTextEl = document.getElementById("hakkaText");
+    const pinyinTextEl = document.getElementById("pinyinText");
+    const chineseTextEl = document.getElementById("chineseText");
+
+    if (hakkaTextEl) {
+        hakkaTextEl.onclick = () => {
+            flashcardBlurStates.hakka = !flashcardBlurStates.hakka;
+            hakkaTextEl.classList.toggle('blur-text', flashcardBlurStates.hakka);
+        };
+    }
+    if (pinyinTextEl) {
+        pinyinTextEl.onclick = () => {
+            flashcardBlurStates.pinyin = !flashcardBlurStates.pinyin;
+            pinyinTextEl.classList.toggle('blur-text', flashcardBlurStates.pinyin);
+        };
+    }
+    if (chineseTextEl) {
+        chineseTextEl.onclick = () => {
+            flashcardBlurStates.chinese = !flashcardBlurStates.chinese;
+            chineseTextEl.classList.toggle('blur-text', flashcardBlurStates.chinese);
+        };
+    }
+    // --- 新增結束 ---
+
 
     if (autoPlayAudioCheckbox) {
         autoPlayAudioCheckbox.checked = userSettings.flashcardAutoPlayAudio;
@@ -1118,8 +1346,7 @@ function setupFlashcardControls() {
     
     const popups = [
         { btn: autoPlayButton, menu: autoPlayPopup },
-        { btn: filterButton, menu: filterPopup },
-        { btn: allSettingsButton, menu: allSettingsPopup }
+        { btn: filterButton, menu: filterPopup }
     ];
 
     popups.forEach(popup => {
@@ -1193,7 +1420,6 @@ function setupFlashcardControls() {
         }
     }
 
-    // 修改：stopAutoPlay 函數
     function stopAutoPlay() {
         if (autoPlayTimer) {
             autoPlayTimer = null;
@@ -1206,11 +1432,10 @@ function setupFlashcardControls() {
                 autoPlayButton.title = "自動播放";
             }
             
-            // 修改：停止播放時，隱藏並重設循環按鈕
             if(repeatButton) {
                 repeatButton.classList.add('hidden');
                 repeatButton.classList.remove("active");
-                isAutoplayLooping = false; // 確保重設循環狀態
+                isAutoplayLooping = false;
             }
             
             if (currentAudio) {
@@ -1219,7 +1444,6 @@ function setupFlashcardControls() {
         }
     }
     
-    // 修改：startAutoPlay 函數
     function startAutoPlay() {
         stopAutoPlay(); 
 
@@ -1229,7 +1453,6 @@ function setupFlashcardControls() {
         autoPlayButton.classList.add("active");
         autoPlayButton.title = "暫停播放";
 
-        // 修改：啟動播放時，顯示循環按鈕
         if(repeatButton) {
             repeatButton.classList.remove('hidden');
         }
@@ -1371,7 +1594,6 @@ function setupFlashcardControls() {
     }
 
     if (flashcardKeyHandler) { document.removeEventListener('keydown', flashcardKeyHandler); }
-    // 修改：加入 's' 鍵的快捷操作
     flashcardKeyHandler = (event) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
       const key = event.key.toLowerCase();
@@ -1389,7 +1611,6 @@ function setupFlashcardControls() {
             event.preventDefault();
             if (goToLastButton) goToLastButton.click();
             break;
-          // 新增 S 鍵功能
           case 's':
             event.preventDefault();
             if (starButton) starButton.click();
@@ -1397,33 +1618,6 @@ function setupFlashcardControls() {
       }
     };
     document.addEventListener('keydown', flashcardKeyHandler);
-
-    const setupHideButton = (buttonId, textId, type) => {
-        const button = document.getElementById(buttonId);
-        if(!button) return;
-        const icon = button.querySelector('.material-icons');
-        button.onclick = (e) => {
-            e.stopPropagation(); 
-            const states = ["show", "blur", "hide"];
-            hideStates[type] = states[(states.indexOf(hideStates[type]) + 1) % states.length];
-            const element = document.getElementById(textId);
-            element.classList.remove("blur-text", "hidden-text");
-            button.classList.remove('active');
-            icon.textContent = 'visibility';
-            if (hideStates[type] === "blur") {
-                element.classList.add("blur-text");
-                icon.textContent = 'blur_on';
-                button.classList.add('active');
-            } else if (hideStates[type] === "hide") {
-                element.classList.add("hidden-text");
-                icon.textContent = 'visibility_off';
-                button.classList.add('active');
-            }
-        };
-    };
-    setupHideButton("hideHakkaFlash", "hakkaText", "客語");
-    setupHideButton("hidePinyinFlash", "pinyinText", "拼音");
-    setupHideButton("hideChineseFlash", "chineseText", "華語");
     
     updateFilterPopup();
 }
@@ -1526,6 +1720,8 @@ function showMatchingGame() {
                                 <option value="4" selected>4組</option>
                                 <option value="5">5組</option>
                                 <option value="6">6組</option>
+                                <option value="7">7組</option>
+                                <option value="8">8組</option>
                             </select>
                             <select id="matchingCondition" class="bg-gray-100 border-gray-300 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="time60">60秒</option>
@@ -1585,140 +1781,9 @@ function showMatchingGame() {
   setupMatchingGame();
 }
 
-function showQuizGame() {
-  stopAllTimers()
-  updateCurrentMode("測驗")
 
-  const total = selectedSentences.size
-  const sentencesArray = Array.from(selectedSentences).map(
-    (index) => categories[currentCategory][index]
-  )
-  const isRandom = document.getElementById("quizRandom").checked
-  const isPinyin = document.getElementById("quizShowPinyin").checked
-  const maxOptions = 4 // 固定為4個選項
-  const quizMode = document.getElementById("quizModeSelect").value
-  const showHakka = document.getElementById("quizShowHakka").checked
 
-  quizGameState = {
-    originalSentences: sentencesArray,
-    currentQuestions: [],
-    questionIndex: 0,
-    correctCount: 0,
-    totalQuestions: total,
-    mode: quizMode,
-    isPinyin: isPinyin,
-    showHakka: showHakka,
-    timerInterval: null,
-    time: 0,
-  }
 
-  // 根據選擇模式準備題目
-  if (quizGameState.mode === "chooseMeaning") {
-    // 華語找客語
-    quizGameState.currentQuestions = quizGameState.originalSentences.map(
-      (s, index) => ({
-        ...s,
-        index,
-        options: generateQuizOptions(s, sentencesArray, "華語", maxOptions),
-      })
-    )
-  } else {
-    // 客語找華語
-    quizGameState.currentQuestions = quizGameState.originalSentences.map(
-      (s, index) => ({
-        ...s,
-        index,
-        options: generateQuizOptions(s, sentencesArray, "客語", maxOptions),
-      })
-    )
-  }
-
-  if (isRandom) {
-    quizGameState.currentQuestions = shuffleArray(
-      quizGameState.currentQuestions
-    )
-  }
-
-  const contentArea = document.getElementById("contentArea")
-  contentArea.innerHTML = `
-        <div class="max-w-4xl mx-auto">
-            <div class="bg-white rounded-lg shadow-sm px-4 py-3 mb-6 border border-gray-200">
-                <div class="flex flex-wrap items-center justify-between gap-3 md:gap-4">
-                    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold">
-                        <span class="material-icons !text-lg text-green-600">check_circle</span>
-                        <div id="quizScore">0 / ${quizGameState.totalQuestions}</div>
-                    </div>
-                    <div class="flex-1 text-center font-semibold text-blue-600">
-                        <span id="quizModeDisplay"></span>
-                    </div>
-                    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold">
-                        <span class="material-icons !text-lg text-blue-600">timer</span>
-                        <div id="quizTimer">00:00</div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="quizQuestionContainer"></div>
-        </div>
-    `
-
-  // 渲染第一道題目
-  renderQuizQuestion()
-  // 開始計時
-  startQuizTimer()
-}
-
-function showSortingGame() {
-  stopAllTimers()
-  updateCurrentMode("排序")
-
-  const sentencesArray = shuffleArray(
-    Array.from(selectedSentences).map(
-      (index) => categories[currentCategory][index]
-    )
-  )
-  const isRandom = document.getElementById("sortingRandom").checked
-  const showPinyin = document.getElementById("sortingShowPinyin").checked
-  const showChinese = document.getElementById("sortingShowChinese").checked
-
-  sortingGameState = {
-    originalSentences: sentencesArray,
-    currentQuestionIndex: 0,
-    currentWords: [],
-    correctCount: 0,
-    totalQuestions: sentencesArray.length,
-    isRandom: isRandom,
-    showPinyin: showPinyin,
-    showChinese: showChinese,
-    timerInterval: null,
-    time: 0,
-  }
-
-  const contentArea = document.getElementById("contentArea")
-  contentArea.innerHTML = `
-        <div class="max-w-4xl mx-auto">
-            <div class="bg-white rounded-lg shadow-sm px-4 py-3 mb-6 border border-gray-200">
-                <div class="flex flex-wrap items-center justify-between gap-3 md:gap-4">
-                    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold">
-                        <span class="material-icons !text-lg text-green-600">check_circle</span>
-                        <div id="sortingScore">0 / ${sortingGameState.totalQuestions}</div>
-                    </div>
-                    <div class="flex-1 text-center font-semibold text-blue-600">
-                        句子排序
-                    </div>
-                    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold">
-                        <span class="material-icons !text-lg text-blue-600">timer</span>
-                        <div id="sortingTimer">00:00</div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="sortingQuestionContainer" class="space-y-4"></div>
-        </div>
-    `
-  renderSortingQuestion()
-  startSortingTimer()
-}
 
 function setupMatchingGame() {
   const isMobile = window.innerWidth < 768;
@@ -2275,8 +2340,6 @@ function showQuizGame() {
                                 <option value="4" selected>4項</option>
                                 <option value="5">5項</option>
                                 <option value="6">6項</option>
-                                <option value="7">7項</option>
-                                <option value="8">8項</option>
                             </select>
                             <select id="quizCondition" class="bg-gray-100 border-gray-300 focus:ring-red-500 focus:border-red-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="time60">60秒</option>
@@ -2299,9 +2362,6 @@ function showQuizGame() {
                                 <input type="checkbox" id="autoPlayAudio" class="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-gray-300">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
                             </label>
-                            <button id="blurQuizText" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="模糊題目文字">
-                                <span class="material-icons text-gray-600 !text-xl align-middle">blur_on</span>
-                            </button>
                             <button id="quizLayoutToggle" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換排版">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
                             </button>
@@ -2337,7 +2397,6 @@ function showQuizGame() {
 
 function setupQuizGame() {
   const isMobile = window.innerWidth < 768;
-  // 確保 quizLayout 存在，並增加 'flow' 為可能的值
   if (!userSettings.quizLayout || !['horizontal', 'vertical', 'flow'].includes(userSettings.quizLayout)) {
       userSettings.quizLayout = isMobile ? 'vertical' : 'horizontal';
   }
@@ -2363,25 +2422,24 @@ function setupQuizGame() {
   const layoutToggleButton = document.getElementById("quizLayoutToggle");
   const layoutIcon = layoutToggleButton.querySelector('.material-icons');
   
-  // 根據當前模式，設定下一個模式的圖示與提示文字
   function updateLayoutButton() {
     switch (quizLayout) {
       case 'horizontal':
-        layoutIcon.textContent = 'view_agenda'; // 下一個是 vertical
+        layoutIcon.textContent = 'view_agenda';
         layoutToggleButton.title = '切換為垂直列表';
         break;
       case 'vertical':
-        layoutIcon.textContent = 'wrap_text'; // 下一個是 flow
+        layoutIcon.textContent = 'wrap_text';
         layoutToggleButton.title = '切換為置中排列';
         break;
       case 'flow':
-        layoutIcon.textContent = 'view_column'; // 下一個是 horizontal
+        layoutIcon.textContent = 'view_column';
         layoutToggleButton.title = '切換為左右平分';
         break;
     }
   }
   
-  updateLayoutButton(); // 初始化按鈕狀態
+  updateLayoutButton();
 
   layoutToggleButton.onclick = () => {
     const layouts = ['horizontal', 'vertical', 'flow'];
@@ -2390,27 +2448,10 @@ function setupQuizGame() {
     
     userSettings.quizLayout = quizLayout;
     saveUserSettings();
-    updateLayoutButton(); // 更新圖示與提示
+    updateLayoutButton();
 
     if (quizGameState.isPlaying) {
       renderQuizQuestion();
-    }
-  }
-
-  let isBlurred = false
-  const blurButton = document.getElementById("blurQuizText")
-  blurButton.onclick = () => {
-    isBlurred = !isBlurred
-    const questionElement = document.querySelector("#quizArea .question-text")
-    
-    if (questionElement) {
-      if (isBlurred) {
-        questionElement.classList.add("blur-text")
-        blurButton.classList.add("bg-blue-100", "text-blue-700")
-      } else {
-        questionElement.classList.remove("blur-text")
-        blurButton.classList.remove("bg-blue-100", "text-blue-700")
-      }
     }
   }
 }
@@ -2587,15 +2628,13 @@ function generateQuizQuestion() {
 
 function renderQuizQuestion() {
   const quizArea = document.getElementById("quizArea");
-  const questionNumber = quizGameState.currentIndex + 1;
+  const questionNumber = quizGameState.total + 1;
   
   let optionsHtml = '';
   let containerClass = '';
 
-  // 根據 quizLayout 決定容器 class 和選項的 HTML
   switch (quizLayout) {
     case 'horizontal':
-      // 【修正】加上 quiz-horizontal 類別
       containerClass = 'quiz-horizontal grid grid-cols-2 gap-4';
       optionsHtml = quizGameState.options.map((option, index) => `
         <button class="quiz-option bg-white rounded-lg text-left hover:shadow-md transition-all" 
@@ -2607,7 +2646,6 @@ function renderQuizQuestion() {
       break;
 
     case 'vertical':
-      // 【修正】加上 quiz-vertical 類別
       containerClass = 'quiz-vertical space-y-3';
       optionsHtml = quizGameState.options.map((option, index) => `
         <button class="quiz-option bg-white rounded-lg text-left hover:shadow-md transition-all" 
@@ -2637,7 +2675,7 @@ function renderQuizQuestion() {
                     class="text-gray-800 hover:bg-gray-100 p-2 rounded transition-colors">
                 <span class="material-icons">volume_up</span>
             </button>
-            <div id="quizQuestion" class="text-2xl font-bold text-red-800" style="font-size: ${userSettings.fontSize + 4}px">
+            <div id="quizQuestion" class="text-2xl font-bold text-red-800 cursor-pointer" style="font-size: ${userSettings.fontSize + 4}px">
                 <span class="question-number">${questionNumber}. </span><span class="question-text">${quizGameState.currentQuestion}</span>
             </div>
         </div>
@@ -2647,52 +2685,69 @@ function renderQuizQuestion() {
         ${optionsHtml}
     </div>
   `;
+
+  const questionContainer = document.getElementById('quizQuestion');
+  const questionTextEl = questionContainer?.querySelector('.question-text');
+
+  if (questionContainer && questionTextEl) {
+      questionTextEl.classList.toggle('blur-text', quizIsBlurred);
+
+      questionContainer.onclick = () => {
+          quizIsBlurred = !quizIsBlurred; 
+          questionTextEl.classList.toggle('blur-text', quizIsBlurred);
+      };
+  }
 }
 
-
 function selectQuizOption(selectedAnswer, element) {
-  if (quizGameState.isAnswered) return
+  if (quizGameState.isAnswered) return;
 
-  quizGameState.isAnswered = true
-  quizGameState.total++
+  quizGameState.isAnswered = true;
+  quizGameState.total++;
 
-  const isCorrect = selectedAnswer === quizGameState.correctAnswer
+  const isCorrect = selectedAnswer.trim() === quizGameState.correctAnswer.trim();
 
   document.querySelectorAll(".quiz-option").forEach((option) => {
-    option.classList.add("quiz-answered")
-    option.textContent = option.textContent.trim()
+    option.classList.add("quiz-answered");
+    
+    // 【修改】使用更穩健的方式來獲取選項的純文字內容，以進行比對
+    let rawOptionText = option.textContent.trim();
+    if (rawOptionText.match(/^[A-H]\.\s/)) { // 處理 "A. " 或 "B. " 這種前綴
+        rawOptionText = rawOptionText.substring(3).trim();
+    }
 
-    if (option.textContent.substring(3) === quizGameState.correctAnswer) {
-      option.classList.add("quiz-correct")
+    if (rawOptionText === quizGameState.correctAnswer) {
+      option.classList.add("quiz-correct");
+      // 當使用者答對時，在正確的選項上觸發慶祝特效
       if (isCorrect) {
-        showCelebration(option)
+        showCelebration(option);
       }
     } else if (option === element && !isCorrect) {
-      option.classList.add("quiz-incorrect")
+      option.classList.add("quiz-incorrect");
     }
-  })
+  });
 
   if (isCorrect) {
-    quizGameState.correct++
-    document.getElementById("quizCorrect").textContent = quizGameState.correct
+    quizGameState.correct++;
+    document.getElementById("quizCorrect").textContent = quizGameState.correct;
   } else {
-    quizGameState.incorrect++
-    document.getElementById("quizIncorrect").textContent = quizGameState.incorrect
+    quizGameState.incorrect++;
+    document.getElementById("quizIncorrect").textContent = quizGameState.incorrect;
   }
 
-  const condition = document.getElementById("quizCondition").value
+  const condition = document.getElementById("quizCondition").value;
   if (condition.startsWith("correct")) {
-    const target = Number.parseInt(condition.replace("correct", ""))
+    const target = Number.parseInt(condition.replace("correct", ""));
     if (quizGameState.correct >= target) {
-      setTimeout(() => endQuizGame(`恭喜達成目標！\n答對 ${target} 題`), 1500)
-      return
+      setTimeout(() => endQuizGame(`恭喜達成目標！\n答對 ${target} 題`), 1500);
+      return;
     }
   }
 
   setTimeout(() => {
-    quizGameState.currentIndex++
-    generateQuizQuestion()
-  }, 1500)
+    quizGameState.currentIndex++;
+    generateQuizQuestion();
+  }, 1500);
 }
 
 function endQuizGame(message) {
@@ -2830,9 +2885,6 @@ function showSortingGame() {
                                 <input type="checkbox" id="sortingPlaySound" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300" checked>
                                 <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
                             </label>
-                            <button id="blurSortingText" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="模糊題目文字">
-                                <span class="material-icons text-gray-600 !text-xl align-middle">blur_on</span>
-                            </button>
                             <button onclick="adjustFontSize(-1, 'sorting')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
                             </button>
@@ -2885,24 +2937,6 @@ function setupSortingGame() {
   }
   
   document.getElementById("startSorting").onclick = startSortingGame;
-
-  // 【新增】模糊題目按鈕的邏輯
-  let isBlurred = false;
-  const blurButton = document.getElementById("blurSortingText");
-  blurButton.onclick = () => {
-    isBlurred = !isBlurred;
-    const questionElement = document.querySelector("#sortingArea .question-text");
-    
-    if (questionElement) {
-      if (isBlurred) {
-        questionElement.classList.add("blur-text");
-        blurButton.classList.add("bg-blue-100", "text-blue-700");
-      } else {
-        questionElement.classList.remove("blur-text");
-        blurButton.classList.remove("bg-blue-100", "text-blue-700");
-      }
-    }
-  };
 }
 
 
@@ -3094,7 +3128,7 @@ function renderSortingQuestion() {
                         class="text-gray-800 hover:bg-gray-100 p-2 rounded transition-colors">
                     <span class="material-icons">volume_up</span>
                 </button>
-                <div class="text-2xl font-bold text-indigo-800" style="font-size: ${userSettings.fontSize + 4}px">
+                <div id="sortingQuestion" class="text-2xl font-bold text-indigo-800 cursor-pointer" style="font-size: ${userSettings.fontSize + 4}px">
                     <span class="question-number">${questionNumber}. </span><span class="question-text">${sortingGameState.questionText}</span>
                 </div>
             </div>
@@ -3143,6 +3177,18 @@ function renderSortingQuestion() {
             </div>
         </div>
     `;
+
+    const questionContainer = document.getElementById('sortingQuestion');
+    const questionTextEl = questionContainer?.querySelector('.question-text');
+
+    if (questionContainer && questionTextEl) {
+        questionTextEl.classList.toggle('blur-text', sortingIsBlurred);
+
+        questionContainer.onclick = () => {
+            sortingIsBlurred = !sortingIsBlurred;
+            questionTextEl.classList.toggle('blur-text', sortingIsBlurred);
+        };
+    }
 }
 
 function addToTarget(word, index) {
@@ -3266,9 +3312,7 @@ function showResult(icon, title, message) {
 }
 
 // 設置事件監聽器
-
 function setupEventListeners() {
-  // ---【修改後】整合的搜尋功能設定 ---
   const mainTitle = document.getElementById("mainTitle");
   const mobileSearchBox = document.getElementById("mobileSearchBox");
   const searchToggle = document.getElementById("searchToggle");
@@ -3293,7 +3337,7 @@ function setupEventListeners() {
     searchToggle.classList.add("hidden");
     
     mobileSearchBox.classList.remove("hidden");
-    searchOverlay.classList.remove("hidden"); // 【新增】顯示遮罩
+    searchOverlay.classList.remove("hidden");
     mobileSearchInput.focus();
   };
 
@@ -3304,12 +3348,12 @@ function setupEventListeners() {
     searchToggle.classList.remove("hidden");
 
     mobileSearchBox.classList.add("hidden");
-    searchOverlay.classList.add("hidden"); // 【新增】隱藏遮罩
+    searchOverlay.classList.add("hidden");
     mobileSearchInput.value = "";
     searchResults.classList.add("hidden");
   };
 
-  // 【新增】點擊遮罩層時，觸發關閉按鈕的功能
+  // 點擊遮罩層時，觸發關閉按鈕的功能
   searchOverlay.onclick = () => {
     closeMobileSearch.click();
   };
@@ -3333,7 +3377,31 @@ function setupEventListeners() {
     }
   });
 
-  // --- 以下保留原有的其他事件監聽器 ---
+    // 處理「更多頁籤」按鈕的點擊事件
+    const moreTabsButton = document.getElementById("moreTabsButton");
+    const moreTabsDropdown = document.getElementById("moreTabsDropdown");
+    if (moreTabsButton && moreTabsDropdown) {
+        moreTabsButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            moreTabsDropdown.classList.toggle("hidden");
+        });
+    }
+
+    // 點擊頁面其他地方時，關閉下拉選單
+    document.addEventListener("click", () => {
+        if (moreTabsDropdown && !moreTabsDropdown.classList.contains("hidden")) {
+            moreTabsDropdown.classList.add("hidden");
+        }
+    });
+
+    // 當視窗大小改變時，重新計算頁籤是否溢出
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            renderCatalogTabs();
+        }, 150); // debounce to avoid excessive calls
+    });
 
   // 檢視切換
   document.getElementById("viewToggle").onclick = () => {
@@ -3461,34 +3529,6 @@ function setupEventListeners() {
     }
   }
 
-  // 選取工具條
-  document.getElementById("selectAll").onclick = () => {
-    Object.keys(categories).forEach((category) => {
-      selectedCategories.add(category)
-    })
-    renderCategoryList()
-  }
-
-  document.getElementById("deselectAll").onclick = () => {
-    selectedCategories.clear()
-    renderCategoryList()
-  }
-
-  document.getElementById("learnSelected").onclick = () => {
-    if (selectedCategories.size > 0) {
-      // 合併選中分類的句子
-      const combinedSentences = []
-      selectedCategories.forEach((category) => {
-        combinedSentences.push(...categories[category])
-      })
-
-      // 創建臨時分類
-      const tempCategory = `已選取的 ${selectedCategories.size} 個主題`
-      categories[tempCategory] = combinedSentences
-      showCategoryDetail(tempCategory)
-    }
-  }
-
   // 選單下拉功能
   document.getElementById("menuToggle").onclick = (e) => {
     e.stopPropagation()
@@ -3574,9 +3614,7 @@ function setupEventListeners() {
   document.getElementById("closeResult").onclick = () => {
     document.getElementById("resultModal").classList.add("hidden")
   }
-	document.getElementById("deselectAll").addEventListener("click", () => {
-		clearAllSelections();
-	});
+
 }
 
 // 停止所有計時器

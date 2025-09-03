@@ -17,7 +17,8 @@
 
         <div id="mainMenu" class="min-h-screen">
             
-            <header class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
+            <header class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40 shadow-sm">
+
                 <div class="container mx-auto px-4 py-3">
                     <div class="flex items-center justify-between gap-4">
                         
@@ -53,9 +54,6 @@
                                     </div>
                                 </div>
                                 
-                                <button id="viewToggle" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors" title="切換檢視" aria-label="切換檢視模式">
-                                    <span class="material-icons">grid_view</span>
-                                </button>
                             </div>
                             <div id="searchResults" class="search-results hidden"></div>
                         </div>
@@ -87,33 +85,50 @@
                     </div>
                 </div>
             </header>
-            
-			<div id="selectionToolbar" class="hidden bg-gray-100 border-b border-gray-300 fixed top-16 left-0 right-0 z-30 shadow-sm">
-				<div class="container mx-auto px-4 py-2">
-					<div id="selectionContent" class="flex items-center justify-between">
-						<div class="flex items-center gap-4">
-							<button id="deselectAll" class="p-2 rounded-full hover:bg-gray-200 transition-colors text-gray-700" title="取消選取">
-								<span class="material-icons">close</span>
+
+
+            <main class="bg-gray-50 min-h-screen pt-20 md:pt-14">
+                <section class="container mx-auto px-4 py-8 pb-24">
+
+					<div class="mb-6 pb-4 border-b border-gray-200 flex items-center justify-between gap-2">
+
+						<div id="selectionControls" class="flex items-center gap-2 flex-shrink-0 hidden">
+							<input type="checkbox" id="currentTabSelectAll" class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+							<button id="clearAllSelections" class="p-1 rounded-full hover:bg-gray-200 transition-colors text-gray-600" title="取消所有選取">
+								<span class="material-icons text-base">close</span>
 							</button>
-							<span id="selectionCount" class="text-base font-semibold text-gray-800"></span>
 						</div>
-						<div class="flex items-center gap-4">
-                            <button id="selectAll" class="px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-200 rounded-lg transition-colors">全選</button>
-						    <button id="learnSelected" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center gap-2">
-							    <span class="material-icons text-base">school</span>
-							    <span>學習選取</span>
-						    </button>
+
+                        <div id="catalogTabsContainer" class="flex-grow flex items-center gap-2 overflow-hidden">
+						    <div id="catalogTabs" class="flex items-center gap-2 whitespace-nowrap"></div>
                         </div>
+
+                        <div id="moreTabsContainer" class="relative hidden flex-shrink-0">
+                            <button id="moreTabsButton" class="p-2 rounded-lg hover:bg-gray-100">
+                                <span class="material-icons text-gray-600">more_vert</span>
+                            </button>
+                            <div id="moreTabsDropdown" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-20 py-1">
+                                </div>
+                        </div>
+
+                        <button id="viewToggle" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors flex-shrink-0" title="切換檢視" aria-label="切換檢視模式">
+                            <span class="material-icons">grid_view</span>
+                        </button>
 					</div>
-				</div>
-			</div>
-            
-            <main class="bg-gray-50 min-h-screen pt-20 md:pt-24">
-                <section class="container mx-auto px-4 py-8">
-                    <div id="categoryList"></div>
-                </section>
-            </main>
-        </div>
+
+					<div id="categoryList"></div>
+				</section>
+
+				<button id="learnSelected" class="hidden fixed bottom-6 right-6 md:bottom-8 md:right-8 lg:bottom-10 lg:right-10 
+						   px-6 py-3 bg-blue-600 text-white rounded-full shadow-lg 
+						   hover:bg-blue-700 transition-all duration-300 
+						   font-semibold text-lg flex items-center gap-2 z-40">
+					<span class="material-icons text-xl">rocket_launch</span>
+					<span id="learnSelectedText">學習選取</span>
+				</button>
+			</main>
+
+		</div>
 
 		<div id="categoryDetail" class="hidden min-h-screen bg-gray-50">
 		    <header id="topNav" class="bg-white border-b border-gray-200 top-0 z-20">
