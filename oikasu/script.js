@@ -10,7 +10,7 @@ const selectedSentences = new Set()
 let gameTimer = null
 const gameStats = { correct: 0, total: 0, score: 0, steps: 0 }
 let userSettings = {}
-const starredCards = new Set()
+let starredCards = new Set()
 let currentCardIndex = 0
 let flashcardSentences = []
 let autoPlayTimer = null
@@ -64,20 +64,41 @@ function parseCatalog() {
     const parts = line.split("\t");
     if (parts.length === 2) {
       const key = parts[0].trim();
-      const value = parts[1].split(',').map(item => item.trim());
-      catalog[key] = value;
+      const valueStr = parts[1].trim();
+
+      // 檢查是否為新的章節格式
+      if (valueStr.startsWith('{')) {
+        const chapters = [];
+        const regex = /\{([^:]+):([^}]+)\}/g;
+        let match;
+        while ((match = regex.exec(valueStr)) !== null) {
+          chapters.push({
+            title: match[1].trim(),
+            // 將分類字串分割成陣列，並過濾掉因結尾逗號可能產生的空字串
+            categories: match[2].split(',').map(item => item.trim()).filter(Boolean)
+          });
+        }
+        catalog[key] = { type: 'chapters', data: chapters };
+      } else {
+        // 處理舊的、簡單的列表格式
+        const categories = valueStr.split(',').map(item => item.trim());
+        catalog[key] = { type: 'list', data: categories };
+      }
     }
   });
 }
 
-// 【替換】使用新的函數來處理頁籤溢出
+// 使用新的函數來處理頁籤溢出
 function renderCatalogTabs() {
     const tabsContainer = document.getElementById("catalogTabs");
     const moreTabsContainer = document.getElementById("moreTabsContainer");
     const moreTabsDropdown = document.getElementById("moreTabsDropdown");
     const container = document.getElementById("catalogTabsContainer");
 
-    if (!tabsContainer || !container) return;
+    // 【新增的防護】如果容器是隱藏的(寬度為0)，則不執行後續程式碼
+    if (!tabsContainer || !container || container.offsetWidth === 0) {
+        return; 
+    }
 
     // 暫時清空
     tabsContainer.innerHTML = "";
@@ -153,10 +174,162 @@ function renderCatalogTabs() {
 }
 
 
+
+/**
+ * 根據分類名稱和數量，建立一個卡片或列表項的 HTML 元素。
+ * @param {string} categoryName - 分類名稱 (例如 "01天氣" 或 "星號").
+ * @param {number} cardCount - 該分類下的句子數量.
+ * @returns {HTMLElement} - 代表該分類的 div 元素.
+ */
+function createCategoryCardElement(categoryName, cardCount) {
+    const isSelected = selectedCategories.has(categoryName);
+    const emoji = getCategoryEmoji(categoryName);
+    const categoryItem = document.createElement("div");
+
+    const isStarredCategory = categoryName === "星號";
+    const titleClickAction = isStarredCategory 
+        ? `event.stopPropagation(); showStarredCategory()`
+        : `event.stopPropagation(); showCategoryDetail('${categoryName.replace(/'/g, "\\'")}')`;
+    
+    categoryItem.onclick = () => toggleCategorySelection(categoryName);
+
+    if (currentViewMode === "card") {
+        // 僅透過 className 控制選取狀態
+        categoryItem.className = `category-card bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md ${isSelected ? "checkbox-selected selected-border" : ""}`;
+        categoryItem.innerHTML = `
+            <div class="p-2">
+                <div class="flex items-center space-x-2"> <div class="text-4xl">
+                        ${emoji}
+                    </div>
+                    <div>
+                        <h3 class="category-title-link text-lg text-gray-800" onclick="${titleClickAction}">
+                            ${categoryName}
+                        </h3>
+                        <p class="text-sm text-gray-500">${cardCount} 句</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else { // list view (保持不變)
+        categoryItem.className = `category-card p-3 flex items-center space-x-4 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-gray-50 hover:transform-none hover:shadow-none ${isSelected ? "checkbox-selected" : ""}`;
+        categoryItem.innerHTML = `
+            <div class="selection-indicator !left-3 !top-1/2 !-translate-y-1/2">
+                <span class="material-icons text-base">${isSelected ? 'check' : 'radio_button_unchecked'}</span>
+            </div>
+            <div class="pl-8 flex items-center space-x-4">
+                <span class="text-2xl">${emoji}</span>
+                <div class="flex items-baseline gap-x-3">
+                    <h3 class="category-title-link text-lg text-gray-800" onclick="${titleClickAction}">
+                        ${categoryName}
+                    </h3>
+                    <p class="text-sm text-gray-500 flex-shrink-0">${cardCount} 句</p>
+                </div>
+            </div>
+        `;
+    }
+    return categoryItem;
+}
+
+function getCategoriesInCurrentTab() {
+    const tabData = catalog[currentCatalogTab];
+    if (!tabData) return [];
+
+    if (tabData.type === 'list') {
+        return tabData.data;
+    } else { // type === 'chapters'
+        // 使用 flatMap 將所有章節的分類合併成一個陣列
+        return tabData.data.flatMap(chapter => chapter.categories);
+    }
+}
+
+
+// 渲染分類列表
+function renderCategoryList() {
+    const categoryList = document.getElementById("categoryList");
+    categoryList.innerHTML = "";
+    // 主容器本身不帶有佈局樣式，佈局由其子元素決定
+    categoryList.className = "";
+
+    const currentTabData = catalog[currentCatalogTab];
+    if (!currentTabData) return;
+
+    let renderableSections = [];
+    const firstTabName = Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "";
+    const isFirstTab = currentCatalogTab === firstTabName;
+    const hasStarredCards = starredCards.size > 0;
+
+    // 根據新邏輯處理「星號」卡片的顯示
+    if (isFirstTab && hasStarredCards) {
+        if (currentTabData.type === 'chapters') {
+            // **情況1：首頁籤有分章節** -> 顯示「我的收藏」標題
+            renderableSections.push({
+                title: "我的收藏",
+                categories: ["星號"]
+            });
+            renderableSections.push(...currentTabData.data);
+        } else { // type === 'list'
+            // **情況2：首頁籤沒有分章節** -> 將「星號」卡片直接放在最前面，不加標題
+            const combinedCategories = ["星號", ...currentTabData.data];
+            renderableSections.push({
+                title: null, // 不顯示標題
+                categories: combinedCategories
+            });
+        }
+    } else {
+        // 對於其他頁籤，或沒有星號卡片時，照常顯示
+        if (currentTabData.type === 'chapters') {
+            renderableSections.push(...currentTabData.data);
+        } else { // type === 'list'
+            renderableSections.push({
+                title: null,
+                categories: currentTabData.data
+            });
+        }
+    }
+
+    // --- 以下渲染邏輯保持不變 ---
+
+    // 遍歷這個統一的結構並渲染畫面
+    renderableSections.forEach(section => {
+        // 如果有標題，則渲染標題元素
+        if (section.title) {
+            const titleEl = document.createElement("h2");
+            titleEl.className = "text-xl font-bold text-gray-700 mt-6 mb-4 px-2";
+            titleEl.textContent = section.title;
+            categoryList.appendChild(titleEl);
+        }
+
+        // 為本區塊的卡片建立一個容器
+        const container = document.createElement("div");
+        container.className = currentViewMode === "card" 
+            ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
+            : "bg-white rounded-xl shadow-sm border";
+        
+        section.categories.forEach(categoryName => {
+            const isStarredCategory = categoryName === "星號";
+            const cardCount = isStarredCategory ? starredCards.size : (categories[categoryName] ? categories[categoryName].length : 0);
+            
+            // 如果是一般分類但資料不存在，則不渲染
+            if (!isStarredCategory && !categories[categoryName]) return;
+
+            const cardElement = createCategoryCardElement(categoryName, cardCount);
+            container.appendChild(cardElement);
+        });
+
+        // 只有當容器內有卡片時才將其加入到主列表
+        if (container.hasChildNodes()) {
+            categoryList.appendChild(container);
+        }
+    });
+    
+    updateSelectionToolbar();
+    updateSelectionControlsState(); 
+}
+
 // 切換目前頁籤的全選/取消全選
 function toggleCurrentTabSelection(event) {
     const isChecked = event.target.checked;
-    const categoriesInCurrentTab = catalog[currentCatalogTab] || [];
+    const categoriesInCurrentTab = getCategoriesInCurrentTab();
     
     categoriesInCurrentTab.forEach(category => {
         if (categories[category]) { // 確保分類存在
@@ -181,7 +354,7 @@ function clearAllSelections() {
 // 更新目前頁籤的全選核取方塊狀態
 function updateSelectionControlsState() {
     const currentTabSelectAllCheckbox = document.getElementById("currentTabSelectAll");
-    const categoriesInCurrentTab = catalog[currentCatalogTab] || [];
+    const categoriesInCurrentTab = getCategoriesInCurrentTab();
 
     if (categoriesInCurrentTab.length === 0) {
         currentTabSelectAllCheckbox.checked = false;
@@ -198,8 +371,8 @@ function updateSelectionControlsState() {
         currentTabSelectAllCheckbox.checked = true;
         currentTabSelectAllCheckbox.indeterminate = false;
     } else {
-        currentTabSelectAllCheckbox.checked = false; // 或 true，根據偏好。這裡設定為false表示沒有完全選取。
-        currentTabSelectAllCheckbox.indeterminate = true; // 部分選取
+        currentTabSelectAllCheckbox.checked = false;
+        currentTabSelectAllCheckbox.indeterminate = true;
     }
 }
 
@@ -292,6 +465,16 @@ function loadUserSettings() {
   if (selectedData) {
     selectedCategories = new Set(JSON.parse(selectedData))
   }
+  
+  // --- 新增：載入星號紀錄 ---
+  const starredKey = `kasuStarred_${currentUser.id}`;
+  const starredData = localStorage.getItem(starredKey);
+  if (starredData) {
+    starredCards = new Set(JSON.parse(starredData));
+  } else {
+    starredCards = new Set(); // 如果沒有紀錄，確保是空的 Set
+  }
+  // --- 結束 ---
 }
 
 function saveSelectedCategories() {
@@ -327,19 +510,15 @@ function updateUserDisplay() {
 }
 
 // 搜尋功能
-// 搜尋功能
 function handleSearchInput(e) {
-  const query = e.target.value.trim().toLowerCase();
+  // 由於此函數現在由 `handleRealtimeTransform` 觸發，`e.target.value` 已是轉換後的值
+  // 【修改】將查詢中的一個或多個 '-' 替換為空格
+  const query = e.target.value.toLowerCase().replace(/-+/g, ' ');
   const searchResults = document.getElementById("searchResults");
-  const clearSearchBtn = document.getElementById("clearSearch"); // 桌面版清除按鈕
+  const clearSearchBtn = document.getElementById("clearSearch");
 
-  // 根據輸入框是否有文字，顯示或隱藏桌面版的清除按鈕
   if (clearSearchBtn) {
-    if (query.length > 0) {
-      clearSearchBtn.classList.remove('hidden');
-    } else {
-      clearSearchBtn.classList.add('hidden');
-    }
+    clearSearchBtn.classList.toggle('hidden', query.length === 0);
   }
 
   if (query.length < 1) {
@@ -347,52 +526,110 @@ function handleSearchInput(e) {
     return;
   }
 
-  const results = [];
+  let results = [];
+  
+  // --- 規則 1: 彈性元音 (o/oo) 和聲調的正規表示式查詢 ---
+  const createSearchRegex = (pattern, isToneInsensitive = false) => {
+    // 將 'o' 轉換為 '(o|oo)' 以同時匹配 'o' 和 'oo'
+    let regexPattern = pattern.replace(/o/g, '(o|oo)');
+    if (isToneInsensitive) {
+      // 移除所有聲調符號
+      regexPattern = regexPattern.replace(/[ˊˇˋˆ]/g, '');
+    }
+    try {
+      return new RegExp(regexPattern, 'i');
+    } catch (error) {
+      // 如果正則表達式錯誤，返回一個簡單的包含查詢
+      console.error("Regex creation failed:", error);
+      return null;
+    }
+  };
+  
+  const searchInSentences = (isToneInsensitive = false) => {
+    const searchRegex = createSearchRegex(query, isToneInsensitive);
+    if (!searchRegex) return []; // 如果正則表達式建立失敗，返回空
 
-  // 搜尋分類
+    const foundResults = [];
+    Object.entries(categories).forEach(([category, sentences]) => {
+      sentences.forEach((sentence, index) => {
+        // 【修改】將資料庫文本中的一個或多個 '-' 替換為空格
+        let searchText = `${sentence["客語"]} ${sentence["拼音"]} ${sentence["華語"]}`.toLowerCase().replace(/-+/g, ' ');
+        if (isToneInsensitive) {
+          searchText = searchText.replace(/[ˊˇˋˆ]/g, ''); // 移除資料中的聲調
+        }
+
+        if (searchRegex.test(searchText)) {
+          foundResults.push({
+            type: "sentence",
+            title: sentence["客語"],
+            chinese: sentence["華語"],
+            category: category,
+            data: { category, index },
+          });
+        }
+      });
+    });
+    return foundResults;
+  };
+
+  // --- 主要搜尋流程 ---
+  // 1. 先進行包含聲調的標準查詢
+  const sentenceResults = searchInSentences(false);
+  results.push(...sentenceResults);
+
+  // 2. 如果沒有句子結果，且使用者有輸入內容，則進行無聲調的後援查詢
+  if (sentenceResults.length === 0 && query.trim() !== '') {
+    const fallbackResults = searchInSentences(true);
+    results.push(...fallbackResults);
+  }
+
+  // 搜尋分類 (分類搜尋不受聲調影響)
   Object.keys(categories).forEach((category) => {
     if (category.toLowerCase().includes(query)) {
       results.push({
         type: "category",
         title: category,
-        subtitle: `${categories[category].length} 個句子`,
+        subtitle: `${categories[category].length} 句`,
         data: category,
       });
     }
   });
+  
+  // 去除重複的結果 (例如後援查詢可能找到與分類重疊的內容)
+  const uniqueResults = results.filter((v,i,a)=>a.findIndex(t=>(JSON.stringify(t.data) === JSON.stringify(v.data)))===i);
 
-  // 搜尋句子內容
-  Object.entries(categories).forEach(([category, sentences]) => {
-    sentences.forEach((sentence, index) => {
-      const searchText = `${sentence["客語"]} ${sentence["拼音"]} ${sentence["華語"]}`.toLowerCase();
-      if (searchText.includes(query)) {
-        results.push({
-          type: "sentence",
-          title: sentence["客語"],
-          subtitle: `${category} - ${sentence["華語"]}`,
-          data: { category, index },
-        });
-      }
-    });
-  });
 
-  if (results.length > 0) {
-    searchResults.innerHTML = results
+  if (uniqueResults.length > 0) {
+    searchResults.innerHTML = uniqueResults
       .slice(0, 10)
       .map(
-        (result, index) => { // 【修改】增加了 index 參數
-          const emoji = result.type === 'category' ? `<span class="text-xl mr-3">${getCategoryEmoji(result.title)}</span>` : '';
+        (result, index) => {
+          let contentHtml;
+          if (result.type === 'category') {
+            const emoji = getCategoryEmoji(result.title);
+            contentHtml = `
+              <div class="flex items-baseline gap-2 flex-1 min-w-0">
+                <span class="text-xl">${emoji}</span>
+                <span class="font-semibold text-gray-900 truncate">${result.title}</span>
+                <span class="text-sm text-gray-500 truncate flex-shrink-0">${result.subtitle}</span>
+              </div>
+            `;
+          } else {
+            contentHtml = `
+              <div class="min-w-0">
+                <div class="font-semibold text-gray-900 truncate">${result.title}</div>
+                <div class="text-sm text-gray-600 truncate">
+                  <span>${result.chinese}</span>
+                  <span class="text-blue-600 font-medium ml-1">${result.category}</span>
+                </div>
+              </div>
+            `;
+          }
           return `
               <div class="search-result-item p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 flex items-start" 
                    onclick="selectSearchResult('${result.type}', '${JSON.stringify(result.data).replace(/"/g, "&quot;")}')">
                   <span class="mr-3 text-gray-500 font-medium pt-0.5">${index + 1}.</span>
-                  <div class="flex items-center flex-1 min-w-0">
-                      ${emoji}
-                      <div class="min-w-0">
-                        <div class="font-semibold text-gray-900 truncate">${result.title}</div>
-                        <div class="text-sm text-gray-600 truncate">${result.subtitle}</div>
-                      </div>
-                  </div>
+                  ${contentHtml}
               </div>
           `;
         }
@@ -404,6 +641,34 @@ function handleSearchInput(e) {
     searchResults.classList.remove("hidden");
   }
 }
+
+/**
+ * 根據客語拼音輸入規則，轉換查詢字串。
+ * @param {string} query - 使用者輸入的原始字串。
+ * @returns {string} 轉換後的字串。
+ */
+function transformHakkaQuery(query) {
+  // 將查詢字串按空格分割成單詞陣列
+  const words = query.split(' ');
+  const transformedWords = words.map(word => {
+    let newWord = word;
+    // 規則 1: 字尾聲調取代
+    newWord = newWord.replace(/([aeioumngbdr])z$/i, '$1ˊ');
+    newWord = newWord.replace(/([aeioumngbdr])v$/i, '$1ˇ');
+    newWord = newWord.replace(/([aeioumngbdr])s$/i, '$1ˋ');
+    newWord = newWord.replace(/([aeioumngbdr])(x|\^)$/i, '$1ˆ');
+
+    // 規則 2: 開頭字母取代
+    newWord = newWord.replace(/^v([aeiou])/i, 'bb$1');
+    newWord = newWord.replace(/^r([aeiou])/i, 'rh$1');
+    
+    return newWord;
+  });
+  
+  // 將處理過的單詞重新組合成一個字串
+  return transformedWords.join(' ');
+}
+
 
 function selectSearchResult(type, data) {
   const parsedData = JSON.parse(data)
@@ -495,89 +760,69 @@ const emojiMap = myEmoji.trim().split('\n').reduce((acc, line) => {
 }, {});
 
 function getCategoryEmoji(categoryName) {
+    if (categoryName === "星號") {
+        return '🌟';
+    }
     const cleanName = categoryName.replace(/[0-9\s]+/g, '');
     return emojiMap[cleanName] || '📚';
 }
 
 
 
+// 開始學習選取的項目
+function startLearning() {
+  const selectedCount = selectedCategories.size;
+  if (selectedCount === 0) {
+    showResult("⚠️", "提醒", "請先勾選要學習的主題。");
+    return;
+  }
 
-// 渲染分類列表
-function renderCategoryList() {
-    const categoryList = document.getElementById("categoryList");
-    categoryList.innerHTML = "";
+  let combinedSentences = [];
+  const combinedSentenceIds = new Set(); // 用於防止句子重複
 
-    // 當處於'list'(清單)模式時，讓容器本身變成一個帶有邊框的白色區塊。
-    // 原本的'space-y-2'會被移除。
-    const viewModeClass = currentViewMode === "card" 
-        ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
-        : "bg-white rounded-xl shadow-sm border";
-    categoryList.className = viewModeClass;
-    
-    // 根據當前選擇的頁籤，決定要顯示的分類
-    const categoriesToShow = catalog[currentCatalogTab] || Object.keys(categories);
-
-    categoriesToShow.forEach((category) => {
-        // 確保分類存在，避免錯誤
-        if (!categories[category]) return; 
-
-        const isSelected = selectedCategories.has(category);
-        const emoji = getCategoryEmoji(category);
-        const categoryItem = document.createElement("div");
-
-        categoryItem.onclick = () => toggleCategorySelection(category);
-
-        const safeCategory = category.replace(/'/g, "\\'");
-
-        if (currentViewMode === "card") {
-            // 卡片檢視模式的樣式保持不變
-            categoryItem.className = `category-card bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md ${isSelected ? "checkbox-selected" : ""}`;
-            
-            categoryItem.innerHTML = `
-                <div class="p-2">
-                    <div class="selection-indicator">
-                        <span class="material-icons text-base">${isSelected ? 'check' : 'radio_button_unchecked'}</span>
-                    </div>
-                    <div class="flex items-center space-x-2 pl-8">
-                        <div class="text-4xl">
-                            ${emoji}
-                        </div>
-                        <div>
-                            <h3 class="category-title-link text-lg text-gray-800" onclick="event.stopPropagation(); showCategoryDetail('${safeCategory}')">
-                                ${category}
-                            </h3>
-                            <p class="text-sm text-gray-500">${categories[category].length} 句</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else {
-            // 清單檢視模式的新樣式
-            // 移除了 bg-white, rounded-xl, shadow-sm 等卡片樣式
-            // 新增 border-b (底部邊框) 與 last:border-b-0 (最後一項無邊框) 來製造分隔線效果
-            // 透過 hover:transform-none 和 hover:shadow-none 取消了原有的卡片浮動效果
-            categoryItem.className = `category-card p-3 flex items-center space-x-4 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-gray-50 hover:transform-none hover:shadow-none ${isSelected ? "checkbox-selected" : ""}`;
-
-            categoryItem.innerHTML = `
-                <div class="selection-indicator !left-3 !top-1/2 !-translate-y-1/2">
-                    <span class="material-icons text-base">${isSelected ? 'check' : 'radio_button_unchecked'}</span>
-                </div>
-                <div class="pl-8 flex items-center space-x-4">
-                    <span class="text-2xl">${emoji}</span>
-                    <div class="flex items-baseline gap-x-3">
-                        <h3 class="category-title-link text-lg font-bold text-gray-800" onclick="event.stopPropagation(); showCategoryDetail('${safeCategory}')">
-                            ${category}
-                        </h3>
-                        <p class="text-sm text-gray-500 flex-shrink-0">${categories[category].length} 句</p>
-                    </div>
-                </div>
-            `;
-        }
-        categoryList.appendChild(categoryItem);
+  // 優先處理特殊的 "星號" 分類
+  if (selectedCategories.has("星號")) {
+    const starredSentences = sentences.filter(sentence => {
+      const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+      return starredCards.has(sentenceId);
     });
+    
+    starredSentences.forEach(sentence => {
+      const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+      if (!combinedSentenceIds.has(sentenceId)) {
+        combinedSentences.push(sentence);
+        combinedSentenceIds.add(sentenceId);
+      }
+    });
+  }
 
-    updateSelectionToolbar();
-    updateSelectionControlsState(); 
+  // 處理其他常規分類
+  selectedCategories.forEach(categoryName => {
+    if (categoryName !== "星號" && categories[categoryName]) {
+      categories[categoryName].forEach(sentence => {
+        const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+        if (!combinedSentenceIds.has(sentenceId)) {
+          combinedSentences.push(sentence);
+          combinedSentenceIds.add(sentenceId);
+        }
+      });
+    }
+  });
+  
+  const tempCategoryName = `已選取的 ${selectedCount} 個主題`;
+  
+  // 為了避免重複的臨時分類，先檢查並刪除舊的
+  Object.keys(categories).forEach(key => {
+    if (key.startsWith("已選取的")) {
+      delete categories[key];
+    }
+  });
+
+  // 將合併後的句子加入到一個臨時的分類中
+  categories[tempCategoryName] = combinedSentences;
+
+  // 顯示這個臨時分類的詳情頁面
+  showCategoryDetail(tempCategoryName);
 }
 
 // 清除所有勾選的分類
@@ -625,6 +870,27 @@ function updateSelectionToolbar() {
 
         selectionControls.classList.add("hidden");
     }
+}
+
+function showStarredCategory() {
+  const categoryName = "星號";
+  
+  // 從所有句子中，篩選出ID存在於 starredCards 中的句子
+  const starredSentences = sentences.filter(sentence => {
+    const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+    return starredCards.has(sentenceId);
+  });
+
+  // 為了安全起見，先刪除可能存在的舊暫存分類
+  if (categories[categoryName]) {
+      delete categories[categoryName];
+  }
+
+  // 建立一個暫時的 "星號" 分類
+  categories[categoryName] = starredSentences;
+
+  // 顯示這個暫存分類的詳情頁面
+  showCategoryDetail(categoryName);
 }
 
 // 開始學習選取的項目
@@ -859,7 +1125,7 @@ function showLearningView() {
   
   contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
-            <div class="mode-toolbar bg-white rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
+            <div id="learningModeToolbar" class="sticky top-0 z-20 mode-toolbar bg-white rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     
                     <div class="flex items-center gap-1">
@@ -902,6 +1168,7 @@ function showLearningView() {
 
   renderSentences()
   setupLearningControls()
+  setStickyTopPosition();
 }
 
 
@@ -918,6 +1185,28 @@ function updateCompactToggleButton() {
       button.classList.remove("bg-blue-100", "text-blue-700")
     }
   }
+}
+
+function saveStarredCards() {
+  const starredKey = `kasuStarred_${currentUser.id}`;
+  localStorage.setItem(starredKey, JSON.stringify(Array.from(starredCards)));
+}
+
+function toggleStar(index) {
+  const sentence = categories[currentCategory][index];
+  if (!sentence) return;
+
+  // 使用與閃示卡相同的ID邏輯以確保同步
+  const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+
+  if (starredCards.has(sentenceId)) {
+    starredCards.delete(sentenceId);
+  } else {
+    starredCards.add(sentenceId);
+  }
+  
+  saveStarredCards();
+  renderSentences();
 }
 
 function renderSentences() {
@@ -937,11 +1226,15 @@ function renderSentences() {
 
   sentences.forEach((sentence, index) => {
     const isSelected = selectedSentences.has(index);
+    // --- 新增：星號狀態判斷 ---
+    const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+    const isStarred = starredCards.has(sentenceId);
+    const starIcon = isStarred ? 'star' : 'star_border';
+    // --- 結束 ---
     const sentenceItem = document.createElement("div");
 
     if (userSettings.layout === 'compact') {
         sentenceItem.className = "flex items-center gap-3 p-3 border-b last:border-b-0";
-        // 【修改重點】下方的 <div> 結構移除了 flex-basis，讓文字內容能自然緊靠
         sentenceItem.innerHTML = `
             <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded flex-shrink-0" 
                    ${isSelected ? "checked" : ""} 
@@ -951,10 +1244,13 @@ function renderSentences() {
             </button>
             <span class="text-sm text-gray-500 font-mono flex-shrink-0">${index + 1}</span>
             <div class="flex-1 min-w-0 flex items-baseline gap-4">
-                <span class="hakka-text font-bold text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</span>
+                <span class="hakka-text  text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</span>
                 <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</span>
                 <span class="chinese-text text-gray-800 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</span>
             </div>
+            <button onclick="toggleStar(${index})" class="learning-star-btn ml-2" title="標示星號">
+                <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
+            </button>
         `;
     } else { // Card view (single or double)
         sentenceItem.className = "sentence-card bg-white rounded-xl shadow-sm p-6";
@@ -966,12 +1262,17 @@ function renderSentences() {
                     </button>
                     <span class="text-sm text-gray-500 font-mono">${index + 1}</span>
                 </div>
-                <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
-                       ${isSelected ? "checked" : ""} 
-                       onchange="toggleSentenceSelection(${index}, this.checked)">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
+                           ${isSelected ? "checked" : ""} 
+                           onchange="toggleSentenceSelection(${index}, this.checked)">
+                    <button onclick="toggleStar(${index})" class="learning-star-btn" title="標示星號">
+                        <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
+                    </button>
+                </div>
             </div>
             <div class="space-y-3">
-                <div class="hakka-text font-bold text-blue-800 line-spacing-tight" 
+                <div class="hakka-text text-blue-800 line-spacing-tight" 
                      style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</div>
                 <div class="pinyin-text text-gray-600 line-spacing-tight" 
                      style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</div>
@@ -983,10 +1284,8 @@ function renderSentences() {
     container.appendChild(sentenceItem);
   });
   
-  // 渲染完畢後，更新「全選」按鈕的狀態
   updateSelectAllButtonState();
 }
-
 
 function setupLearningControls() {
   const hideStates = { hakka: "show", pinyin: "show", chinese: "show" }
@@ -1408,6 +1707,7 @@ function setupFlashcardControls() {
             clearStarsBtn.onclick = () => {
                  if (starredCards.size > 0) {
                     starredCards.clear();
+                    saveStarredCards(); // 新增：儲存變更
                     if (flashcardPracticeMode === 'starred') {
                         flashcardPracticeMode = 'all';
                     }
@@ -1570,6 +1870,7 @@ function setupFlashcardControls() {
         if (!sentence) return;
         const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
         if (starredCards.has(sentenceId)) { starredCards.delete(sentenceId); } else { starredCards.add(sentenceId); }
+        saveStarredCards(); // 新增：儲存變更
         updateFlashcard();
         updateFilterPopup();
     };
@@ -2353,7 +2654,7 @@ function showQuizGame() {
                                 <option value="correct30">30題</option>
                             </select>
                         </div>
-						<div id="quizTimer" class="text-lg font-mono font-bold text-gray-700 min-w-[5rem]"></div>
+						<div id="quizTimer" class="text-lg font-mono text-gray-700 min-w-[5rem]"></div>
                     </div>
 
                     <div class="flex items-center gap-x-3 gap-y-2 flex-wrap justify-end">
@@ -2675,7 +2976,7 @@ function renderQuizQuestion() {
                     class="text-gray-800 hover:bg-gray-100 p-2 rounded transition-colors">
                 <span class="material-icons">volume_up</span>
             </button>
-            <div id="quizQuestion" class="text-2xl font-bold text-red-800 cursor-pointer" style="font-size: ${userSettings.fontSize + 4}px">
+            <div id="quizQuestion" class="text-2xl text-red-800 cursor-pointer" style="font-size: ${userSettings.fontSize + 4}px">
                 <span class="question-number">${questionNumber}. </span><span class="question-text">${quizGameState.currentQuestion}</span>
             </div>
         </div>
@@ -2876,7 +3177,7 @@ function showSortingGame() {
                                 <option value="correct30">30題</option>
                             </select>
                         </div>
-                        <div id="sortingTimer" class="text-lg font-mono font-bold text-gray-700 min-w-[5rem]"></div>
+                        <div id="sortingTimer" class="text-lg font-mono text-gray-700 min-w-[5rem]"></div>
                     </div>
 
                     <div class="flex items-center gap-x-3 gap-y-2 flex-wrap justify-end">
@@ -3311,6 +3612,16 @@ function showResult(icon, title, message) {
   document.getElementById("resultModal").classList.remove("hidden")
 }
 
+
+function setStickyTopPosition() {
+    const header = document.querySelector('#mainMenu > header');
+    const tabBar = document.getElementById('tabBarStrip');
+    if (header && tabBar) {
+        const headerHeight = header.offsetHeight;
+        tabBar.style.top = `${headerHeight}px`;
+    }
+}
+
 // 設置事件監聽器
 function setupEventListeners() {
   const mainTitle = document.getElementById("mainTitle");
@@ -3323,14 +3634,35 @@ function setupEventListeners() {
   const mobileSearchInput = document.getElementById("mobileSearchInput");
   const closeMobileSearch = document.getElementById("closeMobileSearch");
   const clearSearchBtn = document.getElementById("clearSearch");
-  const searchOverlay = document.getElementById("searchOverlay"); // 【新增】獲取遮罩元素
+  const searchOverlay = document.getElementById("searchOverlay");
+
+	// 處理即時拼音轉換的函數
+	const handleRealtimeTransform = (e) => {
+		const input = e.target;
+		const originalValue = input.value;
+		const cursorPosition = input.selectionStart;
+		const transformedValue = transformHakkaQuery(originalValue);
+
+		if (originalValue !== transformedValue) {
+			// 【修改】計算轉換前後的長度差
+			const lengthDifference = transformedValue.length - originalValue.length;
+			const newCursorPosition = cursorPosition + lengthDifference;
+
+			input.value = transformedValue;
+			
+			// 【修改】恢復游標位置，並根據長度變化進行調整
+			input.setSelectionRange(newCursorPosition, newCursorPosition);
+		}
+		
+		// 觸發搜尋
+		handleSearchInput(e);
+	};
 
   // 將統一的處理函數綁定到電腦版和手機版兩個輸入框
-  searchInput.addEventListener("input", handleSearchInput);
-  mobileSearchInput.addEventListener("input", handleSearchInput);
+  searchInput.addEventListener("input", handleRealtimeTransform);
+  mobileSearchInput.addEventListener("input", handleRealtimeTransform);
 
   // 手機版搜尋 UI 優化
-  // 點擊放大鏡圖示，展開手機搜尋框
   searchToggle.onclick = () => {
     mainTitle.classList.add("hidden");
     viewToggle.classList.add("hidden");
@@ -3341,7 +3673,6 @@ function setupEventListeners() {
     mobileSearchInput.focus();
   };
 
-  // 點擊關閉按鈕，收回手機搜尋框
   closeMobileSearch.onclick = () => {
     mainTitle.classList.remove("hidden");
     viewToggle.classList.remove("hidden");
@@ -3353,11 +3684,9 @@ function setupEventListeners() {
     searchResults.classList.add("hidden");
   };
 
-  // 點擊遮罩層時，觸發關閉按鈕的功能
   searchOverlay.onclick = () => {
     closeMobileSearch.click();
   };
-
 
   // 桌面版清除按鈕的點擊事件
   clearSearchBtn.addEventListener('click', () => {
@@ -3365,6 +3694,7 @@ function setupEventListeners() {
     searchResults.classList.add('hidden');
     clearSearchBtn.classList.add('hidden');
     searchInput.focus();
+    handleSearchInput({ target: searchInput }); // 清除後重新觸發搜尋
   });
 
   // 點擊頁面其他地方，關閉搜尋結果
@@ -3400,7 +3730,7 @@ function setupEventListeners() {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
             renderCatalogTabs();
-        }, 150); // debounce to avoid excessive calls
+        }, 150);
     });
 
   // 檢視切換
@@ -3442,8 +3772,6 @@ function setupEventListeners() {
       saveUserData()
       updateUserDisplay()
       document.getElementById("userModal").classList.add("hidden")
-
-      // 重新載入設定
       loadUserSettings()
     }
   }
@@ -3460,9 +3788,10 @@ function setupEventListeners() {
   document.getElementById("confirmClear").onclick = () => {
     const password = document.getElementById("clearPassword").value
     if (password === "kasu") {
-      // 清除學習記錄
-      const settingsKey = `${STORAGE_PREFIX}settings_${currentUser.id}`
-      localStorage.removeItem(settingsKey)
+      const settingsKey = `${STORAGE_PREFIX}settings_${currentUser.id}`;
+      const starredKey = `kasuStarred_${currentUser.id}`; // 新增：星號紀錄的 key
+      localStorage.removeItem(settingsKey);
+      localStorage.removeItem(starredKey); // 新增：移除星號紀錄
       starredCards.clear()
       selectedCategories.clear()
       selectedSentences.clear()
@@ -3504,8 +3833,7 @@ function setupEventListeners() {
         userDropdownDetail.classList.add("hidden")
       }
     })
-
-    // 詳情頁用戶功能
+    
     document.getElementById("editProfileDetail").onclick = () => {
       userDropdownDetail.classList.add("hidden")
       document.getElementById("editName").value = currentUser.name
@@ -3541,17 +3869,27 @@ function setupEventListeners() {
     }
   })
 
+  // --- 【修改點】 ---
   // 首頁按鈕點擊
   document.getElementById("goHome").onclick = () => {
     stopAllTimers()
-    // 清理臨時分類
+    // --- 修改：增加對 "星號" 分類的清理 ---
     Object.keys(categories).forEach((key) => {
-      if (key.startsWith("已選取的")) {
-        delete categories[key]
+      if (key.startsWith("已選取的") || key === "星號") {
+        delete categories[key];
       }
     })
     document.getElementById("categoryDetail").classList.add("hidden")
     document.getElementById("mainMenu").classList.remove("hidden")
+    
+    // 【新增】重新渲染頁籤以解決溢位問題
+    renderCatalogTabs();
+    // 【新增，解決問題2】重新渲染分類列表，這樣才會根據最新的星號狀態，決定是否顯示「星號」卡片
+    renderCategoryList();
+    // 【新增，解決問題1】重新計算並設定頁籤工具列的黏貼(sticky)位置
+    setStickyTopPosition();
+    // 【新增】返回時將頁面捲動到最頂端
+    window.scrollTo(0, 0);
   }
 
   // 模式切換
@@ -3615,7 +3953,10 @@ function setupEventListeners() {
     document.getElementById("resultModal").classList.add("hidden")
   }
 
+	setStickyTopPosition();
+	window.addEventListener('resize', setStickyTopPosition);
 }
+
 
 // 停止所有計時器
 function stopAllTimers() {

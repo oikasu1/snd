@@ -38,6 +38,10 @@
 
 /* --- 卡片元件 (Card Components) --- */
 
+#categoryList {
+  margin-top: 1rem; /* 16px */
+}
+
 /* 主題卡片 (Category Card) */
 .category-card {
   position: relative;
@@ -361,6 +365,60 @@
    .search-result-item .text-sm {
      font-size: 0.9rem; /* 14.4px */
   }
+
+  /* 通用工具列調整：縮小整體留白和元件間距 */
+  .mode-toolbar {
+    padding-left: 0.5rem !important;  /* 8px */
+    padding-right: 0.5rem !important; /* 8px */
+    padding-top: 0.5rem !important;    /* 8px */
+    padding-bottom: 0.5rem !important; /* 8px */
+    gap: 0.5rem 0.25rem !important;    /* 垂直間距8px, 水平間距4px */
+  }
+
+  /* 縮小工具列內的按鈕和選單的內距與字級 */
+  .mode-toolbar button,
+  .mode-toolbar select {
+    padding: 0.375rem 0.5rem; /* 6px 8px */
+    font-size: 0.875rem;     /* 14px */
+  }
+  .mode-toolbar select {
+    padding-right: 0.5rem; /* 確保選單箭頭不會被蓋住 */
+  }
+
+  /* 特別處理純圖示按鈕，使其為方形 */
+  .mode-toolbar button.p-2 {
+     padding: 0.375rem; /* 6px */
+  }
+  
+  /* 縮小圖示尺寸 */
+  .mode-toolbar .material-icons {
+    font-size: 1.25rem !important; /* 20px */
+  }
+
+  /* 調整工具列內群組的間距 */
+  .mode-toolbar > div {
+     gap: 0.25rem; /* 4px */
+  }
+  
+  /* 遊戲設定選項群組的間距 */
+  .mode-toolbar #matchingOptions,
+  .mode-toolbar #quizOptionsContainer,
+  .mode-toolbar #sortingOptions {
+    gap: 0.375rem; /* 6px */
+  }
+  
+  /* 學習模式的文字按鈕，縮小左右內距 */
+  .mode-toolbar button.px-3 {
+    padding-left: 0.5rem;  /* 8px */
+    padding-right: 0.5rem; /* 8px */
+  }
+  
+  /* 學習模式中，在小螢幕隱藏按鈕文字，只保留圖示以節省空間 */
+  .mode-toolbar #hideHakka span:last-child,
+  .mode-toolbar #hidePinyin span:last-child,
+  .mode-toolbar #hideChinese span:last-child {
+    display: none;
+  }
 }
 
 
@@ -418,60 +476,35 @@
   background-color: #e5e7eb; /* gray-200 */
 }
 
-/* --- RWD: 工具列響應式調整 (Responsive Toolbars) --- */
-@media (max-width: 767px) {
-  
-  /* 通用工具列調整：縮小整體留白和元件間距 */
-  .mode-toolbar {
-    padding-left: 0.5rem !important;  /* 8px */
-    padding-right: 0.5rem !important; /* 8px */
-    padding-top: 0.5rem !important;    /* 8px */
-    padding-bottom: 0.5rem !important; /* 8px */
-    gap: 0.5rem 0.25rem !important;    /* 垂直間距8px, 水平間距4px */
-  }
 
-  /* 縮小工具列內的按鈕和選單的內距與字級 */
-  .mode-toolbar button,
-  .mode-toolbar select {
-    padding: 0.375rem 0.5rem; /* 6px 8px */
-    font-size: 0.875rem;     /* 14px */
-  }
-  .mode-toolbar select {
-    padding-right: 1.75rem; /* 確保選單箭頭不會被蓋住 */
-  }
-
-  /* 特別處理純圖示按鈕，使其為方形 */
-  .mode-toolbar button.p-2 {
-     padding: 0.375rem; /* 6px */
-  }
-  
-  /* 縮小圖示尺寸 */
-  .mode-toolbar .material-icons {
-    font-size: 1.25rem !important; /* 20px */
-  }
-
-  /* 調整工具列內群組的間距 */
-  .mode-toolbar > div {
-     gap: 0.25rem; /* 4px */
-  }
-  
-  /* 遊戲設定選項群組的間距 */
-  .mode-toolbar #matchingOptions,
-  .mode-toolbar #quizOptionsContainer,
-  .mode-toolbar #sortingOptions {
-    gap: 0.375rem; /* 6px */
-  }
-  
-  /* 學習模式的文字按鈕，縮小左右內距 */
-  .mode-toolbar button.px-3 {
-    padding-left: 0.5rem;  /* 8px */
-    padding-right: 0.5rem; /* 8px */
-  }
-  
-  /* 學習模式中，在小螢幕隱藏按鈕文字，只保留圖示以節省空間 */
-  .mode-toolbar #hideHakka span:last-child,
-  .mode-toolbar #hidePinyin span:last-child,
-  .mode-toolbar #hideChinese span:last-child {
-    display: none;
-  }
+.learning-star-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af; /* gray-400 */
+  transition: color 0.2s ease;
 }
+
+.learning-star-btn:hover {
+  color: #fbbf24; /* amber-400 */
+}
+
+/* 讓圖示尺寸與周圍文字大小保持相對一致 */
+.learning-star-btn .material-icons {
+  font-size: 1.25em; 
+}
+
+/* 當星號被標記時 (JS會加上text-yellow-400)，將圖示填滿 */
+.learning-star-btn .material-icons.text-yellow-400 {
+  font-variation-settings: 'FILL' 1;
+}
+
+.category-card.checkbox-selected.selected-border {
+    border: 2px solid theme('colors.blue.500'); /* 使用 Tailwind CSS 的藍色作為邊框 */
+    box-shadow: 0 0 0 3px theme('colors.blue.200'); /* 可選：增加一個更寬的陰影效果 */
+}
+
