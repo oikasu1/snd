@@ -1,7 +1,46 @@
-const STORAGE_PREFIX = "hakkaLearning_" // 可以輕鬆修改這個前置名稱
+// =================================================================
+// 全域設定 (Global Configuration)
+// =================================================================
+const config = {
+    // Local Storage 的獨特前綴，避免與其他應用程式衝突
+    STORAGE_PREFIX: "hakkaLearningApp_v1_",
+
+    // 清除學習記錄時需要輸入的密碼
+    CLEAR_DATA_PASSWORD: "kasu",
+
+    // 慶祝動畫中隨機顯示的表情符號
+    CELEBRATION_EMOJIS: ["🌈", "🌟", "🎊", "🎉", "✨", "💖", "😍", "🥰"],
+
+    // 新使用者的預設設定
+    DEFAULT_USER_SETTINGS: {
+        fontSize: 20,
+        flashcardFontSize: 24,
+        lineSpacing: "loose",
+        layout: "double",
+        viewMode: "card",
+        matchingLayout: '1col',
+        quizLayout: 'horizontal', // 將在初次載入時根據螢幕寬度動態調整
+        flashcardAutoPlayAudio: true,
+        matchingColumns: 2 // 配對遊戲在電腦版的預設欄數
+    },
+
+    // 不同模式下的字體大小級距
+    FONT_SIZES: {
+        learning: [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40],
+        flashcard: [24, 28, 32, 36, 40, 44, 48, 52, 56, 60]
+    },
+
+    // 音檔存放的基礎路徑
+    AUDIO_BASE_PATH: "https://oikasu1.github.io/snd/oikasu/",
+};
+// =================================================================
+
+
+
 // 全域變數
 let sentences = []
 let categories = {}
+let orderedCategories = [];
 let currentUser = { id: "guest", name: "訪客", avatar: "U" }
 let currentCategory = ""
 let currentViewMode = "card"
@@ -32,8 +71,465 @@ let currentCatalogTab = "";
 let learnSelectedText;
 
 
-// 慶祝表情符號
-const celebrationEmojis = ["🌈", "🌟", "🎊", "🎉", "✨", "💖", "😍", "🥰"]
+
+// 將這些新函數貼到 script.js 中 init() 函數之前
+
+/**
+ * 解析 URL 中的 no 參數字串 (例如 "1-3,8") 為數字陣列 [1, 2, 3, 8]
+ * @param {string} noString - 從 URL 獲取的 no 參數值
+ * @returns {number[]|null} 解析後的數字陣列，若格式錯誤則返回 null
+ */
+function parseCategoryNumbers(noString) {
+    const numbers = new Set();
+    if (!noString) return [];
+
+    const parts = noString.split(',');
+    for (const part of parts) {
+        if (part.includes('-')) {
+            const [start, end] = part.split('-').map(Number);
+            if (!isNaN(start) && !isNaN(end) && start <= end) {
+                for (let i = start; i <= end; i++) {
+                    numbers.add(i);
+                }
+            } else {
+                return null; // 範圍格式錯誤
+            }
+        } else {
+            const num = Number(part);
+            if (!isNaN(num)) {
+                numbers.add(num);
+            } else {
+                return null; // 數字格式錯誤
+            }
+        }
+    }
+    return Array.from(numbers);
+}
+
+
+// 將這些新函數貼到 script.js 中 init() 函數之前
+
+/**
+ * 解析 URL 中的 no 參數字串 (例如 "1-3,8") 為數字陣列 [1, 2, 3, 8]
+ * @param {string} noString - 從 URL 獲取的 no 參數值
+ * @returns {number[]|null} 解析後的數字陣列，若格式錯誤則返回 null
+ */
+function parseCategoryNumbers(noString) {
+    const numbers = new Set();
+    if (!noString) return [];
+
+    const parts = noString.split(',');
+    for (const part of parts) {
+        if (part.includes('-')) {
+            const [start, end] = part.split('-').map(Number);
+            if (!isNaN(start) && !isNaN(end) && start <= end) {
+                for (let i = start; i <= end; i++) {
+                    numbers.add(i);
+                }
+            } else {
+                return null; // 範圍格式錯誤
+            }
+        } else {
+            const num = Number(part);
+            if (!isNaN(num)) {
+                numbers.add(num);
+            } else {
+                return null; // 數字格式錯誤
+            }
+        }
+    }
+    return Array.from(numbers);
+}
+
+
+
+
+/**
+ * 將排序過的數字陣列壓縮成範圍字串 (例如 [1,2,3,5] -> "1-3,5")
+ * @param {number[]} numbers - 經過排序的數字陣列
+ * @returns {string} 壓縮後的字串
+ */
+function compressNumberArray(numbers) {
+    if (numbers.length === 0) {
+        return "";
+    }
+
+    const ranges = [];
+    let start = numbers[0];
+    let end = numbers[0];
+
+    for (let i = 1; i < numbers.length; i++) {
+        if (numbers[i] === end + 1) {
+            end = numbers[i];
+        } else {
+            ranges.push(start === end ? `${start}` : `${start}-${end}`);
+            start = numbers[i];
+            end = numbers[i];
+        }
+    }
+    ranges.push(start === end ? `${start}` : `${start}-${end}`);
+
+    return ranges.join(',');
+}
+
+
+/**
+ * 根據當前模式和選取的分類，更新瀏覽器 URL
+ * @param {string} mode - 當前模式 (例如 'learning', 'matching')
+ * @param {string[]} categoryNames - 選取的分類名稱陣列
+ */
+function updateUrl(mode, categoryNames) {
+    if (!history.pushState) {
+        return; // 如果瀏覽器不支援 History API 則不執行
+    }
+
+    const reverseModeMap = {
+        'learning': '學習',
+        'matching': '配對',
+        'quiz': '測驗',
+        'sorting': '排序',
+        'flashcard': '閃示卡'
+    };
+
+    const typeParam = reverseModeMap[mode];
+    if (!typeParam) return;
+
+    const categoryIndexes = categoryNames
+        .map(name => orderedCategories.indexOf(name) + 1)
+        .filter(index => index > 0)
+        .sort((a, b) => a - b); // *** 修改點：先進行排序 ***
+
+    if (categoryIndexes.length === 0) return;
+    
+    // *** 修改點：呼叫新的壓縮函數來產生 no 參數 ***
+    const noParam = compressNumberArray(categoryIndexes);
+
+    const newUrl = `${window.location.pathname}?type=${typeParam}&no=${noParam}`;
+    const newSearchParams = `?type=${typeParam}&no=${noParam}`;
+
+    // 只有當 URL 實際發生變化時才更新，避免不必要的歷史紀錄
+    if (window.location.search !== newSearchParams) {
+        history.pushState({ mode, categoryNames }, '', newUrl);
+    }
+}
+
+
+/**
+ * 處理從單一分類主題直接開始學習的邏輯
+ * @param {string} categoryName - 要學習的分類名稱
+ */
+function startSingleCategoryLearning(categoryName) {
+    selectedCategories.clear();
+    selectedCategories.add(categoryName);
+    updateUrl('learning', [categoryName]);
+    showCategoryDetail(categoryName);
+}
+
+
+/**
+ * 頁面載入時檢查並處理 URL 參數
+ * @returns {boolean} 如果成功處理了 URL 參數則返回 true，否則返回 false
+ */
+function handleUrlParameters() {
+    const params = new URLSearchParams(window.location.search);
+    const typeParam = params.get('type');
+    const noParam = params.get('no');
+
+    if (!typeParam || !noParam) {
+        return false; // 沒有參數，正常載入頁面
+    }
+
+    const modeMap = {
+        '學習': 'learning',
+        '配對': 'matching',
+        '測驗': 'quiz',
+        '排序': 'sorting',
+        '閃示卡': 'flashcard'
+    };
+
+    const targetMode = modeMap[typeParam];
+    if (!targetMode) {
+        console.error("URL 中的 'type' 參數無效。");
+        return false; // 模式無效，正常載入
+    }
+
+    const categoryIndexes = parseCategoryNumbers(noParam);
+    if (categoryIndexes === null || categoryIndexes.length === 0) {
+        console.error("URL 中的 'no' 參數格式錯誤。");
+        return false; // 編號無效，正常載入
+    }
+
+    const categoriesToSelect = [];
+    for (const index of categoryIndexes) {
+        const categoryName = orderedCategories[index - 1]; // 轉換為 0-based 索引
+        if (categoryName) {
+            categoriesToSelect.push(categoryName);
+        } else {
+            console.error(`分類索引 ${index} 超出範圍。`);
+            return false; // 索引超出範圍，正常載入
+        }
+    }
+
+    // --- 參數驗證通過，開始啟動指定模式 ---
+
+    // 1. 設定選取的分類
+    selectedCategories.clear();
+    categoriesToSelect.forEach(name => selectedCategories.add(name));
+
+    // 2. 組合句子並顯示詳情頁 (類似 startLearning 的邏輯)
+    const tempCategoryName = `已選取的 ${selectedCategories.size} 個主題`;
+    let combinedSentences = [];
+    selectedCategories.forEach(categoryName => {
+        if (categories[categoryName]) {
+            combinedSentences = combinedSentences.concat(categories[categoryName]);
+        }
+    });
+    categories[tempCategoryName] = combinedSentences;
+    showCategoryDetail(tempCategoryName);
+
+    // 3. 切換到 URL 指定的模式
+    if (selectedSentences.size === 0 && targetMode !== 'learning') {
+        showResult("⚠️", "提醒", "所選主題內沒有可供練習的句子。");
+        return true; 
+    }
+
+    switch (targetMode) {
+        case 'flashcard':
+            showFlashcardView();
+            updateCurrentMode("閃示卡");
+            break;
+        case 'matching':
+            showMatchingGame();
+            updateCurrentMode("配對");
+            break;
+        case 'quiz':
+            showQuizGame();
+            updateCurrentMode("測驗");
+            break;
+        case 'sorting':
+            showSortingGame();
+            updateCurrentMode("排序");
+            break;
+        default:
+            updateCurrentMode("學習");
+            break;
+    }
+
+    return true; // 表示已成功處理 URL 參數
+}
+
+
+/**
+ * 處理從單一分類主題直接開始學習的邏輯
+ * @param {string} categoryName - 要學習的分類名稱
+ */
+function startSingleCategoryLearning(categoryName) {
+    selectedCategories.clear();
+    selectedCategories.add(categoryName);
+    updateUrl('learning', [categoryName]);
+    showCategoryDetail(categoryName);
+}
+
+
+/**
+ * 頁面載入時檢查並處理 URL 參數
+ * @returns {boolean} 如果成功處理了 URL 參數則返回 true，否則返回 false
+ */
+function handleUrlParameters() {
+    const params = new URLSearchParams(window.location.search);
+    const typeParam = params.get('type');
+    const noParam = params.get('no');
+
+    if (!typeParam || !noParam) {
+        return false; // 沒有參數，正常載入頁面
+    }
+
+    const modeMap = {
+        '學習': 'learning',
+        '配對': 'matching',
+        '測驗': 'quiz',
+        '排序': 'sorting',
+        '閃示卡': 'flashcard'
+    };
+
+    const targetMode = modeMap[typeParam];
+    if (!targetMode) {
+        console.error("URL 中的 'type' 參數無效。");
+        return false; // 模式無效，正常載入
+    }
+
+    const categoryIndexes = parseCategoryNumbers(noParam);
+    if (categoryIndexes === null || categoryIndexes.length === 0) {
+        console.error("URL 中的 'no' 參數格式錯誤。");
+        return false; // 編號無效，正常載入
+    }
+
+    const categoriesToSelect = [];
+    for (const index of categoryIndexes) {
+        const categoryName = orderedCategories[index - 1]; // 轉換為 0-based 索引
+        if (categoryName) {
+            categoriesToSelect.push(categoryName);
+        } else {
+            console.error(`分類索引 ${index} 超出範圍。`);
+            return false; // 索引超出範圍，正常載入
+        }
+    }
+
+    // --- 參數驗證通過，開始啟動指定模式 ---
+
+    // 1. 設定選取的分類
+    selectedCategories.clear();
+    categoriesToSelect.forEach(name => selectedCategories.add(name));
+
+    // 2. 組合句子並顯示詳情頁 (類似 startLearning 的邏輯)
+    const tempCategoryName = `已選取的 ${selectedCategories.size} 個主題`;
+    let combinedSentences = [];
+    selectedCategories.forEach(categoryName => {
+        if (categories[categoryName]) {
+            combinedSentences = combinedSentences.concat(categories[categoryName]);
+        }
+    });
+    categories[tempCategoryName] = combinedSentences;
+    showCategoryDetail(tempCategoryName);
+
+    // 3. 切換到 URL 指定的模式
+    if (selectedSentences.size === 0 && targetMode !== 'learning') {
+        showResult("⚠️", "提醒", "所選主題內沒有可供練習的句子。");
+        return true; 
+    }
+
+    switch (targetMode) {
+        case 'flashcard':
+            showFlashcardView();
+            updateCurrentMode("閃示卡");
+            break;
+        case 'matching':
+            showMatchingGame();
+            updateCurrentMode("配對");
+            break;
+        case 'quiz':
+            showQuizGame();
+            updateCurrentMode("測驗");
+            break;
+        case 'sorting':
+            showSortingGame();
+            updateCurrentMode("排序");
+            break;
+        default:
+            updateCurrentMode("學習");
+            break;
+    }
+
+    return true; // 表示已成功處理 URL 參數
+}
+
+
+
+
+
+/**
+ * 處理從單一分類主題直接開始學習的邏輯
+ * @param {string} categoryName - 要學習的分類名稱
+ */
+function startSingleCategoryLearning(categoryName) {
+    selectedCategories.clear();
+    selectedCategories.add(categoryName);
+    updateUrl('learning', [categoryName]);
+    showCategoryDetail(categoryName);
+}
+
+
+/**
+ * 頁面載入時檢查並處理 URL 參數
+ * @returns {boolean} 如果成功處理了 URL 參數則返回 true，否則返回 false
+ */
+function handleUrlParameters() {
+    const params = new URLSearchParams(window.location.search);
+    const typeParam = params.get('type');
+    const noParam = params.get('no');
+
+    if (!typeParam || !noParam) {
+        return false; // 沒有參數，正常載入頁面
+    }
+
+    const modeMap = {
+        '學習': 'learning',
+        '配對': 'matching',
+        '測驗': 'quiz',
+        '排序': 'sorting',
+        '閃示卡': 'flashcard'
+    };
+
+    const targetMode = modeMap[typeParam];
+    if (!targetMode) {
+        console.error("URL 中的 'type' 參數無效。");
+        return false; // 模式無效，正常載入
+    }
+
+    const categoryIndexes = parseCategoryNumbers(noParam);
+    if (categoryIndexes === null || categoryIndexes.length === 0) {
+        console.error("URL 中的 'no' 參數格式錯誤。");
+        return false; // 編號無效，正常載入
+    }
+
+    const categoriesToSelect = [];
+    for (const index of categoryIndexes) {
+        const categoryName = orderedCategories[index - 1]; // 轉換為 0-based 索引
+        if (categoryName) {
+            categoriesToSelect.push(categoryName);
+        } else {
+            console.error(`分類索引 ${index} 超出範圍。`);
+            return false; // 索引超出範圍，正常載入
+        }
+    }
+
+    // --- 參數驗證通過，開始啟動指定模式 ---
+
+    // 1. 設定選取的分類
+    selectedCategories.clear();
+    categoriesToSelect.forEach(name => selectedCategories.add(name));
+
+    // 2. 組合句子並顯示詳情頁 (類似 startLearning 的邏輯)
+    const tempCategoryName = `已選取的 ${selectedCategories.size} 個主題`;
+    let combinedSentences = [];
+    selectedCategories.forEach(categoryName => {
+        if (categories[categoryName]) {
+            combinedSentences = combinedSentences.concat(categories[categoryName]);
+        }
+    });
+    categories[tempCategoryName] = combinedSentences;
+    showCategoryDetail(tempCategoryName);
+
+    // 3. 切換到 URL 指定的模式
+    if (selectedSentences.size === 0 && targetMode !== 'learning') {
+        showResult("⚠️", "提醒", "所選主題內沒有可供練習的句子。");
+        return true; 
+    }
+
+    switch (targetMode) {
+        case 'flashcard':
+            showFlashcardView();
+            updateCurrentMode("閃示卡");
+            break;
+        case 'matching':
+            showMatchingGame();
+            updateCurrentMode("配對");
+            break;
+        case 'quiz':
+            showQuizGame();
+            updateCurrentMode("測驗");
+            break;
+        case 'sorting':
+            showSortingGame();
+            updateCurrentMode("排序");
+            break;
+        default:
+            updateCurrentMode("學習");
+            break;
+    }
+
+    return true; // 表示已成功處理 URL 參數
+}
 
 // 初始化
 function init() {
@@ -46,6 +542,17 @@ function init() {
 
   loadUserData();
   loadUserSettings();
+
+  // 如果 handleUrlParameters 返回 true，表示已根據 URL 啟動特定模式，
+  // 就不需要執行後續的正常首頁渲染流程。
+  const paramsHandled = handleUrlParameters();
+  if (paramsHandled) {
+    setupEventListeners(); // 依然需要設定事件監聽器
+    updateUserDisplay();   // 依然需要更新使用者資訊
+    return; // 結束 init 函數
+  }
+
+  // --- 只有在沒有 URL 參數時，才會執行以下程式碼 ---
   renderCatalogTabs();
   renderCategoryList();
   setupEventListeners();
@@ -187,14 +694,14 @@ function createCategoryCardElement(categoryName, cardCount) {
     const categoryItem = document.createElement("div");
 
     const isStarredCategory = categoryName === "星號";
+    // *** 修改點：讓標題點擊呼叫新的 startSingleCategoryLearning 函數 ***
     const titleClickAction = isStarredCategory 
         ? `event.stopPropagation(); showStarredCategory()`
-        : `event.stopPropagation(); showCategoryDetail('${categoryName.replace(/'/g, "\\'")}')`;
+        : `event.stopPropagation(); startSingleCategoryLearning('${categoryName.replace(/'/g, "\\'")}')`;
     
     categoryItem.onclick = () => toggleCategorySelection(categoryName);
 
     if (currentViewMode === "card") {
-        // 僅透過 className 控制選取狀態
         categoryItem.className = `category-card bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md ${isSelected ? "checkbox-selected selected-border" : ""}`;
         categoryItem.innerHTML = `
             <div class="p-2">
@@ -210,7 +717,7 @@ function createCategoryCardElement(categoryName, cardCount) {
                 </div>
             </div>
         `;
-    } else { // list view (保持不變)
+    } else {
         categoryItem.className = `category-card p-3 flex items-center space-x-4 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-gray-50 hover:transform-none hover:shadow-none ${isSelected ? "checkbox-selected" : ""}`;
         categoryItem.innerHTML = `
             <div class="selection-indicator !left-3 !top-1/2 !-translate-y-1/2">
@@ -411,35 +918,32 @@ function parseData() {
       categories[category] = []
     }
     categories[category].push(sentence)
-  })
+  });
+
+  // 排序分類鍵值以確保順序一致性，供給 URL 參數使用
+  orderedCategories = Object.keys(categories).sort();
 }
 
 // 用戶資料管理
 function loadUserData() {
-  const userData = localStorage.getItem("kasuUser")
+  const userData = localStorage.getItem(`${config.STORAGE_PREFIX}user`);
   if (userData) {
     currentUser = JSON.parse(userData)
   }
 }
 
 function saveUserData() {
-  localStorage.setItem("kasuUser", JSON.stringify(currentUser))
+  localStorage.setItem(`${config.STORAGE_PREFIX}user`, JSON.stringify(currentUser))
 }
 
 function loadUserSettings() {
-  const settingsKey = `kasuSettings_${currentUser.id}`
+  const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`
   const settings = localStorage.getItem(settingsKey)
   if (settings) {
     userSettings = JSON.parse(settings)
   } else {
-    userSettings = {
-      fontSize: 20,
-      flashcardFontSize: 24,
-      lineSpacing: "loose",
-      layout: "double",
-      viewMode: "card",
-      compactMode: false,
-    }
+    // 從 config 載入預設設定 (使用深拷貝以避免修改原始設定)
+    userSettings = JSON.parse(JSON.stringify(config.DEFAULT_USER_SETTINGS));
   }
   
   // 確保 matchingLayout 屬性存在
@@ -460,32 +964,32 @@ function loadUserSettings() {
   currentViewMode = userSettings.viewMode || "card"
 
   // 載入選取的分類
-  const selectedKey = `kasuSelected_${currentUser.id}`
+  const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`
   const selectedData = localStorage.getItem(selectedKey)
   if (selectedData) {
     selectedCategories = new Set(JSON.parse(selectedData))
   }
   
   // --- 新增：載入星號紀錄 ---
-  const starredKey = `kasuStarred_${currentUser.id}`;
+  const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
   const starredData = localStorage.getItem(starredKey);
   if (starredData) {
     starredCards = new Set(JSON.parse(starredData));
   } else {
     starredCards = new Set(); // 如果沒有紀錄，確保是空的 Set
   }
-  // --- 結束 ---
 }
 
 function saveSelectedCategories() {
-  const selectedKey = `kasuSelected_${currentUser.id}`
+  const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`
   localStorage.setItem(selectedKey, JSON.stringify(Array.from(selectedCategories)))
 }
 
 function saveUserSettings() {
-  const settingsKey = `kasuSettings_${currentUser.id}`
+  const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`
   localStorage.setItem(settingsKey, JSON.stringify(userSettings))
 }
+
 
 function updateUserDisplay() {
   // 首頁用戶顯示
@@ -770,17 +1274,20 @@ function getCategoryEmoji(categoryName) {
 
 
 // 開始學習選取的項目
+// 替換 script.js 中舊的 startLearning 函數
 function startLearning() {
   const selectedCount = selectedCategories.size;
   if (selectedCount === 0) {
     showResult("⚠️", "提醒", "請先勾選要學習的主題。");
     return;
   }
+  
+  // *** 新增點：在開始學習前，更新 URL ***
+  updateUrl('learning', Array.from(selectedCategories));
 
   let combinedSentences = [];
-  const combinedSentenceIds = new Set(); // 用於防止句子重複
+  const combinedSentenceIds = new Set(); 
 
-  // 優先處理特殊的 "星號" 分類
   if (selectedCategories.has("星號")) {
     const starredSentences = sentences.filter(sentence => {
       const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
@@ -796,7 +1303,6 @@ function startLearning() {
     });
   }
 
-  // 處理其他常規分類
   selectedCategories.forEach(categoryName => {
     if (categoryName !== "星號" && categories[categoryName]) {
       categories[categoryName].forEach(sentence => {
@@ -811,17 +1317,14 @@ function startLearning() {
   
   const tempCategoryName = `已選取的 ${selectedCount} 個主題`;
   
-  // 為了避免重複的臨時分類，先檢查並刪除舊的
   Object.keys(categories).forEach(key => {
     if (key.startsWith("已選取的")) {
       delete categories[key];
     }
   });
 
-  // 將合併後的句子加入到一個臨時的分類中
   categories[tempCategoryName] = combinedSentences;
 
-  // 顯示這個臨時分類的詳情頁面
   showCategoryDetail(tempCategoryName);
 }
 
@@ -893,38 +1396,6 @@ function showStarredCategory() {
   showCategoryDetail(categoryName);
 }
 
-// 開始學習選取的項目
-function startLearning() {
-  const selectedCount = selectedCategories.size;
-  if (selectedCount === 0) {
-    showResult("⚠️", "提醒", "請先勾選要學習的主題。");
-    return;
-  }
-
-  // 建立一個臨時的分類名稱，用於顯示在詳情頁標題
-  const tempCategoryName = `已選取的 ${selectedCount} 個主題`;
-  let combinedSentences = [];
-
-  // 從所有選取的分類中收集句子
-  selectedCategories.forEach(categoryName => {
-    if (categories[categoryName]) {
-      combinedSentences = combinedSentences.concat(categories[categoryName]);
-    }
-  });
-  
-  // 為了避免重複的臨時分類，先檢查並刪除舊的
-  Object.keys(categories).forEach(key => {
-    if (key.startsWith("已選取的")) {
-      delete categories[key];
-    }
-  });
-
-  // 將合併後的句子加入到一個臨時的分類中
-  categories[tempCategoryName] = combinedSentences;
-
-  // 顯示這個臨時分類的詳情頁面
-  showCategoryDetail(tempCategoryName);
-}
 
 
 // 切換檢視模式
@@ -1014,7 +1485,7 @@ function playAudio(filename, iconElement = null) {
             return;
         }
 
-        const audio = new Audio(`https://oikasu1.github.io/snd/oikasu/${filename}`);
+        const audio = new Audio(`${config.AUDIO_BASE_PATH}${filename}`);
         currentAudio = audio; // 將當前音檔指定到全域變數
 
         if (iconElement) {
@@ -1070,7 +1541,7 @@ function showCelebration(element) {
   setTimeout(() => element.classList.remove("celebration"), 800)
 
   // 隨機表情符號特效
-  const emoji = celebrationEmojis[Math.floor(Math.random() * celebrationEmojis.length)]
+  const emoji = config.CELEBRATION_EMOJIS[Math.floor(Math.random() * config.CELEBRATION_EMOJIS.length)]
   const emojiElement = document.createElement("div")
   emojiElement.className = "emoji-celebration"
   emojiElement.textContent = emoji
@@ -1188,7 +1659,7 @@ function updateCompactToggleButton() {
 }
 
 function saveStarredCards() {
-  const starredKey = `kasuStarred_${currentUser.id}`;
+  const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
   localStorage.setItem(starredKey, JSON.stringify(Array.from(starredCards)));
 }
 
@@ -1397,8 +1868,7 @@ function toggleSentenceSelection(index, checked) {
 
 // 字體大小調整
 function adjustFontSize(change, mode = "learning") {
-  const fontSizes =
-    mode === "flashcard" ? [24, 28, 32, 36, 40, 44, 48, 52, 56, 60] : [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40]
+  const fontSizes = mode === "flashcard" ? config.FONT_SIZES.flashcard : config.FONT_SIZES.learning;
 
   const settingKey = mode === "flashcard" ? "flashcardFontSize" : "fontSize"
   const currentIndex = fontSizes.indexOf(userSettings[settingKey])
@@ -3636,7 +4106,6 @@ function setupEventListeners() {
   const clearSearchBtn = document.getElementById("clearSearch");
   const searchOverlay = document.getElementById("searchOverlay");
 
-	// 處理即時拼音轉換的函數
 	const handleRealtimeTransform = (e) => {
 		const input = e.target;
 		const originalValue = input.value;
@@ -3644,30 +4113,21 @@ function setupEventListeners() {
 		const transformedValue = transformHakkaQuery(originalValue);
 
 		if (originalValue !== transformedValue) {
-			// 【修改】計算轉換前後的長度差
 			const lengthDifference = transformedValue.length - originalValue.length;
 			const newCursorPosition = cursorPosition + lengthDifference;
-
 			input.value = transformedValue;
-			
-			// 【修改】恢復游標位置，並根據長度變化進行調整
 			input.setSelectionRange(newCursorPosition, newCursorPosition);
 		}
-		
-		// 觸發搜尋
 		handleSearchInput(e);
 	};
 
-  // 將統一的處理函數綁定到電腦版和手機版兩個輸入框
   searchInput.addEventListener("input", handleRealtimeTransform);
   mobileSearchInput.addEventListener("input", handleRealtimeTransform);
 
-  // 手機版搜尋 UI 優化
   searchToggle.onclick = () => {
     mainTitle.classList.add("hidden");
     viewToggle.classList.add("hidden");
     searchToggle.classList.add("hidden");
-    
     mobileSearchBox.classList.remove("hidden");
     searchOverlay.classList.remove("hidden");
     mobileSearchInput.focus();
@@ -3677,7 +4137,6 @@ function setupEventListeners() {
     mainTitle.classList.remove("hidden");
     viewToggle.classList.remove("hidden");
     searchToggle.classList.remove("hidden");
-
     mobileSearchBox.classList.add("hidden");
     searchOverlay.classList.add("hidden");
     mobileSearchInput.value = "";
@@ -3688,16 +4147,14 @@ function setupEventListeners() {
     closeMobileSearch.click();
   };
 
-  // 桌面版清除按鈕的點擊事件
   clearSearchBtn.addEventListener('click', () => {
     searchInput.value = '';
     searchResults.classList.add('hidden');
     clearSearchBtn.classList.add('hidden');
     searchInput.focus();
-    handleSearchInput({ target: searchInput }); // 清除後重新觸發搜尋
+    handleSearchInput({ target: searchInput });
   });
 
-  // 點擊頁面其他地方，關閉搜尋結果
   document.addEventListener("click", (e) => {
     const isClickInsideSearch = searchBox.contains(e.target) || 
                                 mobileSearchBox.contains(e.target) || 
@@ -3707,7 +4164,6 @@ function setupEventListeners() {
     }
   });
 
-    // 處理「更多頁籤」按鈕的點擊事件
     const moreTabsButton = document.getElementById("moreTabsButton");
     const moreTabsDropdown = document.getElementById("moreTabsDropdown");
     if (moreTabsButton && moreTabsDropdown) {
@@ -3717,14 +4173,12 @@ function setupEventListeners() {
         });
     }
 
-    // 點擊頁面其他地方時，關閉下拉選單
     document.addEventListener("click", () => {
         if (moreTabsDropdown && !moreTabsDropdown.classList.contains("hidden")) {
             moreTabsDropdown.classList.add("hidden");
         }
     });
 
-    // 當視窗大小改變時，重新計算頁籤是否溢出
     let resizeTimeout;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
@@ -3733,13 +4187,11 @@ function setupEventListeners() {
         }, 150);
     });
 
-  // 檢視切換
   document.getElementById("viewToggle").onclick = () => {
     const newMode = currentViewMode === "card" ? "list" : "card"
     setViewMode(newMode)
   }
 
-  // 用戶下拉選單
   document.getElementById("userButton").onclick = (e) => {
     e.stopPropagation()
     document.getElementById("userDropdown").classList.toggle("hidden")
@@ -3751,7 +4203,6 @@ function setupEventListeners() {
     }
   })
 
-  // 用戶功能
   document.getElementById("editProfile").onclick = () => {
     document.getElementById("userDropdown").classList.add("hidden")
     document.getElementById("editName").value = currentUser.name
@@ -3787,11 +4238,15 @@ function setupEventListeners() {
 
   document.getElementById("confirmClear").onclick = () => {
     const password = document.getElementById("clearPassword").value
-    if (password === "kasu") {
-      const settingsKey = `${STORAGE_PREFIX}settings_${currentUser.id}`;
-      const starredKey = `kasuStarred_${currentUser.id}`; // 新增：星號紀錄的 key
+    if (password === config.CLEAR_DATA_PASSWORD) {
+      const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`;
+      const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
+      const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`;
+      
       localStorage.removeItem(settingsKey);
-      localStorage.removeItem(starredKey); // 新增：移除星號紀錄
+      localStorage.removeItem(starredKey);
+      localStorage.removeItem(selectedKey); // 也清除選取紀錄
+      
       starredCards.clear()
       selectedCategories.clear()
       selectedSentences.clear()
@@ -3818,7 +4273,6 @@ function setupEventListeners() {
     showResult("👋", "已登出", "已切換為訪客模式")
   }
 
-  // 詳情頁用戶下拉選單
   const userButtonDetail = document.getElementById("userButtonDetail")
   const userDropdownDetail = document.getElementById("userDropdownDetail")
 
@@ -3857,7 +4311,6 @@ function setupEventListeners() {
     }
   }
 
-  // 選單下拉功能
   document.getElementById("menuToggle").onclick = (e) => {
     e.stopPropagation()
     document.getElementById("menuDropdown").classList.toggle("hidden")
@@ -3869,35 +4322,33 @@ function setupEventListeners() {
     }
   })
 
-  // --- 【修改點】 ---
-  // 首頁按鈕點擊
   document.getElementById("goHome").onclick = () => {
     stopAllTimers()
-    // --- 修改：增加對 "星號" 分類的清理 ---
     Object.keys(categories).forEach((key) => {
       if (key.startsWith("已選取的") || key === "星號") {
         delete categories[key];
       }
-    })
+    });
+    // *** 新增點：返回首頁時，清除 URL 參數 ***
+    if(history.pushState) {
+        history.pushState({}, '', window.location.pathname);
+    }
     document.getElementById("categoryDetail").classList.add("hidden")
     document.getElementById("mainMenu").classList.remove("hidden")
     
-    // 【新增】重新渲染頁籤以解決溢位問題
     renderCatalogTabs();
-    // 【新增，解決問題2】重新渲染分類列表，這樣才會根據最新的星號狀態，決定是否顯示「星號」卡片
     renderCategoryList();
-    // 【新增，解決問題1】重新計算並設定頁籤工具列的黏貼(sticky)位置
     setStickyTopPosition();
-    // 【新增】返回時將頁面捲動到最頂端
     window.scrollTo(0, 0);
   }
 
-  // 模式切換
+  // --- 修改點：在模式切換時更新 URL ---
   document.getElementById("viewSentences").onclick = () => {
     stopAllTimers()
     showLearningView()
     updateCurrentMode("學習")
     document.getElementById("menuDropdown").classList.add("hidden")
+    updateUrl('learning', Array.from(selectedCategories));
   }
 
   document.getElementById("flashcardMode").onclick = () => {
@@ -3910,6 +4361,7 @@ function setupEventListeners() {
     showFlashcardView()
     updateCurrentMode("閃示卡")
     document.getElementById("menuDropdown").classList.add("hidden")
+    updateUrl('flashcard', Array.from(selectedCategories));
   }
 
   document.getElementById("matchingGame").onclick = () => {
@@ -3922,6 +4374,7 @@ function setupEventListeners() {
     showMatchingGame()
     updateCurrentMode("配對")
     document.getElementById("menuDropdown").classList.add("hidden")
+    updateUrl('matching', Array.from(selectedCategories));
   }
 
   document.getElementById("quizGame").onclick = () => {
@@ -3934,6 +4387,7 @@ function setupEventListeners() {
     showQuizGame()
     updateCurrentMode("測驗")
     document.getElementById("menuDropdown").classList.add("hidden")
+    updateUrl('quiz', Array.from(selectedCategories));
   }
 
   document.getElementById("sortingGame").onclick = () => {
@@ -3946,9 +4400,9 @@ function setupEventListeners() {
     showSortingGame()
     updateCurrentMode("排序")
     document.getElementById("menuDropdown").classList.add("hidden")
+    updateUrl('sorting', Array.from(selectedCategories));
   }
 
-  // 結果視窗關閉
   document.getElementById("closeResult").onclick = () => {
     document.getElementById("resultModal").classList.add("hidden")
   }
