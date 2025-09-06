@@ -90,32 +90,28 @@
             <main class="bg-gray-50 min-h-screen pt-20 md:pt-14">
                 <section class="container mx-auto px-4 py-8 pb-24">
 
-					<div id="tabBarStrip" class="sticky z-30 bg-gray-50 py-1 border-b border-gray-200 flex items-center justify-between gap-2 mb-4">
+				<div id="tabBarStrip" class="sticky z-30 bg-gray-50 py-1 border-b border-gray-200 flex items-center justify-between gap-2 mb-4">
 
-						<div id="selectionControls" class="flex items-center gap-2 flex-shrink-0 hidden">
-							<input type="checkbox" id="currentTabSelectAll" class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-							<button id="clearAllSelections" class="p-1 rounded-full hover:bg-gray-200 transition-colors text-gray-600" title="取消所有選取">
-								<span class="material-icons text-base">close</span>
-							</button>
-						</div>
+				    <div id="multiSelectControls" class="flex items-center gap-2 flex-shrink-0">
+				        </div>
 
-                        <div id="catalogTabsContainer" class="flex-grow flex items-center gap-2 overflow-hidden">
-						    <div id="catalogTabs" class="flex items-center gap-2 whitespace-nowrap"></div>
-                        </div>
+				    <div id="catalogTabsContainer" class="flex-grow flex items-center gap-2 overflow-hidden">
+				        <div id="catalogTabs" class="flex items-center gap-2 whitespace-nowrap"></div>
+				    </div>
 
-						<div id="moreTabsContainer" class="relative hidden flex-shrink-0">
-							<button id="moreTabsButton" class="flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors">
-								<span>更多</span>
-								<span class="material-icons !text-xl">expand_more</span>
-							</button>
-							<div id="moreTabsDropdown" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-20 py-1">
-							</div>
-						</div>
+				    <div id="moreTabsContainer" class="relative hidden flex-shrink-0">
+				        <button id="moreTabsButton" class="flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors">
+				            <span>更多</span>
+				            <span class="material-icons !text-xl">expand_more</span>
+				        </button>
+				        <div id="moreTabsDropdown" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-20 py-1">
+				        </div>
+				    </div>
 
-                        <button id="viewToggle" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors flex-shrink-0" title="切換檢視" aria-label="切換檢視模式">
-                            <span class="material-icons">grid_view</span>
-                        </button>
-					</div>
+				    <button id="viewToggle" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors flex-shrink-0" title="切換檢視" aria-label="切換檢視模式">
+				        <span class="material-icons">grid_view</span>
+				    </button>
+				</div>
 
 					<div id="categoryList"></div>
 				</section>
@@ -127,6 +123,22 @@
 					<span class="material-icons text-xl">rocket_launch</span>
 					<span id="learnSelectedText">學習選取</span>
 				</button>
+
+    <button id="addToCollectionBtn" class="hidden fixed bottom-6 left-6 md:bottom-8 md:left-8 lg:bottom-10 lg:left-10 
+                       px-6 py-3 bg-purple-600 text-white rounded-full shadow-lg 
+                       hover:bg-purple-700 transition-all duration-300 
+                       font-semibold text-lg flex items-center gap-2 z-40">
+        <span class="material-icons text-xl">favorite</span>
+        <span id="addToCollectionText">加入收藏</span>
+    </button>
+    
+    <button id="removeFromCollectionBtn" class="hidden fixed bottom-6 left-6 md:bottom-8 md:left-8 lg:bottom-10 lg:left-10 
+                           px-6 py-3 bg-red-600 text-white rounded-full shadow-lg 
+                           hover:bg-red-700 transition-all duration-300 
+                           font-semibold text-lg flex items-center gap-2 z-40">
+        <span class="material-icons text-xl">delete</span>
+        <span id="removeFromCollectionText">取消收藏</span>
+    </button>				
 			</main>
 
 		</div>
@@ -168,7 +180,7 @@
                                     </button>
                                 </div>
                             </div>
-                            <h2 id="categoryTitle" class="text-xl font-bold text-gray-800"></h2>
+                            <div id="categoryTitleContainer" class="relative text-xl font-bold text-gray-800"></div>
                         </div>
                         
                         <div class="flex items-center space-x-3 flex-shrink-0">

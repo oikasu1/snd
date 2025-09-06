@@ -3,7 +3,7 @@
 // =================================================================
 const config = {
     // Local Storage 的獨特前綴，避免與其他應用程式衝突
-    STORAGE_PREFIX: "hakkaLearningApp_v1_",
+    STORAGE_PREFIX: "hakkaLearningApp_v3_",
 
     // 清除學習記錄時需要輸入的密碼
     CLEAR_DATA_PASSWORD: "kasu",
@@ -69,45 +69,12 @@ let sortingIsBlurred = false;
 let catalog = {};
 let currentCatalogTab = "";
 let learnSelectedText;
+let isMultiSelectMode = false; 
+let isLearningSelectMode = false;
+let lastVisitedTab = "";
+let collectedCategories = new Set();
 
 
-
-// 將這些新函數貼到 script.js 中 init() 函數之前
-
-/**
- * 解析 URL 中的 no 參數字串 (例如 "1-3,8") 為數字陣列 [1, 2, 3, 8]
- * @param {string} noString - 從 URL 獲取的 no 參數值
- * @returns {number[]|null} 解析後的數字陣列，若格式錯誤則返回 null
- */
-function parseCategoryNumbers(noString) {
-    const numbers = new Set();
-    if (!noString) return [];
-
-    const parts = noString.split(',');
-    for (const part of parts) {
-        if (part.includes('-')) {
-            const [start, end] = part.split('-').map(Number);
-            if (!isNaN(start) && !isNaN(end) && start <= end) {
-                for (let i = start; i <= end; i++) {
-                    numbers.add(i);
-                }
-            } else {
-                return null; // 範圍格式錯誤
-            }
-        } else {
-            const num = Number(part);
-            if (!isNaN(num)) {
-                numbers.add(num);
-            } else {
-                return null; // 數字格式錯誤
-            }
-        }
-    }
-    return Array.from(numbers);
-}
-
-
-// 將這些新函數貼到 script.js 中 init() 函數之前
 
 /**
  * 解析 URL 中的 no 參數字串 (例如 "1-3,8") 為數字陣列 [1, 2, 3, 8]
@@ -180,15 +147,15 @@ function compressNumberArray(numbers) {
  */
 function updateUrl(mode, categoryNames) {
     if (!history.pushState) {
-        return; // 如果瀏覽器不支援 History API 則不執行
+        return;
     }
 
     const reverseModeMap = {
-        'learning': '學習',
-        'matching': '配對',
-        'quiz': '測驗',
-        'sorting': '排序',
-        'flashcard': '閃示卡'
+        'learning': 'l', //學習
+        'matching': 'm', //配對
+        'quiz': 'q', //測驗
+        'sorting': 's', //排序
+        'flashcard': 'f' //閃示卡
     };
 
     const typeParam = reverseModeMap[mode];
@@ -197,33 +164,21 @@ function updateUrl(mode, categoryNames) {
     const categoryIndexes = categoryNames
         .map(name => orderedCategories.indexOf(name) + 1)
         .filter(index => index > 0)
-        .sort((a, b) => a - b); // *** 修改點：先進行排序 ***
+        .sort((a, b) => a - b); 
 
     if (categoryIndexes.length === 0) return;
     
-    // *** 修改點：呼叫新的壓縮函數來產生 no 參數 ***
     const noParam = compressNumberArray(categoryIndexes);
 
     const newUrl = `${window.location.pathname}?type=${typeParam}&no=${noParam}`;
     const newSearchParams = `?type=${typeParam}&no=${noParam}`;
 
-    // 只有當 URL 實際發生變化時才更新，避免不必要的歷史紀錄
     if (window.location.search !== newSearchParams) {
         history.pushState({ mode, categoryNames }, '', newUrl);
     }
 }
 
 
-/**
- * 處理從單一分類主題直接開始學習的邏輯
- * @param {string} categoryName - 要學習的分類名稱
- */
-function startSingleCategoryLearning(categoryName) {
-    selectedCategories.clear();
-    selectedCategories.add(categoryName);
-    updateUrl('learning', [categoryName]);
-    showCategoryDetail(categoryName);
-}
 
 
 /**
@@ -240,11 +195,11 @@ function handleUrlParameters() {
     }
 
     const modeMap = {
-        '學習': 'learning',
-        '配對': 'matching',
-        '測驗': 'quiz',
-        '排序': 'sorting',
-        '閃示卡': 'flashcard'
+        'l': 'learning', //學習
+        'm': 'matching',//配對
+        'q': 'quiz',//測驗
+        's': 'sorting',//排序
+        'f': 'flashcard'//閃示卡
     };
 
     const targetMode = modeMap[typeParam];
@@ -277,7 +232,7 @@ function handleUrlParameters() {
     categoriesToSelect.forEach(name => selectedCategories.add(name));
 
     // 2. 組合句子並顯示詳情頁 (類似 startLearning 的邏輯)
-    const tempCategoryName = `已選取的 ${selectedCategories.size} 個主題`;
+    const tempCategoryName = `已選取的 ${selectedCategories.size} 個主題`; //這裡
     let combinedSentences = [];
     selectedCategories.forEach(categoryName => {
         if (categories[categoryName]) {
@@ -315,15 +270,12 @@ function handleUrlParameters() {
             break;
     }
 
-    return true; // 表示已成功處理 URL 參數
+    return true; 
 }
 
 
-/**
- * 處理從單一分類主題直接開始學習的邏輯
- * @param {string} categoryName - 要學習的分類名稱
- */
 function startSingleCategoryLearning(categoryName) {
+    lastVisitedTab = currentCatalogTab;
     selectedCategories.clear();
     selectedCategories.add(categoryName);
     updateUrl('learning', [categoryName]);
@@ -331,228 +283,89 @@ function startSingleCategoryLearning(categoryName) {
 }
 
 
+
+
 /**
- * 頁面載入時檢查並處理 URL 參數
- * @returns {boolean} 如果成功處理了 URL 參數則返回 true，否則返回 false
+ * 啟用多選模式
  */
-function handleUrlParameters() {
-    const params = new URLSearchParams(window.location.search);
-    const typeParam = params.get('type');
-    const noParam = params.get('no');
-
-    if (!typeParam || !noParam) {
-        return false; // 沒有參數，正常載入頁面
-    }
-
-    const modeMap = {
-        '學習': 'learning',
-        '配對': 'matching',
-        '測驗': 'quiz',
-        '排序': 'sorting',
-        '閃示卡': 'flashcard'
-    };
-
-    const targetMode = modeMap[typeParam];
-    if (!targetMode) {
-        console.error("URL 中的 'type' 參數無效。");
-        return false; // 模式無效，正常載入
-    }
-
-    const categoryIndexes = parseCategoryNumbers(noParam);
-    if (categoryIndexes === null || categoryIndexes.length === 0) {
-        console.error("URL 中的 'no' 參數格式錯誤。");
-        return false; // 編號無效，正常載入
-    }
-
-    const categoriesToSelect = [];
-    for (const index of categoryIndexes) {
-        const categoryName = orderedCategories[index - 1]; // 轉換為 0-based 索引
-        if (categoryName) {
-            categoriesToSelect.push(categoryName);
-        } else {
-            console.error(`分類索引 ${index} 超出範圍。`);
-            return false; // 索引超出範圍，正常載入
-        }
-    }
-
-    // --- 參數驗證通過，開始啟動指定模式 ---
-
-    // 1. 設定選取的分類
-    selectedCategories.clear();
-    categoriesToSelect.forEach(name => selectedCategories.add(name));
-
-    // 2. 組合句子並顯示詳情頁 (類似 startLearning 的邏輯)
-    const tempCategoryName = `已選取的 ${selectedCategories.size} 個主題`;
-    let combinedSentences = [];
-    selectedCategories.forEach(categoryName => {
-        if (categories[categoryName]) {
-            combinedSentences = combinedSentences.concat(categories[categoryName]);
-        }
-    });
-    categories[tempCategoryName] = combinedSentences;
-    showCategoryDetail(tempCategoryName);
-
-    // 3. 切換到 URL 指定的模式
-    if (selectedSentences.size === 0 && targetMode !== 'learning') {
-        showResult("⚠️", "提醒", "所選主題內沒有可供練習的句子。");
-        return true; 
-    }
-
-    switch (targetMode) {
-        case 'flashcard':
-            showFlashcardView();
-            updateCurrentMode("閃示卡");
-            break;
-        case 'matching':
-            showMatchingGame();
-            updateCurrentMode("配對");
-            break;
-        case 'quiz':
-            showQuizGame();
-            updateCurrentMode("測驗");
-            break;
-        case 'sorting':
-            showSortingGame();
-            updateCurrentMode("排序");
-            break;
-        default:
-            updateCurrentMode("學習");
-            break;
-    }
-
-    return true; // 表示已成功處理 URL 參數
+function enableMultiSelectMode() {
+    isMultiSelectMode = true;
+    updateMultiSelectControlsUI();
+    renderCategoryList();
 }
 
-
-
-
-
 /**
- * 處理從單一分類主題直接開始學習的邏輯
- * @param {string} categoryName - 要學習的分類名稱
+ * 停用多選模式並清除選取
  */
-function startSingleCategoryLearning(categoryName) {
+function disableMultiSelectMode() {
+    isMultiSelectMode = false;
     selectedCategories.clear();
-    selectedCategories.add(categoryName);
-    updateUrl('learning', [categoryName]);
-    showCategoryDetail(categoryName);
+    updateSelectionToolbar();
+    updateMultiSelectControlsUI();
+    renderCategoryList();
 }
 
-
 /**
- * 頁面載入時檢查並處理 URL 參數
- * @returns {boolean} 如果成功處理了 URL 參數則返回 true，否則返回 false
+ * 更新多選模式控制按鈕的 UI
  */
-function handleUrlParameters() {
-    const params = new URLSearchParams(window.location.search);
-    const typeParam = params.get('type');
-    const noParam = params.get('no');
+function updateMultiSelectControlsUI() {
+    const controlsContainer = document.getElementById("multiSelectControls");
+    if (!controlsContainer) return;
 
-    if (!typeParam || !noParam) {
-        return false; // 沒有參數，正常載入頁面
-    }
+    if (isMultiSelectMode) {
+        const categoriesInCurrentTab = getCategoriesInCurrentTab();
+        const selectedCountInTab = categoriesInCurrentTab.filter(category => selectedCategories.has(category)).length;
+        let isChecked = false;
+        let isIndeterminate = false;
 
-    const modeMap = {
-        '學習': 'learning',
-        '配對': 'matching',
-        '測驗': 'quiz',
-        '排序': 'sorting',
-        '閃示卡': 'flashcard'
-    };
-
-    const targetMode = modeMap[typeParam];
-    if (!targetMode) {
-        console.error("URL 中的 'type' 參數無效。");
-        return false; // 模式無效，正常載入
-    }
-
-    const categoryIndexes = parseCategoryNumbers(noParam);
-    if (categoryIndexes === null || categoryIndexes.length === 0) {
-        console.error("URL 中的 'no' 參數格式錯誤。");
-        return false; // 編號無效，正常載入
-    }
-
-    const categoriesToSelect = [];
-    for (const index of categoryIndexes) {
-        const categoryName = orderedCategories[index - 1]; // 轉換為 0-based 索引
-        if (categoryName) {
-            categoriesToSelect.push(categoryName);
-        } else {
-            console.error(`分類索引 ${index} 超出範圍。`);
-            return false; // 索引超出範圍，正常載入
+        if (categoriesInCurrentTab.length > 0) {
+            if (selectedCountInTab === categoriesInCurrentTab.length) {
+                isChecked = true;
+            } else if (selectedCountInTab > 0) {
+                isIndeterminate = true;
+            }
         }
+
+        controlsContainer.innerHTML = `
+            <button onclick="disableMultiSelectMode()" class="p-1 rounded-full hover:bg-gray-200 transition-colors text-gray-600" title="關閉多選模式">
+                <span class="material-icons text-base">close</span>
+            </button>
+            <input type="checkbox" id="currentTabSelectAll" class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" 
+                   title="${isChecked ? '取消全選' : '全選本頁'}">
+        `;
+        const checkbox = document.getElementById("currentTabSelectAll");
+        checkbox.checked = isChecked;
+        checkbox.indeterminate = isIndeterminate;
+        checkbox.addEventListener("change", toggleCurrentTabSelection);
+
+    } else {
+        controlsContainer.innerHTML = `
+            <button onclick="enableMultiSelectMode()" class="p-1.5 rounded-lg hover:bg-gray-200 transition-colors text-gray-600" title="啟用多選">
+                <span class="material-icons text-xl">check_box_outline_blank</span>
+            </button>
+        `;
     }
-
-    // --- 參數驗證通過，開始啟動指定模式 ---
-
-    // 1. 設定選取的分類
-    selectedCategories.clear();
-    categoriesToSelect.forEach(name => selectedCategories.add(name));
-
-    // 2. 組合句子並顯示詳情頁 (類似 startLearning 的邏輯)
-    const tempCategoryName = `已選取的 ${selectedCategories.size} 個主題`;
-    let combinedSentences = [];
-    selectedCategories.forEach(categoryName => {
-        if (categories[categoryName]) {
-            combinedSentences = combinedSentences.concat(categories[categoryName]);
-        }
-    });
-    categories[tempCategoryName] = combinedSentences;
-    showCategoryDetail(tempCategoryName);
-
-    // 3. 切換到 URL 指定的模式
-    if (selectedSentences.size === 0 && targetMode !== 'learning') {
-        showResult("⚠️", "提醒", "所選主題內沒有可供練習的句子。");
-        return true; 
-    }
-
-    switch (targetMode) {
-        case 'flashcard':
-            showFlashcardView();
-            updateCurrentMode("閃示卡");
-            break;
-        case 'matching':
-            showMatchingGame();
-            updateCurrentMode("配對");
-            break;
-        case 'quiz':
-            showQuizGame();
-            updateCurrentMode("測驗");
-            break;
-        case 'sorting':
-            showSortingGame();
-            updateCurrentMode("排序");
-            break;
-        default:
-            updateCurrentMode("學習");
-            break;
-    }
-
-    return true; // 表示已成功處理 URL 參數
 }
 
 // 初始化
 function init() {
+  loadUserData(); // 【修改】先載入使用者資料 (包含收藏)
   parseData();
-  parseCatalog();
+  parseCatalog(); // 【修改】再根據資料解析目錄
   
-  if (Object.keys(catalog).length > 0) {
-    currentCatalogTab = Object.keys(catalog)[0];
-  }
+  const defaultTabName = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
 
-  loadUserData();
   loadUserSettings();
 
-  // 如果 handleUrlParameters 返回 true，表示已根據 URL 啟動特定模式，
-  // 就不需要執行後續的正常首頁渲染流程。
+  currentCatalogTab = defaultTabName;
+
   const paramsHandled = handleUrlParameters();
   if (paramsHandled) {
-    setupEventListeners(); // 依然需要設定事件監聽器
-    updateUserDisplay();   // 依然需要更新使用者資訊
-    return; // 結束 init 函數
+    setupEventListeners();
+    updateUserDisplay();
+    return;
   }
 
-  // --- 只有在沒有 URL 參數時，才會執行以下程式碼 ---
   renderCatalogTabs();
   renderCategoryList();
   setupEventListeners();
@@ -560,12 +373,11 @@ function init() {
 
   learnSelectedText = document.getElementById("learnSelectedText");
   document.getElementById("learnSelected").addEventListener("click", startLearning);
-  document.getElementById("currentTabSelectAll").addEventListener("change", toggleCurrentTabSelection);
-  document.getElementById("clearAllSelections").addEventListener("click", clearAllSelections);
 }
 
 // 解析分類群組資料
 function parseCatalog() {
+  catalog = {}; 
   const lines = myCatalog.trim().split("\n");
   lines.forEach(line => {
     const parts = line.split("\t");
@@ -573,7 +385,6 @@ function parseCatalog() {
       const key = parts[0].trim();
       const valueStr = parts[1].trim();
 
-      // 檢查是否為新的章節格式
       if (valueStr.startsWith('{')) {
         const chapters = [];
         const regex = /\{([^:]+):([^}]+)\}/g;
@@ -581,18 +392,38 @@ function parseCatalog() {
         while ((match = regex.exec(valueStr)) !== null) {
           chapters.push({
             title: match[1].trim(),
-            // 將分類字串分割成陣列，並過濾掉因結尾逗號可能產生的空字串
             categories: match[2].split(',').map(item => item.trim()).filter(Boolean)
           });
         }
         catalog[key] = { type: 'chapters', data: chapters };
       } else {
-        // 處理舊的、簡單的列表格式
         const categories = valueStr.split(',').map(item => item.trim());
         catalog[key] = { type: 'list', data: categories };
       }
     }
   });
+
+  // 【新增】動態建立「收藏」頁籤
+  const hasStarred = starredCards.size > 0;
+  const hasCollected = collectedCategories.size > 0;
+
+  if (hasStarred || hasCollected) {
+    let collectionItems = [];
+    if (hasStarred) {
+      collectionItems.push("星號");
+    }
+    if (hasCollected) {
+      // 排序確保順序一致
+      const sortedCollected = Array.from(collectedCategories).sort();
+      collectionItems.push(...sortedCollected);
+    }
+    
+    const newCatalog = {
+      '收藏': { type: 'list', data: collectionItems }
+    };
+    Object.assign(newCatalog, catalog);
+    catalog = newCatalog;
+  }
 }
 
 // 使用新的函數來處理頁籤溢出
@@ -682,6 +513,7 @@ function renderCatalogTabs() {
 
 
 
+
 /**
  * 根據分類名稱和數量，建立一個卡片或列表項的 HTML 元素。
  * @param {string} categoryName - 分類名稱 (例如 "01天氣" 或 "星號").
@@ -694,44 +526,50 @@ function createCategoryCardElement(categoryName, cardCount) {
     const categoryItem = document.createElement("div");
 
     const isStarredCategory = categoryName === "星號";
-    // *** 修改點：讓標題點擊呼叫新的 startSingleCategoryLearning 函數 ***
-    const titleClickAction = isStarredCategory 
-        ? `event.stopPropagation(); showStarredCategory()`
-        : `event.stopPropagation(); startSingleCategoryLearning('${categoryName.replace(/'/g, "\\'")}')`;
     
-    categoryItem.onclick = () => toggleCategorySelection(categoryName);
-
+    // *** 修改點：根據是否為多選模式，決定點擊行為 ***
+    if (isMultiSelectMode) {
+        categoryItem.onclick = () => toggleCategorySelection(categoryName);
+    } else {
+        if (isStarredCategory) {
+            categoryItem.onclick = () => showStarredCategory();
+        } else {
+            // 將單引號轉義，以避免 HTML 屬性錯誤
+            const safeCategoryName = categoryName.replace(/'/g, "\\'");
+            categoryItem.onclick = () => startSingleCategoryLearning(safeCategoryName);
+        }
+    }
+    
+    // 根據檢視模式設定不同的 class
     if (currentViewMode === "card") {
-        categoryItem.className = `category-card bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md ${isSelected ? "checkbox-selected selected-border" : ""}`;
+        categoryItem.className = `category-card bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md ${isSelected && isMultiSelectMode ? "checkbox-selected selected-border" : ""}`;
         categoryItem.innerHTML = `
             <div class="p-2">
-                <div class="flex items-center space-x-2"> <div class="text-4xl">
-                        ${emoji}
-                    </div>
+                <div class="flex items-center space-x-2">
+                    <div class="text-4xl">${emoji}</div>
                     <div>
-                        <h3 class="category-title-link text-lg text-gray-800" onclick="${titleClickAction}">
-                            ${categoryName}
-                        </h3>
-                        <p class="text-sm text-gray-500">${cardCount} 句</p>
+                        <h3 class="text-lg text-gray-800">${categoryName}</h3>
+                        <p class="text-sm text-gray-500 hidden sm:block">${cardCount} 句</p>
                     </div>
                 </div>
             </div>
+            ${isMultiSelectMode ? `
+            <div class="selection-indicator !left-3 !top-3">
+                <span class="material-icons text-base">${isSelected ? 'check' : 'radio_button_unchecked'}</span>
+            </div>` : ''}
         `;
     } else {
-        categoryItem.className = `category-card p-3 flex items-center space-x-4 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-gray-50 hover:transform-none hover:shadow-none ${isSelected ? "checkbox-selected" : ""}`;
+        categoryItem.className = `category-card p-3 flex items-center justify-between space-x-4 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-gray-50 hover:transform-none hover:shadow-none ${isSelected && isMultiSelectMode ? "checkbox-selected" : ""}`;
         categoryItem.innerHTML = `
+            ${isMultiSelectMode ? `
             <div class="selection-indicator !left-3 !top-1/2 !-translate-y-1/2">
                 <span class="material-icons text-base">${isSelected ? 'check' : 'radio_button_unchecked'}</span>
-            </div>
-            <div class="pl-8 flex items-center space-x-4">
+            </div>` : ''}
+            <div class="${isMultiSelectMode ? 'pl-8' : ''} flex items-center space-x-4">
                 <span class="text-2xl">${emoji}</span>
-                <div class="flex items-baseline gap-x-3">
-                    <h3 class="category-title-link text-lg text-gray-800" onclick="${titleClickAction}">
-                        ${categoryName}
-                    </h3>
-                    <p class="text-sm text-gray-500 flex-shrink-0">${cardCount} 句</p>
-                </div>
+                <h3 class="text-lg text-gray-800">${categoryName}</h3>
             </div>
+            <p class="text-sm text-gray-500 flex-shrink-0">${cardCount} 句</p>
         `;
     }
     return categoryItem;
@@ -749,56 +587,28 @@ function getCategoriesInCurrentTab() {
     }
 }
 
-
 // 渲染分類列表
 function renderCategoryList() {
     const categoryList = document.getElementById("categoryList");
     categoryList.innerHTML = "";
-    // 主容器本身不帶有佈局樣式，佈局由其子元素決定
-    categoryList.className = "";
+    categoryList.className = isMultiSelectMode ? "multi-select-active" : "";
 
     const currentTabData = catalog[currentCatalogTab];
     if (!currentTabData) return;
 
     let renderableSections = [];
-    const firstTabName = Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "";
-    const isFirstTab = currentCatalogTab === firstTabName;
-    const hasStarredCards = starredCards.size > 0;
 
-    // 根據新邏輯處理「星號」卡片的顯示
-    if (isFirstTab && hasStarredCards) {
-        if (currentTabData.type === 'chapters') {
-            // **情況1：首頁籤有分章節** -> 顯示「我的收藏」標題
-            renderableSections.push({
-                title: "我的收藏",
-                categories: ["星號"]
-            });
-            renderableSections.push(...currentTabData.data);
-        } else { // type === 'list'
-            // **情況2：首頁籤沒有分章節** -> 將「星號」卡片直接放在最前面，不加標題
-            const combinedCategories = ["星號", ...currentTabData.data];
-            renderableSections.push({
-                title: null, // 不顯示標題
-                categories: combinedCategories
-            });
-        }
-    } else {
-        // 對於其他頁籤，或沒有星號卡片時，照常顯示
-        if (currentTabData.type === 'chapters') {
-            renderableSections.push(...currentTabData.data);
-        } else { // type === 'list'
-            renderableSections.push({
-                title: null,
-                categories: currentTabData.data
-            });
-        }
+    // 根據頁籤資料的類型（章節或列表）來準備要渲染的區塊
+    if (currentTabData.type === 'chapters') {
+        renderableSections.push(...currentTabData.data);
+    } else { // type === 'list'
+        renderableSections.push({
+            title: null, // 列表模式沒有章節標題
+            categories: currentTabData.data
+        });
     }
-
-    // --- 以下渲染邏輯保持不變 ---
-
-    // 遍歷這個統一的結構並渲染畫面
+    
     renderableSections.forEach(section => {
-        // 如果有標題，則渲染標題元素
         if (section.title) {
             const titleEl = document.createElement("h2");
             titleEl.className = "text-xl font-bold text-gray-700 mt-6 mb-4 px-2";
@@ -806,7 +616,6 @@ function renderCategoryList() {
             categoryList.appendChild(titleEl);
         }
 
-        // 為本區塊的卡片建立一個容器
         const container = document.createElement("div");
         container.className = currentViewMode === "card" 
             ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
@@ -816,28 +625,31 @@ function renderCategoryList() {
             const isStarredCategory = categoryName === "星號";
             const cardCount = isStarredCategory ? starredCards.size : (categories[categoryName] ? categories[categoryName].length : 0);
             
-            // 如果是一般分類但資料不存在，則不渲染
+            // 如果分類不存在（除了星號），則不渲染
             if (!isStarredCategory && !categories[categoryName]) return;
+            
+            // 如果是星號分類，但沒有任何星號卡，也不渲染
+            if (isStarredCategory && cardCount === 0) return;
 
             const cardElement = createCategoryCardElement(categoryName, cardCount);
             container.appendChild(cardElement);
         });
 
-        // 只有當容器內有卡片時才將其加入到主列表
         if (container.hasChildNodes()) {
             categoryList.appendChild(container);
         }
     });
     
     updateSelectionToolbar();
-    updateSelectionControlsState(); 
+    updateMultiSelectControlsUI();
 }
+
 
 // 切換目前頁籤的全選/取消全選
 function toggleCurrentTabSelection(event) {
     const isChecked = event.target.checked;
     const categoriesInCurrentTab = getCategoriesInCurrentTab();
-    
+
     categoriesInCurrentTab.forEach(category => {
         if (categories[category]) { // 確保分類存在
             if (isChecked) {
@@ -851,11 +663,10 @@ function toggleCurrentTabSelection(event) {
     updateSelectionToolbar();
 }
 
+
 // 清除所有選取
 function clearAllSelections() {
-    selectedCategories.clear();
-    renderCategoryList();
-    updateSelectionToolbar();
+    disableMultiSelectMode(); 
 }
 
 // 更新目前頁籤的全選核取方塊狀態
@@ -889,8 +700,8 @@ function selectCatalogTab(tabName) {
     currentCatalogTab = tabName;
     renderCatalogTabs(); 
     renderCategoryList();
-    updateSelectionControlsState();
 }
+
 
 // 解析資料
 function parseData() {
@@ -924,12 +735,25 @@ function parseData() {
   orderedCategories = Object.keys(categories).sort();
 }
 
-// 用戶資料管理
 function loadUserData() {
   const userData = localStorage.getItem(`${config.STORAGE_PREFIX}user`);
   if (userData) {
     currentUser = JSON.parse(userData)
   }
+  
+  // 【新增】載入收藏的分類
+  const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
+  const collectedData = localStorage.getItem(collectedKey);
+  if (collectedData) {
+      collectedCategories = new Set(JSON.parse(collectedData));
+  } else {
+      collectedCategories = new Set();
+  }
+}
+
+function saveCollectedCategories() {
+  const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
+  localStorage.setItem(collectedKey, JSON.stringify(Array.from(collectedCategories)));
 }
 
 function saveUserData() {
@@ -946,19 +770,20 @@ function loadUserSettings() {
     userSettings = JSON.parse(JSON.stringify(config.DEFAULT_USER_SETTINGS));
   }
   
-  // 確保 matchingLayout 屬性存在
   if (!userSettings.matchingLayout) {
     userSettings.matchingLayout = '1col';
   }
   
-  // 新增：確保 quizLayout 屬性存在，若不存在則根據螢幕寬度設定預設值
   if (!userSettings.quizLayout) {
     userSettings.quizLayout = window.innerWidth >= 1024 ? 'horizontal' : 'vertical';
   }
 
-  // 【新增】確保閃示卡自動播音設定存在，預設為開啟
   if (userSettings.flashcardAutoPlayAudio === undefined) {
     userSettings.flashcardAutoPlayAudio = true;
+  }
+
+  if (userSettings.flashcardLoop === undefined) {
+    userSettings.flashcardLoop = false;
   }
 
   currentViewMode = userSettings.viewMode || "card"
@@ -976,7 +801,7 @@ function loadUserSettings() {
   if (starredData) {
     starredCards = new Set(JSON.parse(starredData));
   } else {
-    starredCards = new Set(); // 如果沒有紀錄，確保是空的 Set
+    starredCards = new Set(); 
   }
 }
 
@@ -1271,10 +1096,81 @@ function getCategoryEmoji(categoryName) {
     return emojiMap[cleanName] || '📚';
 }
 
+/**
+ * 將選取的卡片加入收藏
+ */
+function addToCollection() {
+    const selectedCount = selectedCategories.size;
+    if (selectedCount === 0) return;
 
+    // 【新增】檢查在加入前，「收藏」頁籤是否存在
+    const collectionTabExisted = catalog.hasOwnProperty('收藏');
+
+    selectedCategories.forEach(categoryName => {
+        collectedCategories.add(categoryName);
+    });
+    
+    saveCollectedCategories();
+    showResult("💖", `收藏 ${selectedCount} 個主題。`);
+    
+    parseCatalog();
+
+    if (!collectionTabExisted) {
+        renderCatalogTabs();
+    }
+    
+    disableMultiSelectMode();
+}
+
+/**
+ * 從收藏中移除選取的卡片
+ */
+function removeFromCollection() {
+    const selectedCount = selectedCategories.size;
+    if (selectedCount === 0) return;
+    
+    let removedCount = 0;
+    selectedCategories.forEach(categoryName => {
+        if (categoryName !== "星號") {
+            collectedCategories.delete(categoryName);
+            removedCount++;
+        }
+    });
+
+    if (removedCount > 0) {
+        saveCollectedCategories();
+        showResult("🗑️", `移除 ${removedCount} 個主題。`);
+    } else {
+        showResult("ℹ️", "提醒", "「星號」為系統預設項目，無法移除。");
+    }
+    
+    disableMultiSelectMode();
+
+    // 【新增】檢查「收藏」頁籤在移除後是否應被刪除
+    const isCollectionNowEmpty = collectedCategories.size === 0 && starredCards.size === 0;
+
+    // 【修改】重新解析目錄，這會移除空的「收藏」頁籤
+    parseCatalog(); 
+
+    if (isCollectionNowEmpty && currentCatalogTab === '收藏') {
+        // 【新增】如果收藏已空且當前就在該頁籤，則跳轉到預設頁籤
+        const defaultTabName = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
+        
+        if (defaultTabName) {
+            selectCatalogTab(defaultTabName); // selectCatalogTab 會自動處理畫面渲染
+        } else {
+            // 備用：如果沒有其他頁籤，就只渲染空的畫面
+            renderCategoryList();
+            renderCatalogTabs();
+        }
+    } else {
+        // 【修改】如果收藏未空，或使用者不在收藏頁籤，則正常刷新當前畫面即可
+        renderCategoryList();
+        renderCatalogTabs();
+    }
+}
 
 // 開始學習選取的項目
-// 替換 script.js 中舊的 startLearning 函數
 function startLearning() {
   const selectedCount = selectedCategories.size;
   if (selectedCount === 0) {
@@ -1282,7 +1178,23 @@ function startLearning() {
     return;
   }
   
-  // *** 新增點：在開始學習前，更新 URL ***
+  lastVisitedTab = currentCatalogTab;
+
+  // 【修改】如果只選取一個，直接顯示該主題的名稱
+  if (selectedCount === 1) {
+    const singleCategoryName = selectedCategories.values().next().value;
+    
+    // 「星號」是一個動態產生的特殊分類，需要特別處理
+    if (singleCategoryName === "星號") {
+        showStarredCategory();
+    } else {
+        startSingleCategoryLearning(singleCategoryName);
+    }
+    return; // 完成單一主題的啟動後，結束此函數
+  }
+
+  // --- 以下為選取超過一個主題時的原始邏輯 ---
+  
   updateUrl('learning', Array.from(selectedCategories));
 
   let combinedSentences = [];
@@ -1328,6 +1240,8 @@ function startLearning() {
   showCategoryDetail(tempCategoryName);
 }
 
+
+
 // 清除所有勾選的分類
 function clearAllSelections() {
   selectedCategories.clear();
@@ -1346,32 +1260,39 @@ function toggleCategorySelection(category) {
     }
     renderCategoryList();
     updateSelectionToolbar();
-    updateSelectionControlsState();
 }
-
 
 
 // 更新選取工具條
 function updateSelectionToolbar() {
     const learnSelectedButton = document.getElementById("learnSelected");
-    const selectionControls = document.getElementById("selectionControls");
+    const addToCollectionBtn = document.getElementById("addToCollectionBtn");
+    const removeFromCollectionBtn = document.getElementById("removeFromCollectionBtn");
     const count = selectedCategories.size;
 
-    if (count > 0) {
-        // 有選取項目：顯示浮動學習按鈕和頂部選取控制項
+    // 先隱藏所有按鈕
+    learnSelectedButton.classList.add("hidden");
+    addToCollectionBtn.classList.add("hidden");
+    removeFromCollectionBtn.classList.add("hidden");
+
+    if (count > 0 && isMultiSelectMode) {
+        // 無論在哪個頁籤，只要有選取，「學習」按鈕都顯示
         learnSelectedText.textContent = `學習 ${count} 個選取`;
         learnSelectedButton.classList.remove("hidden");
         learnSelectedButton.disabled = false;
         learnSelectedButton.classList.remove("opacity-50", "cursor-not-allowed");
 
-        selectionControls.classList.remove("hidden");
+        // 根據當前頁籤決定顯示「加入」還是「取消」收藏按鈕
+        if (currentCatalogTab === '收藏') {
+            document.getElementById('removeFromCollectionText').textContent = `取消收藏 ${count} 個`;
+            removeFromCollectionBtn.classList.remove("hidden");
+        } else {
+            document.getElementById('addToCollectionText').textContent = `加入收藏 ${count} 個`;
+            addToCollectionBtn.classList.remove("hidden");
+        }
     } else {
-        // 無選取項目：隱藏浮動學習按鈕和頂部選取控制項
-        learnSelectedButton.classList.add("hidden");
         learnSelectedButton.disabled = true;
         learnSelectedButton.classList.add("opacity-50", "cursor-not-allowed");
-
-        selectionControls.classList.add("hidden");
     }
 }
 
@@ -1438,20 +1359,152 @@ function showCategoryDetail(category) {
 
   // 初始化選中的句子（預設全選）
   selectedSentences.clear()
-  categories[category].forEach((_, index) => {
-    selectedSentences.add(index)
-  })
+  if (categories[category]) {
+      categories[category].forEach((_, index) => {
+        selectedSentences.add(index)
+      })
+  }
+
 
   document.getElementById("mainMenu").classList.add("hidden")
   document.getElementById("categoryDetail").classList.remove("hidden")
 
-  document.getElementById("categoryTitle").textContent = category
+  const categoryTitleContainer = document.getElementById("categoryTitleContainer");
+  
+  if (category.startsWith("已選取的")) {
+      renderInteractiveTitle(category);
+  } else {
+      categoryTitleContainer.innerHTML = `<span>${category}</span>`;
+  }
+
 
   // 預設顯示學習模式並重置選單文字
   showLearningView()
   updateCurrentMode("學習")
   window.scrollTo(0, 0);
 }
+
+/**
+ * 渲染可互動的標題和下拉選單（用於多選模式）
+ * @param {string} initialCategoryName - 初始的分類名稱, e.g., "已選取的 4 個主題"
+ */
+function renderInteractiveTitle(initialCategoryName) {
+    const container = document.getElementById("categoryTitleContainer");
+    if (!container) return;
+
+    // 建立下拉選單的 HTML 內容
+    let dropdownItemsHtml = Array.from(selectedCategories).sort().map(catName => `
+        <div class="category-dropdown-item">
+            <label>
+                <input type="checkbox" class="category-select-checkbox" value="${catName.replace(/"/g, '&quot;')}" checked>
+                <span>${catName}</span>
+            </label>
+        </div>
+    `).join('');
+
+    // 建立完整的互動標題 HTML
+    container.innerHTML = `
+        <div class="category-dropdown-container">
+            <button id="categoryDropdownBtn" class="category-dropdown-button">
+                <span id="interactiveTitleText">${initialCategoryName}</span>
+                <span class="material-icons">expand_more</span>
+            </button>
+            <div id="categoryDropdownContent" class="category-dropdown-content">
+                ${dropdownItemsHtml}
+            </div>
+        </div>
+    `;
+
+    // 設定事件監聽器
+    const dropdownBtn = document.getElementById("categoryDropdownBtn");
+    const dropdownContent = document.getElementById("categoryDropdownContent");
+    const checkboxes = dropdownContent.querySelectorAll('.category-select-checkbox');
+
+    dropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdownContent.classList.toggle('show');
+    });
+
+    // 點擊頁面其他地方關閉選單
+    document.addEventListener('click', (e) => {
+        if (!dropdownBtn.contains(e.target) && !dropdownContent.contains(e.target)) {
+            dropdownContent.classList.remove('show');
+        }
+    });
+
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+             updateCombinedSentencesAndRender();
+        });
+    });
+}
+
+
+/**
+ * 根據下拉選單的勾選狀態，更新句子內容並重新渲染畫面
+ */
+function updateCombinedSentencesAndRender() {
+    const dropdownContent = document.getElementById("categoryDropdownContent");
+    if (!dropdownContent) return;
+
+    const checkedBoxes = dropdownContent.querySelectorAll('.category-select-checkbox:checked');
+    
+    // 如果使用者想取消最後一個勾選，跳出提示並阻止
+    if (checkedBoxes.length === 0) {
+        showResult("⚠️", "提醒", "至少需要保留一個主題。");
+        // 找到剛剛被取消的那個 checkbox，並把它重新勾選回來
+        const lastChangedCheckbox = event.target; 
+        if(lastChangedCheckbox) lastChangedCheckbox.checked = true;
+        return;
+    }
+
+    // 1. 更新全域的 selectedCategories 集合
+    const newSelectedCategories = new Set();
+    checkedBoxes.forEach(box => newSelectedCategories.add(box.value));
+    selectedCategories = newSelectedCategories;
+
+    // 2. 重新組合句子
+    let combinedSentences = [];
+    const combinedSentenceIds = new Set();
+
+    selectedCategories.forEach(categoryName => {
+        const sourceCategory = categoryName === "星號" 
+            ? sentences.filter(s => starredCards.has(s["ID"] || `${s["分類"]}_${s["華語"]}`))
+            : categories[categoryName];
+            
+        if (sourceCategory) {
+            sourceCategory.forEach(sentence => {
+                const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+                if (!combinedSentenceIds.has(sentenceId)) {
+                    combinedSentences.push(sentence);
+                    combinedSentenceIds.add(sentenceId);
+                }
+            });
+        }
+    });
+
+    // 3. 建立新的暫存分類名稱並更新 categories 物件
+    const newCount = selectedCategories.size;
+    const newTempCategoryName = `已選取的 ${newCount} 個主題`;
+
+    // 刪除舊的暫存分類，以防萬一
+    Object.keys(categories).forEach(key => {
+        if (key.startsWith("已選取的")) delete categories[key];
+    });
+
+    categories[newTempCategoryName] = combinedSentences;
+    currentCategory = newTempCategoryName; // 更新當前分類
+
+    // 4. 更新標題文字
+    document.getElementById("interactiveTitleText").textContent = newTempCategoryName;
+    
+    // 5. 更新 URL
+    updateUrl('learning', Array.from(selectedCategories));
+
+    // 6. 重新渲染句子列表
+    showLearningView(); // 重新呼叫 showLearningView 會重置句子並渲染
+}
+
 
 // 更新當前模式顯示
 function updateCurrentMode(modeName) {
@@ -1553,80 +1606,90 @@ function showCelebration(element) {
 }
 
 
-// 新增此函式
-function updateSelectAllButtonState() {
-    const button = document.getElementById("learningSelectAll");
-    if (!button) return;
-    
-    const icon = button.querySelector(".material-icons");
-    const totalCount = categories[currentCategory]?.length || 0;
-    const selectedCount = selectedSentences.size;
-
-    if (totalCount === 0) { // 處理沒有句子的情況
-        icon.textContent = "check_box_outline_blank";
-        button.title = "全選";
-        button.disabled = true;
-    } else if (selectedCount === 0) {
-        icon.textContent = "check_box_outline_blank";
-        button.title = "全選";
-        button.disabled = false;
-    } else if (selectedCount === totalCount) {
-        icon.textContent = "check_box";
-        button.title = "取消全選";
-        button.disabled = false;
-    } else {
-        icon.textContent = "indeterminate_check_box";
-        button.title = "全選";
-        button.disabled = false;
-    }
-}
 
 // 學習模式
 function showLearningView() {
-  const contentArea = document.getElementById("contentArea")
+  const contentArea = document.getElementById("contentArea");
 
-  // 確保 layout 屬性存在，並處理舊的 compactMode 設定
   if (userSettings.compactMode) {
-      userSettings.layout = 'compact';
-      delete userSettings.compactMode; // 刪除舊屬性
-      saveUserSettings();
+    userSettings.layout = 'compact';
+    delete userSettings.compactMode;
+    saveUserSettings();
   } else if (!userSettings.layout) {
-      userSettings.layout = 'double';
+    userSettings.layout = 'double';
   }
-  
+
   contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
             <div id="learningModeToolbar" class="sticky top-0 z-20 mode-toolbar bg-white rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     
-                    <div class="flex items-center gap-1">
-                        <button id="learningSelectAll" title="全選/取消全選" class="p-2 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">check_box</span>
-                        </button>
+                    <div id="learningSelectionControls" class="flex items-center gap-1">
+                        <button id="enableLearningSelect" class="control-button">
+                            <span class="material-icons text-gray-600 !text-xl align-middle">check_box_outline_blank</span>
+                        </button>                        
+                        <div id="learningSelectActions" class="hidden items-center gap-1">
+                            <button id="disableLearningSelect" title="關閉選取模式" class="control-button active">
+                                <span class="material-icons text-blue-700 !text-xl align-middle">close</span>
+                            </button>
+                            <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                            <button id="learningSelectAll" title="全選/取消全選" class="control-button">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">select_all</span>
+                            </button>
+                            
+                            <div class="relative">
+                                <button id="starMenuToggle" title="星號操作" class="control-button">
+                                    <span class="material-icons text-gray-600 !text-xl align-middle">star_outline</span>
+                                    <span class="hidden sm:inline">星號</span>
+                                </button>
+                                <div id="starMenu" class="hidden absolute top-full left-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
+                                    <button id="starSelected" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                        <span class="material-icons text-yellow-400 mr-3">star</span>
+                                        <span>全部加星號</span>
+                                    </button>
+                                    <button id="unstarSelected" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                        <span class="material-icons text-gray-400 mr-3">star_border</span>
+                                        <span>全部移除星號</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                        <button id="hideHakka" title="客語顯示/隱藏" class="px-3 py-1.5 text-sm rounded-md hover:bg-gray-200 transition-colors flex items-center gap-1.5">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                            <span>客語</span>
-                        </button>
-                        <button id="hidePinyin" title="拼音顯示/隱藏" class="px-3 py-1.5 text-sm rounded-md hover:bg-gray-200 transition-colors flex items-center gap-1.5">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                            <span>拼音</span>
-                        </button>
-                        <button id="hideChinese" title="華語顯示/隱藏" class="px-3 py-1.5 text-sm rounded-md hover:bg-gray-200 transition-colors flex items-center gap-1.5">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                            <span>華語</span>
-                        </button>
+
+                        <div class="relative md:flex md:items-center md:gap-1">
+                            <button id="displayMenuToggle" class="control-button md:hidden">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
+                                <span class="inline">顯示</span>
+                            </button>
+
+                            <div id="displayMenu" class="hidden md:!flex md:items-center md:gap-1 md:!static md:!w-auto md:!bg-transparent md:!rounded-none md:!shadow-none md:!border-none md:!p-0 absolute top-full left-0 mt-2 w-28 bg-white rounded-md shadow-lg border z-10 p-1">
+                                
+                                <button id="hideHakka" title="客語顯示/隱藏" class="control-button w-full justify-start md:w-auto">
+                                    <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
+                                    <span class="inline">客語</span>
+                                </button>
+                                <button id="hidePinyin" title="拼音顯示/隱藏" class="control-button w-full justify-start md:w-auto">
+                                    <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
+                                    <span class="inline">拼音</span>
+                                </button>
+                                <button id="hideChinese" title="華語顯示/隱藏" class="control-button w-full justify-start md:w-auto">
+                                    <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
+                                    <span class="inline">華語</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="flex items-center gap-1">
-                        <button id="layoutToggle" class="p-2 rounded-md hover:bg-gray-200 transition-colors" title="切換版面">
+                        <button id="layoutToggle" class="control-button" title="切換版面">
                             <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
                         </button>
                         <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                        <button onclick="adjustFontSize(-1, 'learning')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
+                        <button onclick="adjustFontSize(-1, 'learning')" title="縮小字體" class="control-button">
                             <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
                         </button>
-                        <button onclick="adjustFontSize(1, 'learning')" title="放大字體" class="p-2 rounded-md hover:bg-gray-200 transition-colors">
+                        <button onclick="adjustFontSize(1, 'learning')" title="放大字體" class="control-button">
                             <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
                         </button>
                     </div>
@@ -1635,16 +1698,12 @@ function showLearningView() {
             
             <div id="sentenceContainer"></div>
         </div>
-    `
+    `;
 
-  renderSentences()
-  setupLearningControls()
+  renderSentences();
+  setupLearningControls();
   setStickyTopPosition();
 }
-
-
-
-
 
 // 精簡按鈕狀態的函數
 function updateCompactToggleButton() {
@@ -1682,30 +1741,46 @@ function toggleStar(index) {
 
 function renderSentences() {
   const container = document.getElementById("sentenceContainer");
+  if (!container) return;
   const sentences = categories[currentCategory];
   
-  // 根據版面模式設定容器的樣式
-  if (userSettings.layout === "double" && window.innerWidth >= 1024) {
-      container.className = "grid grid-cols-1 lg:grid-cols-2 gap-4";
-  } else if (userSettings.layout === "single" || (userSettings.layout === "double" && window.innerWidth < 1024)) {
-      container.className = "grid grid-cols-1 gap-4";
-  } else { // compact layout
-      container.className = "bg-white rounded-xl shadow-sm border";
+  // 根據選取模式和版面模式設定容器的樣式
+  let containerClasses = [];
+  if (isLearningSelectMode) {
+      containerClasses.push("learning-select-active");
   }
+  if (userSettings.layout === "double" && window.innerWidth >= 1024) {
+      containerClasses.push("grid grid-cols-1 lg:grid-cols-2 gap-4");
+  } else if (userSettings.layout === "single" || (userSettings.layout === "double" && window.innerWidth < 1024)) {
+      containerClasses.push("grid grid-cols-1 gap-4");
+  } else { // compact layout
+      containerClasses.push("bg-white rounded-xl shadow-sm border");
+  }
+  container.className = containerClasses.join(" ");
 
-  container.innerHTML = ""; // 清除舊內容
+  container.innerHTML = "";
+
+  if (!sentences) return;
 
   sentences.forEach((sentence, index) => {
     const isSelected = selectedSentences.has(index);
-    // --- 新增：星號狀態判斷 ---
     const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
     const isStarred = starredCards.has(sentenceId);
     const starIcon = isStarred ? 'star' : 'star_border';
-    // --- 結束 ---
     const sentenceItem = document.createElement("div");
 
+    // 當啟用選取模式時，卡片點擊行為改為切換勾選
+    if (isLearningSelectMode) {
+        sentenceItem.classList.add('cursor-pointer');
+        sentenceItem.onclick = (e) => {
+            if (e.target.closest('button, input')) return;
+            toggleSentenceSelection(index, !isSelected);
+            renderSentences();
+        };
+    }
+
     if (userSettings.layout === 'compact') {
-        sentenceItem.className = "flex items-center gap-3 p-3 border-b last:border-b-0";
+        sentenceItem.className += " flex items-center gap-3 p-3 border-b last:border-b-0";
         sentenceItem.innerHTML = `
             <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded flex-shrink-0" 
                    ${isSelected ? "checked" : ""} 
@@ -1715,7 +1790,7 @@ function renderSentences() {
             </button>
             <span class="text-sm text-gray-500 font-mono flex-shrink-0">${index + 1}</span>
             <div class="flex-1 min-w-0 flex items-baseline gap-4">
-                <span class="hakka-text  text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</span>
+                <span class="hakka-text text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</span>
                 <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</span>
                 <span class="chinese-text text-gray-800 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</span>
             </div>
@@ -1723,20 +1798,20 @@ function renderSentences() {
                 <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
             </button>
         `;
-    } else { // Card view (single or double)
-        sentenceItem.className = "sentence-card bg-white rounded-xl shadow-sm p-6";
+    } else { 
+        sentenceItem.className += " sentence-card bg-white rounded-xl shadow-sm p-6";
         sentenceItem.innerHTML = `
             <div class="flex items-start justify-between mb-4">
                 <div class="flex items-center gap-3">
+                    <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
+                           ${isSelected ? "checked" : ""} 
+                           onchange="toggleSentenceSelection(${index}, this.checked)">
                     <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-800 hover:bg-gray-100 p-1.5 rounded transition-colors">
                         <span class="material-icons text-lg">volume_up</span>
                     </button>
                     <span class="text-sm text-gray-500 font-mono">${index + 1}</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
-                           ${isSelected ? "checked" : ""} 
-                           onchange="toggleSentenceSelection(${index}, this.checked)">
                     <button onclick="toggleStar(${index})" class="learning-star-btn" title="標示星號">
                         <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
                     </button>
@@ -1754,26 +1829,119 @@ function renderSentences() {
     }
     container.appendChild(sentenceItem);
   });
-  
   updateSelectAllButtonState();
 }
 
-function setupLearningControls() {
-  const hideStates = { hakka: "show", pinyin: "show", chinese: "show" }
 
-  // 全選句子
+function setupLearningControls() {
+  const hideStates = { hakka: "show", pinyin: "show", chinese: "show" };
+
+  const enableBtn = document.getElementById("enableLearningSelect");
+  const disableBtn = document.getElementById("disableLearningSelect");
+  const actionsContainer = document.getElementById("learningSelectActions");
+
+  // 模式切換
+  const toggleLearningSelectMode = (enable) => {
+    isLearningSelectMode = enable;
+    if (enable) {
+      enableBtn.classList.add("hidden");
+      actionsContainer.classList.remove("hidden");
+      actionsContainer.classList.add("flex");
+      // 預設全選
+      selectedSentences.clear();
+      categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
+    } else {
+      // 【修改】關閉選取模式前，若無選取則自動全選
+      if (selectedSentences.size === 0) {
+        categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
+      }
+      enableBtn.classList.remove("hidden");
+      actionsContainer.classList.add("hidden");
+      actionsContainer.classList.remove("flex");
+      // 注意：此處不清空 selectedSentences，以便其他模式能接收到選取狀態
+    }
+    renderSentences();
+    updateSelectAllButtonState(); // 更新按鈕狀態
+  };
+
+  enableBtn.onclick = () => toggleLearningSelectMode(true);
+  disableBtn.onclick = () => toggleLearningSelectMode(false);
+
+  // 全選/取消全選
   document.getElementById("learningSelectAll").onclick = () => {
     const totalCount = categories[currentCategory].length;
     const selectedCount = selectedSentences.size;
     
-    // 如果已選的小於總數（部分選取或零選取），則全選。否則（已全選），則取消全選。
     if (selectedCount < totalCount) {
         selectedSentences.clear();
         categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
     } else {
         selectedSentences.clear();
     }
-    renderSentences(); // 重新渲染會自動更新勾選狀態和「全選」按鈕
+    renderSentences();
+    updateSelectAllButtonState(); // 更新按鈕狀態
+  };
+  
+  // START: New Display Dropdown Logic
+  const displayMenuToggle = document.getElementById("displayMenuToggle");
+  const displayMenu = document.getElementById("displayMenu");
+
+  if (displayMenuToggle && displayMenu) {
+      displayMenuToggle.onclick = (e) => {
+          e.stopPropagation();
+          displayMenu.classList.toggle("hidden");
+      };
+
+      // 監聽整個頁面的點擊，如果點擊位置不在選單和觸發按鈕內，就關閉選單
+      document.addEventListener('click', (e) => {
+          if (!displayMenu.classList.contains('hidden') && !displayMenu.contains(e.target) && !displayMenuToggle.contains(e.target)) {
+              displayMenu.classList.add('hidden');
+          }
+      }, true); 
+  }
+  // END: New Display Dropdown Logic
+
+  // 星號下拉選單的控制邏輯
+  const starMenuToggle = document.getElementById("starMenuToggle");
+  const starMenu = document.getElementById("starMenu");
+
+  if (starMenuToggle && starMenu) {
+      starMenuToggle.onclick = (e) => {
+          e.stopPropagation();
+          starMenu.classList.toggle("hidden");
+      };
+      starMenu.querySelectorAll('button').forEach(button => {
+          button.addEventListener('click', () => {
+              starMenu.classList.add('hidden');
+          });
+      });
+      document.addEventListener('click', (e) => {
+          if (!starMenu.classList.contains('hidden') && !starMenu.contains(e.target) && !starMenuToggle.contains(e.target)) {
+              starMenu.classList.add('hidden');
+          }
+      }, true);
+  }
+
+  // 【修改】加入星號 -> 全部加星號
+  document.getElementById("starSelected").onclick = () => {
+      categories[currentCategory].forEach(sentence => {
+          if (!sentence) return;
+          const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+          starredCards.add(sentenceId);
+      });
+      saveStarredCards();
+      renderSentences();
+  };
+
+  // 【修改】取消星號 -> 全部移除星號
+  document.getElementById("unstarSelected").onclick = () => {
+      categories[currentCategory].forEach(sentence => {
+          if (!sentence) return;
+          const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+          starredCards.delete(sentenceId);
+      });
+      saveStarredCards();
+      renderSentences();
   };
 
   // 排版切換 (三段循環)
@@ -1781,79 +1949,43 @@ function setupLearningControls() {
   if (layoutToggle) {
     const layouts = ["double", "single", "compact"];
     const icon = layoutToggle.querySelector(".material-icons");
-    // 根據當前版面，設定下一個版面的圖示與提示文字
     switch (userSettings.layout) {
-        case "double":
-            icon.textContent = "view_agenda"; // 下一個是 single
-            layoutToggle.title = "切換為單欄";
-            break;
-        case "single":
-            icon.textContent = "view_list"; // 下一個是 compact
-            layoutToggle.title = "切換為精簡列表";
-            break;
-        case "compact":
-            icon.textContent = "view_column"; // 下一個是 double
-            layoutToggle.title = "切換為雙欄";
-            break;
+        case "double": icon.textContent = "view_agenda"; layoutToggle.title = "切換為單欄"; break;
+        case "single": icon.textContent = "view_list"; layoutToggle.title = "切換為精簡列表"; break;
+        case "compact": icon.textContent = "view_column"; layoutToggle.title = "切換為雙欄"; break;
     }
-
     layoutToggle.onclick = () => {
       const currentIndex = layouts.indexOf(userSettings.layout);
       const nextIndex = (currentIndex + 1) % layouts.length;
       userSettings.layout = layouts[nextIndex];
       saveUserSettings();
-      showLearningView(); // 重新渲染整個學習介面
+      showLearningView();
     };
   }
-
 
   // 隱藏控制
   const setupHideButton = (buttonId, textClass, type, label) => {
     const button = document.getElementById(buttonId);
     if (!button) return;
-
     const icon = button.querySelector(".material-icons");
-    
     button.onclick = () => {
       const states = ["show", "blur", "hide"];
       const currentIndex = states.indexOf(hideStates[type]);
       hideStates[type] = states[(currentIndex + 1) % states.length];
-
       const elements = document.querySelectorAll(`.${textClass}`);
-      
-      elements.forEach((el) => {
-        el.classList.remove("blur-text", "hidden-text");
-      });
-
-      // 清除舊的顏色樣式
+      elements.forEach((el) => { el.classList.remove("blur-text", "hidden-text"); });
       button.classList.remove("bg-yellow-100", "text-yellow-700", "bg-red-100", "text-red-700");
-      
       switch (hideStates[type]) {
-        case "show":
-          button.title = `${label}顯示`;
-          icon.textContent = "visibility";
-          break;
-        case "blur":
-          elements.forEach((el) => el.classList.add("blur-text"));
-          button.classList.add("bg-yellow-100", "text-yellow-700");
-          button.title = `${label}模糊`;
-          icon.textContent = "blur_on";
-          break;
-        case "hide":
-          elements.forEach((el) => el.classList.add("hidden-text"));
-          button.classList.add("bg-red-100", "text-red-700");
-          button.title = `${label}隱藏`;
-          icon.textContent = "visibility_off";
-          break;
+        case "show": button.title = `${label}顯示`; icon.textContent = "visibility"; break;
+        case "blur": elements.forEach((el) => el.classList.add("blur-text")); button.classList.add("bg-yellow-100", "text-yellow-700"); button.title = `${label}模糊`; icon.textContent = "blur_on"; break;
+        case "hide": elements.forEach((el) => el.classList.add("hidden-text")); button.classList.add("bg-red-100", "text-red-700"); button.title = `${label}隱藏`; icon.textContent = "visibility_off"; break;
       }
     }
   }
-
   setupHideButton("hideHakka", "hakka-text", "hakka", "客語");
   setupHideButton("hidePinyin", "pinyin-text", "pinyin", "拼音");
   setupHideButton("hideChinese", "chinese-text", "chinese", "華語");
 }
-
 
 // 切換句子選取
 function toggleSentenceSelection(index, checked) {
@@ -1862,9 +1994,31 @@ function toggleSentenceSelection(index, checked) {
   } else {
     selectedSentences.delete(index)
   }
-  // 在每次勾選後，更新「全選」按鈕的狀態
   updateSelectAllButtonState();
 }
+
+
+// 切換句子選取
+function updateSelectAllButtonState() {
+    const selectAllButton = document.getElementById("learningSelectAll");
+    if (!selectAllButton) return;
+
+    const icon = selectAllButton.querySelector('.material-icons');
+    const totalCount = categories[currentCategory]?.length || 0;
+    const selectedCount = selectedSentences.size;
+
+    if (selectedCount === totalCount && totalCount > 0) {
+        icon.textContent = 'check_box'; // 圖示：已全選，可點擊取消
+        selectAllButton.title = '取消全選';
+    } else {
+        icon.textContent = 'select_all'; // 圖示：未全選，可點擊全選
+        selectAllButton.title = '全選';
+    }
+}
+
+
+
+
 
 // 字體大小調整
 function adjustFontSize(change, mode = "learning") {
@@ -2057,10 +2211,9 @@ function updateFlashcard() {
   chineseTextEl.style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.9) + "px";
 }
 
-
 function setupFlashcardControls() {
     let currentInterval = 3;
-    let isAutoplayLooping = false;
+    let isAutoplayLooping = userSettings.flashcardLoop || false;
 
     const shuffleButton = document.getElementById("shuffleCards");
     const starButton = document.getElementById("starCard");
@@ -2079,7 +2232,6 @@ function setupFlashcardControls() {
     
     const autoPlayAudioCheckbox = document.getElementById("flashcardAutoPlayAudio");
     
-    // --- 新增：取得句子元素並設定點擊事件 ---
     const hakkaTextEl = document.getElementById("hakkaText");
     const pinyinTextEl = document.getElementById("pinyinText");
     const chineseTextEl = document.getElementById("chineseText");
@@ -2102,8 +2254,6 @@ function setupFlashcardControls() {
             chineseTextEl.classList.toggle('blur-text', flashcardBlurStates.chinese);
         };
     }
-    // --- 新增結束 ---
-
 
     if (autoPlayAudioCheckbox) {
         autoPlayAudioCheckbox.checked = userSettings.flashcardAutoPlayAudio;
@@ -2204,8 +2354,6 @@ function setupFlashcardControls() {
             
             if(repeatButton) {
                 repeatButton.classList.add('hidden');
-                repeatButton.classList.remove("active");
-                isAutoplayLooping = false;
             }
             
             if (currentAudio) {
@@ -2216,6 +2364,10 @@ function setupFlashcardControls() {
     
     function startAutoPlay() {
         stopAutoPlay(); 
+
+        if (currentCardIndex >= flashcardSentences.length - 1) {
+            currentCardIndex = -1;
+        }
 
         const autoPlayButton = document.getElementById("autoPlayBtn");
         const autoPlayIcon = document.getElementById("autoPlayIcon");
@@ -2261,8 +2413,21 @@ function setupFlashcardControls() {
     }
     
     if(repeatButton) {
+        // 根據讀取的設定，初始化按鈕外觀
+        if (isAutoplayLooping) {
+            repeatButton.classList.add("active");
+            repeatButton.title = "取消循環";
+        } else {
+            repeatButton.classList.remove("active");
+            repeatButton.title = "循環播放";
+        }
+
         repeatButton.onclick = () => {
             isAutoplayLooping = !isAutoplayLooping;
+            // 將新設定儲存起來
+            userSettings.flashcardLoop = isAutoplayLooping;
+            saveUserSettings();
+
             if (isAutoplayLooping) {
                 repeatButton.classList.add("active");
                 repeatButton.title = "取消循環";
@@ -4075,7 +4240,7 @@ function checkSortingAnswer() {
 
 
 // 顯示結果視窗
-function showResult(icon, title, message) {
+function showResult(icon, title ,message) {
   document.getElementById("resultIcon").textContent = icon
   document.getElementById("resultTitle").textContent = title
   document.getElementById("resultMessage").textContent = message
@@ -4091,6 +4256,7 @@ function setStickyTopPosition() {
         tabBar.style.top = `${headerHeight}px`;
     }
 }
+
 
 // 設置事件監聽器
 function setupEventListeners() {
@@ -4111,7 +4277,6 @@ function setupEventListeners() {
 		const originalValue = input.value;
 		const cursorPosition = input.selectionStart;
 		const transformedValue = transformHakkaQuery(originalValue);
-
 		if (originalValue !== transformedValue) {
 			const lengthDifference = transformedValue.length - originalValue.length;
 			const newCursorPosition = cursorPosition + lengthDifference;
@@ -4120,10 +4285,8 @@ function setupEventListeners() {
 		}
 		handleSearchInput(e);
 	};
-
   searchInput.addEventListener("input", handleRealtimeTransform);
   mobileSearchInput.addEventListener("input", handleRealtimeTransform);
-
   searchToggle.onclick = () => {
     mainTitle.classList.add("hidden");
     viewToggle.classList.add("hidden");
@@ -4132,7 +4295,6 @@ function setupEventListeners() {
     searchOverlay.classList.remove("hidden");
     mobileSearchInput.focus();
   };
-
   closeMobileSearch.onclick = () => {
     mainTitle.classList.remove("hidden");
     viewToggle.classList.remove("hidden");
@@ -4142,11 +4304,7 @@ function setupEventListeners() {
     mobileSearchInput.value = "";
     searchResults.classList.add("hidden");
   };
-
-  searchOverlay.onclick = () => {
-    closeMobileSearch.click();
-  };
-
+  searchOverlay.onclick = () => { closeMobileSearch.click(); };
   clearSearchBtn.addEventListener('click', () => {
     searchInput.value = '';
     searchResults.classList.add('hidden');
@@ -4154,16 +4312,10 @@ function setupEventListeners() {
     searchInput.focus();
     handleSearchInput({ target: searchInput });
   });
-
   document.addEventListener("click", (e) => {
-    const isClickInsideSearch = searchBox.contains(e.target) || 
-                                mobileSearchBox.contains(e.target) || 
-                                searchResults.contains(e.target);
-    if (!isClickInsideSearch) {
-      searchResults.classList.add("hidden");
-    }
+    const isClickInsideSearch = searchBox.contains(e.target) || mobileSearchBox.contains(e.target) || searchResults.contains(e.target);
+    if (!isClickInsideSearch) { searchResults.classList.add("hidden"); }
   });
-
     const moreTabsButton = document.getElementById("moreTabsButton");
     const moreTabsDropdown = document.getElementById("moreTabsDropdown");
     if (moreTabsButton && moreTabsDropdown) {
@@ -4172,241 +4324,222 @@ function setupEventListeners() {
             moreTabsDropdown.classList.toggle("hidden");
         });
     }
-
     document.addEventListener("click", () => {
         if (moreTabsDropdown && !moreTabsDropdown.classList.contains("hidden")) {
             moreTabsDropdown.classList.add("hidden");
         }
     });
-
     let resizeTimeout;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => {
-            renderCatalogTabs();
-        }, 150);
+        resizeTimeout = setTimeout(() => { renderCatalogTabs(); }, 150);
     });
-
   document.getElementById("viewToggle").onclick = () => {
-    const newMode = currentViewMode === "card" ? "list" : "card"
-    setViewMode(newMode)
+    const newMode = currentViewMode === "card" ? "list" : "card";
+    setViewMode(newMode);
   }
-
   document.getElementById("userButton").onclick = (e) => {
-    e.stopPropagation()
-    document.getElementById("userDropdown").classList.toggle("hidden")
+    e.stopPropagation();
+    document.getElementById("userDropdown").classList.toggle("hidden");
   }
-
   document.addEventListener("click", (e) => {
     if (!document.getElementById("userButton").contains(e.target)) {
-      document.getElementById("userDropdown").classList.add("hidden")
+      document.getElementById("userDropdown").classList.add("hidden");
     }
   })
-
   document.getElementById("editProfile").onclick = () => {
-    document.getElementById("userDropdown").classList.add("hidden")
-    document.getElementById("editName").value = currentUser.name
-    document.getElementById("editId").value = currentUser.id
-    document.getElementById("editAvatar").value = currentUser.avatar
-    document.getElementById("userModal").classList.remove("hidden")
+    document.getElementById("userDropdown").classList.add("hidden");
+    document.getElementById("editName").value = currentUser.name;
+    document.getElementById("editId").value = currentUser.id;
+    document.getElementById("editAvatar").value = currentUser.avatar;
+    document.getElementById("userModal").classList.remove("hidden");
   }
-
   document.getElementById("saveProfile").onclick = () => {
-    const newName = document.getElementById("editName").value.trim()
-    const newId = document.getElementById("editId").value.trim()
-    const newAvatar = document.getElementById("editAvatar").value.trim()
-
+    const newName = document.getElementById("editName").value.trim();
+    const newId = document.getElementById("editId").value.trim();
+    const newAvatar = document.getElementById("editAvatar").value.trim();
     if (newName && newId && newAvatar) {
-      currentUser.name = newName
-      currentUser.id = newId
-      currentUser.avatar = newAvatar
-      saveUserData()
-      updateUserDisplay()
-      document.getElementById("userModal").classList.add("hidden")
-      loadUserSettings()
+      currentUser.name = newName;
+      currentUser.id = newId;
+      currentUser.avatar = newAvatar;
+      saveUserData();
+      updateUserDisplay();
+      document.getElementById("userModal").classList.add("hidden");
+      loadUserSettings();
     }
   }
-
-  document.getElementById("cancelEdit").onclick = () => {
-    document.getElementById("userModal").classList.add("hidden")
-  }
-
+  document.getElementById("cancelEdit").onclick = () => { document.getElementById("userModal").classList.add("hidden"); }
   document.getElementById("clearData").onclick = () => {
-    document.getElementById("userDropdown").classList.add("hidden")
-    document.getElementById("clearModal").classList.remove("hidden")
+    document.getElementById("userDropdown").classList.add("hidden");
+    document.getElementById("clearModal").classList.remove("hidden");
   }
-
   document.getElementById("confirmClear").onclick = () => {
-    const password = document.getElementById("clearPassword").value
+    const password = document.getElementById("clearPassword").value;
     if (password === config.CLEAR_DATA_PASSWORD) {
       const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`;
       const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
       const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`;
-      
+      const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
       localStorage.removeItem(settingsKey);
       localStorage.removeItem(starredKey);
-      localStorage.removeItem(selectedKey); // 也清除選取紀錄
-      
-      starredCards.clear()
-      selectedCategories.clear()
-      selectedSentences.clear()
-
-      document.getElementById("clearModal").classList.add("hidden")
-      document.getElementById("clearPassword").value = ""
-      showResult("✅", "清除完成", "所有學習記錄已清除")
+      localStorage.removeItem(selectedKey);
+      localStorage.removeItem(collectedKey);
+      starredCards.clear();
+      selectedCategories.clear();
+      selectedSentences.clear();
+      collectedCategories.clear();
+      document.getElementById("clearModal").classList.add("hidden");
+      document.getElementById("clearPassword").value = "";
+      showResult("✅", "清除完成", "所有學習記錄已清除");
     } else {
-      showResult("❌", "密碼錯誤", "請輸入正確的密碼")
+      showResult("❌", "密碼錯誤", "請輸入正確的密碼");
     }
   }
-
   document.getElementById("cancelClear").onclick = () => {
-    document.getElementById("clearModal").classList.add("hidden")
-    document.getElementById("clearPassword").value = ""
+    document.getElementById("clearModal").classList.add("hidden");
+    document.getElementById("clearPassword").value = "";
   }
-
   document.getElementById("logout").onclick = () => {
-    currentUser = { id: "guest", name: "訪客", avatar: "U" }
-    saveUserData()
-    updateUserDisplay()
-    loadUserSettings()
-    document.getElementById("userDropdown").classList.add("hidden")
-    showResult("👋", "已登出", "已切換為訪客模式")
+    currentUser = { id: "guest", name: "訪客", avatar: "U" };
+    saveUserData();
+    updateUserDisplay();
+    loadUserSettings();
+    document.getElementById("userDropdown").classList.add("hidden");
+    showResult("👋", "已登出", "已切換為訪客模式");
   }
-
-  const userButtonDetail = document.getElementById("userButtonDetail")
-  const userDropdownDetail = document.getElementById("userDropdownDetail")
-
+  const userButtonDetail = document.getElementById("userButtonDetail");
+  const userDropdownDetail = document.getElementById("userDropdownDetail");
   if (userButtonDetail && userDropdownDetail) {
     userButtonDetail.onclick = (e) => {
-      e.stopPropagation()
-      userDropdownDetail.classList.toggle("hidden")
+      e.stopPropagation();
+      userDropdownDetail.classList.toggle("hidden");
     }
-
     document.addEventListener("click", (e) => {
       if (!userButtonDetail.contains(e.target)) {
-        userDropdownDetail.classList.add("hidden")
+        userDropdownDetail.classList.add("hidden");
       }
     })
-    
     document.getElementById("editProfileDetail").onclick = () => {
-      userDropdownDetail.classList.add("hidden")
-      document.getElementById("editName").value = currentUser.name
-      document.getElementById("editId").value = currentUser.id
-      document.getElementById("editAvatar").value = currentUser.avatar
-      document.getElementById("userModal").classList.remove("hidden")
+      userDropdownDetail.classList.add("hidden");
+      document.getElementById("editName").value = currentUser.name;
+      document.getElementById("editId").value = currentUser.id;
+      document.getElementById("editAvatar").value = currentUser.avatar;
+      document.getElementById("userModal").classList.remove("hidden");
     }
-
     document.getElementById("clearDataDetail").onclick = () => {
-      userDropdownDetail.classList.add("hidden")
-      document.getElementById("clearModal").classList.remove("hidden")
+      userDropdownDetail.classList.add("hidden");
+      document.getElementById("clearModal").classList.remove("hidden");
     }
-
     document.getElementById("logoutDetail").onclick = () => {
-      currentUser = { id: "guest", name: "訪客", avatar: "U" }
-      saveUserData()
-      updateUserDisplay()
-      loadUserSettings()
-      userDropdownDetail.classList.add("hidden")
-      showResult("👋", "已登出", "已切換為訪客模式")
+      currentUser = { id: "guest", name: "訪客", avatar: "U" };
+      saveUserData();
+      updateUserDisplay();
+      loadUserSettings();
+      userDropdownDetail.classList.add("hidden");
+      showResult("👋", "已登出", "已切換為訪客模式");
     }
   }
-
   document.getElementById("menuToggle").onclick = (e) => {
-    e.stopPropagation()
-    document.getElementById("menuDropdown").classList.toggle("hidden")
+    e.stopPropagation();
+    document.getElementById("menuDropdown").classList.toggle("hidden");
   }
-
   document.addEventListener("click", (e) => {
     if (!document.getElementById("menuToggle").contains(e.target)) {
-      document.getElementById("menuDropdown").classList.add("hidden")
+      document.getElementById("menuDropdown").classList.add("hidden");
     }
   })
 
-  document.getElementById("goHome").onclick = () => {
-    stopAllTimers()
+
+document.getElementById("goHome").onclick = () => {
+    stopAllTimers();
+    
+    selectedCategories.clear();
+    isMultiSelectMode = false;
+	isLearningSelectMode = false
+    
     Object.keys(categories).forEach((key) => {
       if (key.startsWith("已選取的") || key === "星號") {
         delete categories[key];
       }
     });
-    // *** 新增點：返回首頁時，清除 URL 參數 ***
+    
+    parseCatalog();
+
+    if (lastVisitedTab && catalog[lastVisitedTab]) {
+        currentCatalogTab = lastVisitedTab;
+    } else {
+        currentCatalogTab = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
+    }
+    lastVisitedTab = "";
+    
     if(history.pushState) {
         history.pushState({}, '', window.location.pathname);
     }
-    document.getElementById("categoryDetail").classList.add("hidden")
-    document.getElementById("mainMenu").classList.remove("hidden")
+    document.getElementById("categoryDetail").classList.add("hidden");
+    document.getElementById("mainMenu").classList.remove("hidden");
     
     renderCatalogTabs();
     renderCategoryList();
     setStickyTopPosition();
     window.scrollTo(0, 0);
   }
+  
+  const ensureSentencesAreSelected = () => {
+      if (selectedSentences.size === 0) {
+          selectedSentences.clear();
+          categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
+          return false;
+      }
+      return true; 
+  };
 
-  // --- 修改點：在模式切換時更新 URL ---
   document.getElementById("viewSentences").onclick = () => {
-    stopAllTimers()
-    showLearningView()
-    updateCurrentMode("學習")
-    document.getElementById("menuDropdown").classList.add("hidden")
+    stopAllTimers();
+    showLearningView();
+    updateCurrentMode("學習");
+    document.getElementById("menuDropdown").classList.add("hidden");
     updateUrl('learning', Array.from(selectedCategories));
   }
 
   document.getElementById("flashcardMode").onclick = () => {
-    if (selectedSentences.size === 0) {
-      showResult("⚠️", "提醒", "請勾選句子後再進入「閃示卡」。")
-      updateCurrentMode("學習")
-      return
-    }
-    stopAllTimers()
-    showFlashcardView()
-    updateCurrentMode("閃示卡")
-    document.getElementById("menuDropdown").classList.add("hidden")
+    ensureSentencesAreSelected(); // 自動全選
+    stopAllTimers();
+    showFlashcardView();
+    updateCurrentMode("閃示卡");
+    document.getElementById("menuDropdown").classList.add("hidden");
     updateUrl('flashcard', Array.from(selectedCategories));
   }
 
   document.getElementById("matchingGame").onclick = () => {
-    if (selectedSentences.size === 0) {
-      showResult("⚠️", "提醒", "請勾選句子後再進入「配對」。")
-      updateCurrentMode("學習")
-      return
-    }
-    stopAllTimers()
-    showMatchingGame()
-    updateCurrentMode("配對")
-    document.getElementById("menuDropdown").classList.add("hidden")
+    ensureSentencesAreSelected(); // 自動全選
+    stopAllTimers();
+    showMatchingGame();
+    updateCurrentMode("配對");
+    document.getElementById("menuDropdown").classList.add("hidden");
     updateUrl('matching', Array.from(selectedCategories));
   }
 
   document.getElementById("quizGame").onclick = () => {
-    if (selectedSentences.size === 0) {
-      showResult("⚠️", "提醒", "請勾選句子後再進入「測驗」。")
-      updateCurrentMode("學習")
-      return
-    }
-    stopAllTimers()
-    showQuizGame()
-    updateCurrentMode("測驗")
-    document.getElementById("menuDropdown").classList.add("hidden")
+    ensureSentencesAreSelected(); // 自動全選
+    stopAllTimers();
+    showQuizGame();
+    updateCurrentMode("測驗");
+    document.getElementById("menuDropdown").classList.add("hidden");
     updateUrl('quiz', Array.from(selectedCategories));
   }
 
   document.getElementById("sortingGame").onclick = () => {
-    if (selectedSentences.size === 0) {
-      showResult("⚠️", "提醒", "請勾選句子後再進入「排序」。")
-      updateCurrentMode("學習")
-      return
-    }
-    stopAllTimers()
-    showSortingGame()
-    updateCurrentMode("排序")
-    document.getElementById("menuDropdown").classList.add("hidden")
+    ensureSentencesAreSelected(); // 自動全選
+    stopAllTimers();
+    showSortingGame();
+    updateCurrentMode("排序");
+    document.getElementById("menuDropdown").classList.add("hidden");
     updateUrl('sorting', Array.from(selectedCategories));
   }
 
-  document.getElementById("closeResult").onclick = () => {
-    document.getElementById("resultModal").classList.add("hidden")
-  }
-
+  document.getElementById("closeResult").onclick = () => { document.getElementById("resultModal").classList.add("hidden"); }
+  document.getElementById("addToCollectionBtn").onclick = addToCollection;
+  document.getElementById("removeFromCollectionBtn").onclick = removeFromCollection;
 	setStickyTopPosition();
 	window.addEventListener('resize', setStickyTopPosition);
 }
