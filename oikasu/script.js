@@ -23,7 +23,8 @@ const config = {
         flashcardAutoPlayAudio: true,
         matchingColumns: 2, // 配對遊戲在電腦版的預設欄數
         pinyinAnnotation: false,
-        phoneticSystem: 'pinyin'
+        phoneticSystem: 'pinyin',
+		playPinyinOnClick: false
     },
 
     // 不同模式下的字體大小級距
@@ -1588,6 +1589,46 @@ function updateCombinedSentencesAndRender() {
     }
 }
 
+/**
+ * 根據原始拼音字串，生成帶有 window.PinyinAudio.kasu 播放功能的可點擊 HTML。
+ * @param {string} originalPinyin - 未經轉換的原始拼音字串。
+ * @returns {string} - 處理過的 HTML 字串。
+ */
+function createClickablePhoneticHtml(originalPinyin) {
+    if (!userSettings.playPinyinOnClick) {
+        // 如果功能未啟用，直接回傳轉換後的文字
+        return userSettings.phoneticSystem === 'zhuyin' ? convertPinyinToZhuyin(originalPinyin) : originalPinyin;
+    }
+
+    // 處理包含連字號和空格的複雜情況
+    const segments = originalPinyin.split(/(\s+)/); // 按空格分割並保留空格
+    let finalHtml = '';
+
+    segments.forEach(segment => {
+        if (segment.trim() === '') {
+            finalHtml += segment; // 保留原始的空格
+        } else {
+            // 處理多音節詞 (用連字號連接)
+            const isMultiSyllable = segment.includes('-');
+            let displayPart = userSettings.phoneticSystem === 'zhuyin' ? convertPinyinToZhuyin(segment) : segment;
+            
+            // 對於多音節詞，整個詞一個點擊事件
+            if (isMultiSyllable) {
+                const safeSegment = segment.replace(/'/g, "\\'");
+                finalHtml += `<span class="pinyin-word" onclick="window.PinyinAudio.kasu(this, '${safeSegment}')">${displayPart}</span>`;
+            } else {
+                 // 對於單音節詞，直接處理
+                 const safeSegment = segment.replace(/'/g, "\\'");
+                 finalHtml += `<span class="pinyin-word" onclick="window.PinyinAudio.kasu(this, '${safeSegment}')">${displayPart}</span>`;
+            }
+        }
+    });
+
+    return finalHtml;
+}
+
+
+
 // 更新當前模式顯示
 function updateCurrentMode(modeName) {
   const modeIconEl = document.getElementById("currentModeIcon");
@@ -1628,19 +1669,12 @@ function updateCurrentMode(modeName) {
  */
 function annotateHakkaText(hakkaText, pinyinText, isAnnotated) {
     if (!isAnnotated || !hakkaText || !pinyinText) {
-        return hakkaText; // 如果未啟用或缺少資料，返回原文
+        return hakkaText;
     }
 
-    // 步驟 1: 預處理拼音字串，在所有指定的標點符號前後加上空格
     const processedPinyin = pinyinText.replace(/([,.?!;:。！？，、：；()（）])/g, ' $1 ');
-
-    // 步驟 2: 產生正確的片段陣列（用 processedPinyin）
     const pinyinSegments = processedPinyin.split(/[\s-]+/).filter(p => p.trim() !== "");
-
-    // 使用 Array.from 來正確處理包含擴充漢字的字串
     const hakkaChars = Array.from(hakkaText);
-
-    // 定義一組對應表，把半形標點對應到全形標點
     const punctuationMap = {
         ".": "。",
         ",": "，",
@@ -1657,32 +1691,37 @@ function annotateHakkaText(hakkaText, pinyinText, isAnnotated) {
 
     hakkaChars.forEach(char => {
         const currentPinyin = pinyinSegments[pinyinIndex];
+        let pinyinForDisplay = currentPinyin;
 
-        // 如果當前字是標點
+        // 【修改】如果啟用注音，轉換顯示文字
+        if (userSettings.phoneticSystem === 'zhuyin' && pinyinForDisplay) {
+            pinyinForDisplay = convertPinyinToZhuyin(pinyinForDisplay);
+        }
+
+        // 【修改】如果啟用點擊播放，建立可點擊的 span
+        let pinyinContent = pinyinForDisplay;
+        if (userSettings.playPinyinOnClick && currentPinyin) {
+            const safePinyin = currentPinyin.replace(/'/g, "\\'");
+            pinyinContent = `<span class="pinyin-word" onclick="event.stopPropagation(); window.PinyinAudio.kasu(this, '${safePinyin}')">${pinyinForDisplay}</span>`;
+        }
+
         if (/[，。？！；：、（）]/.test(char)) {
-            // 嘗試找拼音片段是否是對應的半形或全形標點
-            if (pinyinIndex < pinyinSegments.length &&
-                (currentPinyin === char || punctuationMap[currentPinyin] === char)) {
-                resultHtml += `<ruby><rb>${char}</rb><rt>${currentPinyin}</rt></ruby>`;
+            if (pinyinIndex < pinyinSegments.length && (currentPinyin === char || punctuationMap[currentPinyin] === char)) {
+                resultHtml += `<ruby><rb>${char}</rb><rt>${pinyinContent}</rt></ruby>`;
                 pinyinIndex++;
             } else {
                 resultHtml += `<span>${char}</span>`;
             }
-        }
-        // 如果是漢字，且有拼音
-        else if (pinyinIndex < pinyinSegments.length) {
-            resultHtml += `<ruby><rb>${char}</rb><rt>${currentPinyin}</rt></ruby>`;
+        } else if (pinyinIndex < pinyinSegments.length) {
+            resultHtml += `<ruby><rb>${char}</rb><rt>${pinyinContent}</rt></ruby>`;
             pinyinIndex++;
-        }
-        // 如果拼音已經用完
-        else {
+        } else {
             resultHtml += `<span>${char}</span>`;
         }
     });
 
     return resultHtml;
 }
-
 
 
 /**
@@ -1781,7 +1820,6 @@ function showCelebration(element) {
 
 
 // 學習模式
-// 請替換此函數
 function showLearningView() {
     const contentArea = document.getElementById("contentArea");
 
@@ -1843,6 +1881,9 @@ function showLearningView() {
                         </div>
                         <button id="togglePhoneticSystem" class="control-button" title="切換拼音/注音">
                             <span class="material-icons !text-xl">font_download</span>
+                        </button>
+                        <button id="togglePlayPinyinOnClick" class="control-button" title="啟用點擊拼音播放">
+                            <span class="material-icons !text-xl">mic</span>
                         </button>
                          <div class="relative">
                             <button id="displayMenuToggle" class="control-button" title="顯示設定">
@@ -1919,18 +1960,15 @@ function toggleStar(index) {
 }
 
 
-// 請替換此函數
 function renderSentences() {
     const container = document.getElementById("sentenceContainer");
     if (!container) return;
     const sentences = categories[currentCategory];
 
-    // 根據選取模式和版面模式設定容器的樣式
     let containerClasses = [];
     if (isLearningSelectMode) {
         containerClasses.push("learning-select-active");
     }
-    // 【新增】如果標音啟用，則加入 pinyin-annotated class
     if (userSettings.pinyinAnnotation) {
         containerClasses.push("pinyin-annotated");
     }
@@ -1939,13 +1977,12 @@ function renderSentences() {
         containerClasses.push("grid grid-cols-1 lg:grid-cols-2 gap-4");
     } else if (userSettings.layout === "single" || (userSettings.layout === "double" && window.innerWidth < 1024)) {
         containerClasses.push("grid grid-cols-1 gap-4");
-    } else { // compact layout
+    } else {
         containerClasses.push("bg-white rounded-xl shadow-sm border");
     }
     container.className = containerClasses.join(" ");
 
     container.innerHTML = "";
-
     if (!sentences) return;
 
     sentences.forEach((sentence, index) => {
@@ -1958,18 +1995,16 @@ function renderSentences() {
         if (isLearningSelectMode) {
             sentenceItem.classList.add('cursor-pointer');
             sentenceItem.onclick = (e) => {
-                if (e.target.closest('button, input')) return;
+                if (e.target.closest('button, input, .pinyin-word')) return; // 避免點擊拼音時觸發整行選取
                 toggleSentenceSelection(index, !isSelected);
                 renderSentences();
             };
         }
 
-        // --- 修改開始 ---
-        let pinyinDisplay = sentence["拼音"];
-        if (userSettings.phoneticSystem === 'zhuyin') {
-            pinyinDisplay = convertPinyinToZhuyin(pinyinDisplay);
-        }
-        const annotatedHakka = annotateHakkaText(sentence["客語"], pinyinDisplay, userSettings.pinyinAnnotation);
+        // --- 【修改】使用新邏輯 ---
+        const originalPinyin = sentence["拼音"];
+        const pinyinDisplayHtml = createClickablePhoneticHtml(originalPinyin);
+        const annotatedHakka = annotateHakkaText(sentence["客語"], originalPinyin, userSettings.pinyinAnnotation);
         // --- 修改結束 ---
 
 
@@ -1985,7 +2020,7 @@ function renderSentences() {
             <span class="text-sm text-gray-500 font-mono flex-shrink-0">${index + 1}</span>
             <div class="flex-1 min-w-0 flex items-baseline gap-4">
                 <span class="hakka-text text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</span>
-                <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplay}</span>
+                <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplayHtml}</span>
                 <span class="chinese-text text-gray-800 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</span>
             </div>
             <button onclick="toggleStar(${index})" class="learning-star-btn ml-2" title="標示星號">
@@ -2015,7 +2050,7 @@ function renderSentences() {
                 <div class="hakka-text text-blue-800 line-spacing-tight" 
                      style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</div>
                 <div class="pinyin-text text-gray-600 line-spacing-tight" 
-                     style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplay}</div>
+                     style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplayHtml}</div>
                 <div class="chinese-text text-gray-800 line-spacing-tight" 
                      style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</div>
             </div>
@@ -2024,7 +2059,6 @@ function renderSentences() {
         container.appendChild(sentenceItem);
     });
 
-    // 【新增】更新按鈕狀態
     const toggleAnnotationBtn = document.getElementById("togglePinyinAnnotation");
     if (toggleAnnotationBtn) {
         toggleAnnotationBtn.classList.toggle("annotation-active", userSettings.pinyinAnnotation);
@@ -2258,6 +2292,22 @@ function setupLearningControls() {
             togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
             // 重新渲染句子列表以顯示變更
             renderSentences();
+        };
+    }
+    // --- 新增開始 ---
+    const togglePlayPinyinBtn = document.getElementById("togglePlayPinyinOnClick");
+    if (togglePlayPinyinBtn) {
+        const updateBtnState = () => {
+            togglePlayPinyinBtn.classList.toggle('active', userSettings.playPinyinOnClick);
+            togglePlayPinyinBtn.title = userSettings.playPinyinOnClick ? '停用點擊拼音播放' : '啟用點擊拼音播放';
+        };
+        updateBtnState(); // 初始化按鈕狀態
+
+        togglePlayPinyinBtn.onclick = () => {
+            userSettings.playPinyinOnClick = !userSettings.playPinyinOnClick;
+            saveUserSettings();
+            updateBtnState();
+            renderSentences(); // 重新渲染以應用點擊功能
         };
     }
     // --- 新增結束 ---
@@ -4308,6 +4358,9 @@ function showSortingGame() {
                                 <input type="checkbox" id="sortingPlaySound" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300" checked>
                                 <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
                             </label>
+                             <button id="togglePlayPinyinOnClickSorting" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="啟用點擊拼音播放">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">mic</span>
+                            </button>
                             <button id="togglePhoneticSystem" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換拼音/注音">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">font_download</span>
                             </button>
@@ -4342,7 +4395,6 @@ function showSortingGame() {
     setupSortingGame();
 }
 
-
 function setupSortingGame() {
     sortingGameState = {
         isPlaying: false,
@@ -4365,23 +4417,27 @@ function setupSortingGame() {
 
     document.getElementById("startSorting").onclick = startSortingGame;
 
+    // --- 在函數結尾， togglePhoneticBtn 的邏輯之後，加入以下程式碼 ---
+
     // --- 新增開始 ---
-    const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
-    if (togglePhoneticBtn) {
-        togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
-        togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+    const togglePlayPinyinBtn = document.getElementById("togglePlayPinyinOnClickSorting");
+    if (togglePlayPinyinBtn) {
+        const updateBtnState = () => {
+            togglePlayPinyinBtn.classList.toggle('bg-blue-100', userSettings.playPinyinOnClick);
+             togglePlayPinyinBtn.title = userSettings.playPinyinOnClick ? '停用點擊拼音播放' : '啟用點擊拼音播放';
+        };
+        updateBtnState();
 
-        togglePhoneticBtn.onclick = () => {
-            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+        togglePlayPinyinBtn.onclick = () => {
+            userSettings.playPinyinOnClick = !userSettings.playPinyinOnClick;
             saveUserSettings();
-            togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
-            togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
-
+            updateBtnState();
             if (sortingGameState.isPlaying) {
-                generateSortingQuestion(false);
+                renderSortingQuestion(); // 重新渲染題目以應用變更
             }
         };
     }
+    // --- 新增結束 ---
 }
 
 
@@ -4569,6 +4625,10 @@ function renderSortingQuestion() {
     const canCheck = sortingGameState.userOrder.length === sortingGameState.originalWords.length;
     const questionNumber = sortingGameState.total;
 
+    // 【新增】檢查選項是否為拼音類型
+    const type = document.getElementById("sortingType").value;
+    const isPinyinOption = type.includes('pinyin');
+
     sortingArea.innerHTML = `
         <div class="text-center mb-8">
             <div class="flex items-center justify-center gap-4 mb-6">
@@ -4603,13 +4663,29 @@ function renderSortingQuestion() {
                 <div class="min-h-12 flex gap-3 flex-wrap justify-center">
                     ${sortingGameState.shuffledWords
                       .map(
-                        (word, index) => `
-                        <div class="sorting-word bg-white border-2 border-gray-300 px-4 py-2 rounded-lg cursor-pointer hover:border-indigo-500 transition-colors" 
-                             style="font-size: ${userSettings.fontSize}px"
-                             onclick="addToTarget('${word.replace(/'/g, "\\'")}', ${index})">
-                            ${word}
-                        </div>
-                    `,
+                        (word, index) => {
+                          // --- 【修改】 ---
+                          const originalPinyin = isPinyinOption ? word : null; // 假設 shuffledWords 存的是原始拼音
+                          let displayWord = word;
+                          if (isPinyinOption && userSettings.phoneticSystem === 'zhuyin') {
+                              displayWord = convertPinyinToZhuyin(word);
+                          }
+                          
+                          let wordContent = displayWord;
+                          if (isPinyinOption && userSettings.playPinyinOnClick) {
+                              const safePinyin = originalPinyin.replace(/'/g, "\\'");
+                              wordContent = `<span class="pinyin-word" onclick="event.stopPropagation(); window.PinyinAudio.kasu(this, '${safePinyin}')">${displayWord}</span>`;
+                          }
+
+                          return `
+                            <div class="sorting-word bg-white border-2 border-gray-300 px-4 py-2 rounded-lg cursor-pointer hover:border-indigo-500 transition-colors flex items-center justify-center" 
+                                 style="font-size: ${userSettings.fontSize}px"
+                                 onclick="addToTarget('${word.replace(/'/g, "\\'")}', ${index})">
+                                ${wordContent}
+                            </div>
+                          `;
+                          // --- 修改結束 ---
+                        }
                       )
                       .join("")}
                     ${sortingGameState.shuffledWords.length === 0 ? '<div class="invisible-placeholder px-4 py-2">　</div>' : ""}

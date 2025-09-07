@@ -665,3 +665,22 @@
 .pinyin-annotated .flex.items-baseline {
   align-items: flex-end;
 }
+
+/* --- 新增：點擊拼音播放樣式 --- */
+.pinyin-word {
+    cursor: pointer;
+    display: inline-block;
+    /* padding: 0 0.1em; */
+    border-radius: 0.25rem;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.pinyin-word:hover {
+    background-color: #e0e7ff; /* indigo-100 */
+}
+
+/* 讓排序遊戲中的拼音點擊區域更大 */
+.sorting-word .pinyin-word {
+    padding: 0.25rem 0.5rem;
+    margin: -0.25rem -0.5rem; /* 抵銷內距，維持外觀大小 */
+}
