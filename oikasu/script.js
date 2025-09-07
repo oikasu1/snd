@@ -4417,7 +4417,30 @@ function setupSortingGame() {
 
     document.getElementById("startSorting").onclick = startSortingGame;
 
-    // --- 在函數結尾， togglePhoneticBtn 的邏輯之後，加入以下程式碼 ---
+
+	const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
+	if (togglePhoneticBtn) {
+		// 根據目前設定，初始化按鈕樣式
+		togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
+		togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+		togglePhoneticBtn.onclick = () => {
+			// 切換設定
+			userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+			saveUserSettings();
+
+			// 更新按鈕樣式與標題
+			togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
+			togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+			// 如果遊戲正在進行，重新生成題目以應用變更
+			if (sortingGameState.isPlaying) {
+				// 傳入 false 代表使用當前的題目重新渲染，而不是產生新題目
+				generateSortingQuestion(false);
+			}
+		};
+	}
+
 
     // --- 新增開始 ---
     const togglePlayPinyinBtn = document.getElementById("togglePlayPinyinOnClickSorting");
