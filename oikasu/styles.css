@@ -133,7 +133,7 @@
 
 /* --- 按鈕元件 (Button Components) --- */
 
-/* 閃示卡底部控制按鈕 (小) */
+/* 閃卡底部控制按鈕 (小) */
 .control-btn {
   @apply p-3 text-gray-500 rounded-full hover:bg-gray-100 hover:text-gray-800 transition-colors;
 }
@@ -150,7 +150,20 @@
   font-variation-settings: 'FILL' 1; /* 啟用時圖示填滿 */
 }
 
-/* 閃示卡中間播放按鈕 (大) */
+
+/* 學習模式、閃卡模式 */
+.control-button.active,
+.control-btn.active {
+  @apply bg-blue-100 text-blue-700;
+}
+
+/* 配對、測驗、排序遊戲工具列按鈕 */
+.mode-toolbar button.bg-blue-100 {
+  color: #1d4ed8; /* blue-700 */
+}
+
+
+/* 閃卡中間播放按鈕 (大) */
 .control-btn-main {
   @apply p-5 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition-all transform hover:scale-105;
 }
@@ -158,7 +171,7 @@
   @apply text-4xl;
 }
 
-/* 閃示卡彈出選單內的練習模式按鈕 */
+/* 閃卡彈出選單內的練習模式按鈕 */
 .practice-mode-btn {
   @apply w-full px-3 py-1.5 text-sm font-semibold rounded-md transition-colors text-gray-600;
 }
@@ -169,7 +182,7 @@
   @apply text-gray-400 cursor-not-allowed hover:bg-transparent;
 }
 
-/* 閃示卡頂部設定按鈕 */
+/* 閃卡頂部設定按鈕 */
 .setting-btn {
   @apply p-2 rounded-md hover:bg-gray-200 text-gray-500 transition-colors flex items-center justify-center;
 }
@@ -177,7 +190,7 @@
     @apply text-xl;
 }
 
-/* 閃示卡頂部彈出式選單內的選項 */
+/* 閃卡頂部彈出式選單內的選項 */
 .setting-menu-item {
   @apply w-full text-left px-4 py-2.5 flex items-center text-sm text-gray-700 hover:bg-gray-100;
 }
@@ -439,9 +452,9 @@
 }
 
 
-/* --- 閃示卡內部樣式微調 (Flashcard Internal Style Tweaks) --- */
+/* --- 閃卡內部樣式微調 (Flashcard Internal Style Tweaks) --- */
 
-/* 讓閃示卡內部的控制按鈕顏色變淡，減少視覺干擾 */
+/* 讓閃卡內部的控制按鈕顏色變淡，減少視覺干擾 */
 #flashcardContainer .control-btn,
 #flashcardContainer .setting-btn {
   color: #9ca3af; /* gray-400 */
@@ -458,7 +471,7 @@
 }
 
 
-/* 閃示卡內部的「跳至首張/末張」按鈕樣式 */
+/* 閃卡內部的「跳至首張/末張」按鈕樣式 */
 .card-nav-btn {
   position: absolute;
   bottom: 1rem; /* 距離底部 16px */
@@ -469,7 +482,7 @@
   @apply p-2 text-gray-400 rounded-full hover:bg-gray-100 hover:text-gray-600;
 }
 
-/* 當滑鼠移到閃示卡上時，顯示導航按鈕 */
+/* 當滑鼠移到閃卡上時，顯示導航按鈕 */
 #flashcardContainer:hover .card-nav-btn {
   opacity: 1;
   transform: translateY(0);
@@ -601,8 +614,6 @@
 }
 
 .category-dropdown-item label {
-  display: flex;
-  align-items: center;
   width: 100%;
   cursor: pointer;
   font-weight: normal; /* 讓選項文字不是粗體 */
@@ -615,4 +626,42 @@
   height: 1.125rem; /* 18px */
   accent-color: #3b82f6; /* blue-500 */
   flex-shrink: 0;
+}
+
+/* --- 拼音標註樣式 (Ruby Annotation) --- */
+.hakka-text ruby {
+    display: inline-flex;
+    flex-direction: column-reverse; /* 將 rt (拼音) 呈現在 rb (漢字) 上方 */
+    line-height: 1.2;
+    margin: 0 0.1em;
+    text-align: center;
+}
+
+.hakka-text rt { /* 拼音文字 */
+    font-size: 0.8em; /* 拼音字體縮小 */
+    color: #111;
+    line-height: 1.1;
+    /* user-select: none;  讓拼音不易被選取，減少干擾 */
+    /* opacity: 0.9;*/
+    font-weight: normal; /* 確保拼音不是粗體 */
+    text-align: center;
+}
+
+.hakka-text rb { /* 漢字本身 */
+    line-height: 1.1;
+}
+
+/* 當標音啟用時，隱藏原始的獨立拼音行 */
+.pinyin-annotated .pinyin-text {
+    display: none !important;
+}
+
+/* 標音按鈕啟用時的樣式 */
+.control-button.annotation-active {
+    background-color: #eef2ff; /* indigo-50 */
+    color: #4338ca; /* indigo-700 */
+}
+
+.pinyin-annotated .flex.items-baseline {
+  align-items: flex-end;
 }

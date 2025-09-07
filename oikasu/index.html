@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,56 +9,55 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles.css">
+	<script src="https://oikasu1.github.io/snd/app.js"></script>
 </head>
 
 <body class="bg-gray-50">
 
     <div id="app" class="min-h-screen">
-	    <div id="searchOverlay" class="hidden"></div>
+        <div id="searchOverlay" class="hidden"></div>
 
         <div id="mainMenu" class="min-h-screen">
-            
+
             <header class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40 shadow-sm">
 
                 <div class="container mx-auto px-4 py-3">
                     <div class="flex items-center justify-between gap-4">
-                        
+
                         <div id="mainTitle" class="flex-shrink-0">
                             <h1 class="text-2xl font-bold text-blue-600">🥷愛客書</h1>
                         </div>
-                        
+
                         <div class="search-container flex-1 max-w-sm">
                             <div class="relative flex items-center w-full gap-2">
                                 <button id="searchToggle" class="md:hidden bg-gray-100 hover:bg-white p-2 rounded-lg transition-colors" aria-label="開啟搜尋">
                                     <span class="material-icons text-gray-600">search</span>
                                 </button>
-                                
+
                                 <div id="searchBox" class="hidden md:block w-full">
-									<div class="relative">
-										<span class="material-icons absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">search</span>
-										<input type="text" id="searchInput" placeholder="搜尋主題、客語、拼音、華語..." 
-											   class="w-full pl-10 pr-10 py-2 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none transition-colors">
-										<button id="clearSearch" class="hidden absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="清除搜尋">
-											<span class="material-icons">close</span>
-										</button>
-									</div>
-								</div>
+                                    <div class="relative">
+                                        <span class="material-icons absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">search</span>
+                                        <input type="text" id="searchInput" placeholder="搜尋主題、客語、拼音、華語..." class="w-full pl-10 pr-10 py-2 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none transition-colors">
+                                        <button id="clearSearch" class="hidden absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="清除搜尋">
+                                            <span class="material-icons">close</span>
+                                        </button>
+                                    </div>
+                                </div>
 
                                 <div id="mobileSearchBox" class="hidden w-full">
                                     <div class="relative">
                                         <span class="material-icons absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">search</span>
-                                        <input type="text" id="mobileSearchInput" placeholder="搜尋主題..." 
-                                               class="w-full pl-10 pr-12 py-2 bg-white border-2 border-blue-500 rounded-lg focus:outline-none h-12 shadow-xl">
+                                        <input type="text" id="mobileSearchInput" placeholder="搜尋主題..." class="w-full pl-10 pr-12 py-2 bg-white border-2 border-blue-500 rounded-lg focus:outline-none h-12 shadow-xl">
                                         <button id="closeMobileSearch" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="關閉搜尋">
                                             <span class="material-icons">close</span>
                                         </button>
                                     </div>
                                 </div>
-                                
+
                             </div>
                             <div id="searchResults" class="search-results hidden"></div>
                         </div>
-                        
+
                         <div id="userArea" class="flex items-center space-x-3 flex-shrink-0">
                             <div class="relative">
                                 <button id="userButton" class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -90,73 +90,74 @@
             <main class="bg-gray-50 min-h-screen pt-20 md:pt-14">
                 <section class="container mx-auto px-4 py-8 pb-24">
 
-				<div id="tabBarStrip" class="sticky z-30 bg-gray-50 py-1 border-b border-gray-200 flex items-center justify-between gap-2 mb-4">
+                    <div id="tabBarStrip" class="sticky z-30 bg-gray-50 py-1 border-b border-gray-200 flex items-center justify-between gap-2 mb-4">
 
-				    <div id="multiSelectControls" class="flex items-center gap-2 flex-shrink-0">
-				        </div>
+                        <div id="multiSelectControls" class="flex items-center gap-2 flex-shrink-0">
+                        </div>
 
-				    <div id="catalogTabsContainer" class="flex-grow flex items-center gap-2 overflow-hidden">
-				        <div id="catalogTabs" class="flex items-center gap-2 whitespace-nowrap"></div>
-				    </div>
+                        <div id="catalogTabsContainer" class="flex-grow flex items-center gap-2 overflow-hidden">
+                            <div id="catalogTabs" class="flex items-center gap-2 whitespace-nowrap"></div>
+                        </div>
 
-				    <div id="moreTabsContainer" class="relative hidden flex-shrink-0">
-				        <button id="moreTabsButton" class="flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors">
-				            <span>更多</span>
-				            <span class="material-icons !text-xl">expand_more</span>
-				        </button>
-				        <div id="moreTabsDropdown" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-20 py-1">
-				        </div>
-				    </div>
+                        <div id="moreTabsContainer" class="relative hidden flex-shrink-0">
+                            <button id="moreTabsButton" class="flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors">
+                                <span>更多</span>
+                                <span class="material-icons !text-xl">expand_more</span>
+                            </button>
+                            <div id="moreTabsDropdown" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-20 py-1">
+                            </div>
+                        </div>
 
-				    <button id="viewToggle" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors flex-shrink-0" title="切換檢視" aria-label="切換檢視模式">
-				        <span class="material-icons">grid_view</span>
-				    </button>
-				</div>
+                        <button id="viewToggle" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors flex-shrink-0" title="切換檢視" aria-label="切換檢視模式">
+                            <span class="material-icons">grid_view</span>
+                        </button>
+                    </div>
 
-					<div id="categoryList"></div>
-				</section>
+                    <div id="categoryList"></div>
+                </section>
 
-				<button id="learnSelected" class="hidden fixed bottom-6 right-6 md:bottom-8 md:right-8 lg:bottom-10 lg:right-10 
+                <button id="learnSelected" class="hidden fixed bottom-6 right-6 md:bottom-8 md:right-8 lg:bottom-10 lg:right-10 
 						   px-6 py-3 bg-blue-600 text-white rounded-full shadow-lg 
 						   hover:bg-blue-700 transition-all duration-300 
 						   font-semibold text-lg flex items-center gap-2 z-40">
-					<span class="material-icons text-xl">rocket_launch</span>
-					<span id="learnSelectedText">學習選取</span>
-				</button>
+                    <span class="material-icons text-xl">rocket_launch</span>
+                    <span id="learnSelectedText">學習選取</span>
+                </button>
 
-    <button id="addToCollectionBtn" class="hidden fixed bottom-6 left-6 md:bottom-8 md:left-8 lg:bottom-10 lg:left-10 
+                <button id="addToCollectionBtn" class="hidden fixed bottom-6 left-6 md:bottom-8 md:left-8 lg:bottom-10 lg:left-10 
                        px-6 py-3 bg-purple-600 text-white rounded-full shadow-lg 
                        hover:bg-purple-700 transition-all duration-300 
                        font-semibold text-lg flex items-center gap-2 z-40">
-        <span class="material-icons text-xl">favorite</span>
-        <span id="addToCollectionText">加入收藏</span>
-    </button>
-    
-    <button id="removeFromCollectionBtn" class="hidden fixed bottom-6 left-6 md:bottom-8 md:left-8 lg:bottom-10 lg:left-10 
+                    <span class="material-icons text-xl">favorite</span>
+                    <span id="addToCollectionText">加入收藏</span>
+                </button>
+
+                <button id="removeFromCollectionBtn" class="hidden fixed bottom-6 left-6 md:bottom-8 md:left-8 lg:bottom-10 lg:left-10 
                            px-6 py-3 bg-red-600 text-white rounded-full shadow-lg 
                            hover:bg-red-700 transition-all duration-300 
                            font-semibold text-lg flex items-center gap-2 z-40">
-        <span class="material-icons text-xl">delete</span>
-        <span id="removeFromCollectionText">取消收藏</span>
-    </button>				
-			</main>
+                    <span class="material-icons text-xl">delete</span>
+                    <span id="removeFromCollectionText">取消收藏</span>
+                </button>
+            </main>
 
-		</div>
+        </div>
 
-		<div id="categoryDetail" class="hidden min-h-screen bg-gray-50">
-		    <header id="topNav" class="bg-white border-b border-gray-200 top-0 z-20">
-		        <div class="container mx-auto px-4 py-4">
-		            <div class="flex items-center justify-between">
-		                <div class="flex items-center space-x-4">
-		                    <button id="goHome" class="text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-100 rounded-lg transition-colors" title="返回" aria-label="返回主選單">
-		                        <span class="material-icons">arrow_back</span>
-		                    </button>
-                            
+        <div id="categoryDetail" class="hidden min-h-screen bg-gray-50">
+            <header id="topNav" class="bg-white border-b border-gray-200 top-0 z-20">
+                <div class="container mx-auto px-4 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <button id="goHome" class="text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-100 rounded-lg transition-colors" title="返回" aria-label="返回主選單">
+                                <span class="material-icons">arrow_back</span>
+                            </button>
+
                             <div class="relative bg-gray-100 rounded-lg">
-                                <button id="menuToggle" class="flex items-center space-x-2 px-4 py-2 text-gray-800 hover:bg-gray-200 rounded-lg transition-colors">
-                                    <span id="currentMode">學習</span>
-                                    <span class="material-icons">expand_more</span>
-                                </button>
+								<button id="menuToggle" class="flex items-center space-x-2 px-3 py-2 text-gray-800 hover:bg-gray-200 rounded-lg transition-colors">
+								    <span id="currentModeIcon" class="material-icons text-blue-600">book</span>
+								    <span id="currentMode" class="hidden md:inline">學習</span>
+								    <span class="material-icons !text-xl text-gray-600">expand_more</span>
+								</button>
                                 <div id="menuDropdown" class="hidden absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border min-w-48 z-50">
                                     <button id="viewSentences" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center space-x-3 border-b">
                                         <span class="material-icons text-blue-600">book</span>
@@ -164,7 +165,7 @@
                                     </button>
                                     <button id="flashcardMode" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center space-x-3 border-b">
                                         <span class="material-icons text-purple-600">style</span>
-                                        <span>閃示卡</span>
+                                        <span>閃卡</span>
                                     </button>
                                     <button id="matchingGame" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center space-x-3 border-b">
                                         <span class="material-icons text-orange-600">extension</span>
@@ -182,7 +183,7 @@
                             </div>
                             <div id="categoryTitleContainer" class="relative text-xl font-bold text-gray-800"></div>
                         </div>
-                        
+
                         <div class="flex items-center space-x-3 flex-shrink-0">
                             <div class="relative">
                                 <button id="userButtonDetail" class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -210,7 +211,7 @@
                     </div>
                 </div>
             </header>
-            
+
             <main id="contentArea" class="container mx-auto px-4 py-6"></main>
         </div>
 
@@ -250,19 +251,20 @@
             </div>
         </div>
 
-		<div id="resultModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
-			<div class="bg-white rounded-xl p-5 max-w-sm mx-4 w-full">
-				<div id="resultContent" class="text-center">
-					<div id="resultIcon" class="text-5xl mb-3"></div>
-					<h3 id="resultTitle" class="text-xl font-bold mb-3"></h3>
-					<p id="resultMessage" class="text-gray-600 mb-5 whitespace-pre-line"></p>
-					<button id="closeResult" class="bg-blue-500 text-white px-5 py-2 rounded-lg hover:bg-blue-600">確定</button>
-				</div>
-			</div>
-		</div>
+        <div id="resultModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+            <div class="bg-white rounded-xl p-5 max-w-sm mx-4 w-full">
+                <div id="resultContent" class="text-center">
+                    <div id="resultIcon" class="text-5xl mb-3"></div>
+                    <h3 id="resultTitle" class="text-xl font-bold mb-3"></h3>
+                    <p id="resultMessage" class="text-gray-600 mb-5 whitespace-pre-line"></p>
+                    <button id="closeResult" class="bg-blue-500 text-white px-5 py-2 rounded-lg hover:bg-blue-600">確定</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="data.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>

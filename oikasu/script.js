@@ -21,7 +21,9 @@ const config = {
         matchingLayout: '1col',
         quizLayout: 'horizontal', // 將在初次載入時根據螢幕寬度動態調整
         flashcardAutoPlayAudio: true,
-        matchingColumns: 2 // 配對遊戲在電腦版的預設欄數
+        matchingColumns: 2, // 配對遊戲在電腦版的預設欄數
+        pinyinAnnotation: false,
+        phoneticSystem: 'pinyin'
     },
 
     // 不同模式下的字體大小級距
@@ -36,18 +38,26 @@ const config = {
 // =================================================================
 
 
-
 // 全域變數
 let sentences = []
 let categories = {}
 let orderedCategories = [];
-let currentUser = { id: "guest", name: "訪客", avatar: "U" }
+let currentUser = {
+    id: "guest",
+    name: "訪客",
+    avatar: "U"
+}
 let currentCategory = ""
 let currentViewMode = "card"
 let selectedCategories = new Set()
 const selectedSentences = new Set()
 let gameTimer = null
-const gameStats = { correct: 0, total: 0, score: 0, steps: 0 }
+const gameStats = {
+    correct: 0,
+    total: 0,
+    score: 0,
+    steps: 0
+}
 let userSettings = {}
 let starredCards = new Set()
 let currentCardIndex = 0
@@ -63,13 +73,16 @@ let quizGameState = {}
 let isFlashcardShuffled = false
 let originalFlashcardOrder = []
 let flashcardKeyHandler = null
-let flashcardBlurStates = { hakka: false, pinyin: false, chinese: false };
+let flashcardBlurStates = {
+    hakka: false,
+    pinyin: false,
+    chinese: false
+};
 let quizIsBlurred = false;
 let sortingIsBlurred = false;
 let catalog = {};
 let currentCatalogTab = "";
-let learnSelectedText;
-let isMultiSelectMode = false; 
+let isMultiSelectMode = false;
 let isLearningSelectMode = false;
 let lastVisitedTab = "";
 let collectedCategories = new Set();
@@ -155,7 +168,7 @@ function updateUrl(mode, categoryNames) {
         'matching': 'm', //配對
         'quiz': 'q', //測驗
         'sorting': 's', //排序
-        'flashcard': 'f' //閃示卡
+        'flashcard': 'f' //閃卡
     };
 
     const typeParam = reverseModeMap[mode];
@@ -164,17 +177,20 @@ function updateUrl(mode, categoryNames) {
     const categoryIndexes = categoryNames
         .map(name => orderedCategories.indexOf(name) + 1)
         .filter(index => index > 0)
-        .sort((a, b) => a - b); 
+        .sort((a, b) => a - b);
 
     if (categoryIndexes.length === 0) return;
-    
+
     const noParam = compressNumberArray(categoryIndexes);
 
     const newUrl = `${window.location.pathname}?type=${typeParam}&no=${noParam}`;
     const newSearchParams = `?type=${typeParam}&no=${noParam}`;
 
     if (window.location.search !== newSearchParams) {
-        history.pushState({ mode, categoryNames }, '', newUrl);
+        history.pushState({
+            mode,
+            categoryNames
+        }, '', newUrl);
     }
 }
 
@@ -199,7 +215,7 @@ function handleUrlParameters() {
         'm': 'matching',//配對
         'q': 'quiz',//測驗
         's': 'sorting',//排序
-        'f': 'flashcard'//閃示卡
+        'f': 'flashcard'//閃卡
     };
 
     const targetMode = modeMap[typeParam];
@@ -231,16 +247,24 @@ function handleUrlParameters() {
     selectedCategories.clear();
     categoriesToSelect.forEach(name => selectedCategories.add(name));
 
-    // 2. 組合句子並顯示詳情頁 (類似 startLearning 的邏輯)
-    const tempCategoryName = `已選取的 ${selectedCategories.size} 個主題`; //這裡
-    let combinedSentences = [];
-    selectedCategories.forEach(categoryName => {
-        if (categories[categoryName]) {
-            combinedSentences = combinedSentences.concat(categories[categoryName]);
-        }
-    });
-    categories[tempCategoryName] = combinedSentences;
-    showCategoryDetail(tempCategoryName);
+    // 2. 【修改處】根據選取的主題數量，決定顯示方式
+    if (categoriesToSelect.length === 1) {
+        // 如果只有一個主題，直接顯示該主題的詳情頁
+        const singleCategoryName = categoriesToSelect[0];
+        showCategoryDetail(singleCategoryName);
+    } else {
+        // 如果有多個主題，才組合句子並顯示 "n主題" 的互動式標題
+        const tempCategoryName = `${selectedCategories.size}主題`;
+        let combinedSentences = [];
+        selectedCategories.forEach(categoryName => {
+            if (categories[categoryName]) {
+                combinedSentences = combinedSentences.concat(categories[categoryName]);
+            }
+        });
+        categories[tempCategoryName] = combinedSentences;
+        showCategoryDetail(tempCategoryName);
+    }
+
 
     // 3. 切換到 URL 指定的模式
     if (selectedSentences.size === 0 && targetMode !== 'learning') {
@@ -251,7 +275,7 @@ function handleUrlParameters() {
     switch (targetMode) {
         case 'flashcard':
             showFlashcardView();
-            updateCurrentMode("閃示卡");
+            updateCurrentMode("閃卡");
             break;
         case 'matching':
             showMatchingGame();
@@ -272,7 +296,6 @@ function handleUrlParameters() {
 
     return true; 
 }
-
 
 function startSingleCategoryLearning(categoryName) {
     lastVisitedTab = currentCatalogTab;
@@ -349,81 +372,89 @@ function updateMultiSelectControlsUI() {
 
 // 初始化
 function init() {
-  loadUserData(); // 【修改】先載入使用者資料 (包含收藏)
-  parseData();
-  parseCatalog(); // 【修改】再根據資料解析目錄
-  
-  const defaultTabName = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
+    loadUserData(); 
+    parseData();
+    parseCatalog(); 
 
-  loadUserSettings();
+    const defaultTabName = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
 
-  currentCatalogTab = defaultTabName;
+    loadUserSettings();
 
-  const paramsHandled = handleUrlParameters();
-  if (paramsHandled) {
+    currentCatalogTab = defaultTabName;
+
+    const paramsHandled = handleUrlParameters();
+    if (paramsHandled) {
+        setupEventListeners();
+        updateUserDisplay();
+        return;
+    }
+
+    renderCatalogTabs();
+    renderCategoryList();
     setupEventListeners();
     updateUserDisplay();
-    return;
-  }
 
-  renderCatalogTabs();
-  renderCategoryList();
-  setupEventListeners();
-  updateUserDisplay();  
-
-  learnSelectedText = document.getElementById("learnSelectedText");
-  document.getElementById("learnSelected").addEventListener("click", startLearning);
+    document.getElementById("learnSelected").addEventListener("click", startLearning);
 }
 
 // 解析分類群組資料
 function parseCatalog() {
-  catalog = {}; 
-  const lines = myCatalog.trim().split("\n");
-  lines.forEach(line => {
-    const parts = line.split("\t");
-    if (parts.length === 2) {
-      const key = parts[0].trim();
-      const valueStr = parts[1].trim();
+    catalog = {};
+    const lines = myCatalog.trim().split("\n");
+    lines.forEach(line => {
+        const parts = line.split("\t");
+        if (parts.length === 2) {
+            const key = parts[0].trim();
+            const valueStr = parts[1].trim();
 
-      if (valueStr.startsWith('{')) {
-        const chapters = [];
-        const regex = /\{([^:]+):([^}]+)\}/g;
-        let match;
-        while ((match = regex.exec(valueStr)) !== null) {
-          chapters.push({
-            title: match[1].trim(),
-            categories: match[2].split(',').map(item => item.trim()).filter(Boolean)
-          });
+            if (valueStr.startsWith('{')) {
+                const chapters = [];
+                const regex = /\{([^:]+):([^}]+)\}/g;
+                let match;
+                while ((match = regex.exec(valueStr)) !== null) {
+                    chapters.push({
+                        title: match[1].trim(),
+                        categories: match[2].split(',').map(item => item.trim()).filter(Boolean)
+                    });
+                }
+                catalog[key] = {
+                    type: 'chapters',
+                    data: chapters
+                };
+            } else {
+                const categories = valueStr.split(',').map(item => item.trim());
+                catalog[key] = {
+                    type: 'list',
+                    data: categories
+                };
+            }
         }
-        catalog[key] = { type: 'chapters', data: chapters };
-      } else {
-        const categories = valueStr.split(',').map(item => item.trim());
-        catalog[key] = { type: 'list', data: categories };
-      }
-    }
-  });
+    });
 
-  // 【新增】動態建立「收藏」頁籤
-  const hasStarred = starredCards.size > 0;
-  const hasCollected = collectedCategories.size > 0;
+    // 【新增】動態建立「收藏」頁籤
+    const hasStarred = starredCards.size > 0;
+    const hasCollected = collectedCategories.size > 0;
 
-  if (hasStarred || hasCollected) {
-    let collectionItems = [];
-    if (hasStarred) {
-      collectionItems.push("星號");
+    if (hasStarred || hasCollected) {
+        let collectionItems = [];
+        if (hasStarred) {
+            collectionItems.push("星號");
+        }
+        if (hasCollected) {
+            // 排序確保順序一致
+            const sortedCollected = Array.from(collectedCategories).sort();
+            collectionItems.push(...sortedCollected);
+        }
+
+        const newCatalog = {
+            '收藏': {
+                type: 'list',
+                data: collectionItems
+            }
+        };
+        Object.assign(newCatalog, catalog);
+        catalog = newCatalog;
     }
-    if (hasCollected) {
-      // 排序確保順序一致
-      const sortedCollected = Array.from(collectedCategories).sort();
-      collectionItems.push(...sortedCollected);
-    }
-    
-    const newCatalog = {
-      '收藏': { type: 'list', data: collectionItems }
-    };
-    Object.assign(newCatalog, catalog);
-    catalog = newCatalog;
-  }
 }
 
 // 使用新的函數來處理頁籤溢出
@@ -435,7 +466,7 @@ function renderCatalogTabs() {
 
     // 【新增的防護】如果容器是隱藏的(寬度為0)，則不執行後續程式碼
     if (!tabsContainer || !container || container.offsetWidth === 0) {
-        return; 
+        return;
     }
 
     // 暫時清空
@@ -486,7 +517,7 @@ function renderCatalogTabs() {
                 overflowTabs.push(button);
             }
         });
-        
+
         // 重新渲染正確的 tabs
         tabsContainer.innerHTML = "";
         tabsContainer.append(...visibleTabs);
@@ -526,7 +557,7 @@ function createCategoryCardElement(categoryName, cardCount) {
     const categoryItem = document.createElement("div");
 
     const isStarredCategory = categoryName === "星號";
-    
+
     // *** 修改點：根據是否為多選模式，決定點擊行為 ***
     if (isMultiSelectMode) {
         categoryItem.onclick = () => toggleCategorySelection(categoryName);
@@ -539,7 +570,7 @@ function createCategoryCardElement(categoryName, cardCount) {
             categoryItem.onclick = () => startSingleCategoryLearning(safeCategoryName);
         }
     }
-    
+
     // 根據檢視模式設定不同的 class
     if (currentViewMode === "card") {
         categoryItem.className = `category-card bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md ${isSelected && isMultiSelectMode ? "checkbox-selected selected-border" : ""}`;
@@ -607,7 +638,7 @@ function renderCategoryList() {
             categories: currentTabData.data
         });
     }
-    
+
     renderableSections.forEach(section => {
         if (section.title) {
             const titleEl = document.createElement("h2");
@@ -617,17 +648,17 @@ function renderCategoryList() {
         }
 
         const container = document.createElement("div");
-        container.className = currentViewMode === "card" 
-            ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
-            : "bg-white rounded-xl shadow-sm border";
-        
+        container.className = currentViewMode === "card" ?
+            "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4" :
+            "bg-white rounded-xl shadow-sm border";
+
         section.categories.forEach(categoryName => {
             const isStarredCategory = categoryName === "星號";
             const cardCount = isStarredCategory ? starredCards.size : (categories[categoryName] ? categories[categoryName].length : 0);
-            
+
             // 如果分類不存在（除了星號），則不渲染
             if (!isStarredCategory && !categories[categoryName]) return;
-            
+
             // 如果是星號分類，但沒有任何星號卡，也不渲染
             if (isStarredCategory && cardCount === 0) return;
 
@@ -639,7 +670,7 @@ function renderCategoryList() {
             categoryList.appendChild(container);
         }
     });
-    
+
     updateSelectionToolbar();
     updateMultiSelectControlsUI();
 }
@@ -666,7 +697,7 @@ function toggleCurrentTabSelection(event) {
 
 // 清除所有選取
 function clearAllSelections() {
-    disableMultiSelectMode(); 
+    disableMultiSelectMode();
 }
 
 // 更新目前頁籤的全選核取方塊狀態
@@ -698,253 +729,268 @@ function updateSelectionControlsState() {
 // 處理頁籤選擇事件
 function selectCatalogTab(tabName) {
     currentCatalogTab = tabName;
-    renderCatalogTabs(); 
+    renderCatalogTabs();
     renderCategoryList();
 }
 
 
 // 解析資料
 function parseData() {
-  const lines = myData
-    .trim()
-    .split("\n")
-    .filter((line) => line.trim())
-  const headers = lines[0].split("\t")
-  sentences = []
+    const lines = myData
+        .trim()
+        .split("\n")
+        .filter((line) => line.trim())
+    const headers = lines[0].split("\t")
+    sentences = []
 
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split("\t")
-    const item = {}
-    headers.forEach((header, index) => {
-      item[header] = values[index] || ""
-    })
-    sentences.push(item)
-  }
-
-  // 按分類分組
-  categories = {}
-  sentences.forEach((sentence) => {
-    const category = sentence["分類"]
-    if (!categories[category]) {
-      categories[category] = []
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split("\t")
+        const item = {}
+        headers.forEach((header, index) => {
+            item[header] = values[index] || ""
+        })
+        sentences.push(item)
     }
-    categories[category].push(sentence)
-  });
 
-  // 排序分類鍵值以確保順序一致性，供給 URL 參數使用
-  orderedCategories = Object.keys(categories).sort();
+    // 按分類分組
+    categories = {}
+    sentences.forEach((sentence) => {
+        const category = sentence["分類"]
+        if (!categories[category]) {
+            categories[category] = []
+        }
+        categories[category].push(sentence)
+    });
+
+    // 排序分類鍵值以確保順序一致性，供給 URL 參數使用
+    orderedCategories = Object.keys(categories).sort();
 }
 
 function loadUserData() {
-  const userData = localStorage.getItem(`${config.STORAGE_PREFIX}user`);
-  if (userData) {
-    currentUser = JSON.parse(userData)
-  }
-  
-  // 【新增】載入收藏的分類
-  const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
-  const collectedData = localStorage.getItem(collectedKey);
-  if (collectedData) {
-      collectedCategories = new Set(JSON.parse(collectedData));
-  } else {
-      collectedCategories = new Set();
-  }
+    const userData = localStorage.getItem(`${config.STORAGE_PREFIX}user`);
+    if (userData) {
+        currentUser = JSON.parse(userData)
+    }
+
+    // 【新增】載入收藏的分類
+    const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
+    const collectedData = localStorage.getItem(collectedKey);
+    if (collectedData) {
+        collectedCategories = new Set(JSON.parse(collectedData));
+    } else {
+        collectedCategories = new Set();
+    }
 }
 
 function saveCollectedCategories() {
-  const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
-  localStorage.setItem(collectedKey, JSON.stringify(Array.from(collectedCategories)));
+    const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
+    localStorage.setItem(collectedKey, JSON.stringify(Array.from(collectedCategories)));
 }
 
 function saveUserData() {
-  localStorage.setItem(`${config.STORAGE_PREFIX}user`, JSON.stringify(currentUser))
+    localStorage.setItem(`${config.STORAGE_PREFIX}user`, JSON.stringify(currentUser))
 }
 
+// 請替換此函數
 function loadUserSettings() {
-  const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`
-  const settings = localStorage.getItem(settingsKey)
-  if (settings) {
-    userSettings = JSON.parse(settings)
-  } else {
-    // 從 config 載入預設設定 (使用深拷貝以避免修改原始設定)
-    userSettings = JSON.parse(JSON.stringify(config.DEFAULT_USER_SETTINGS));
-  }
-  
-  if (!userSettings.matchingLayout) {
-    userSettings.matchingLayout = '1col';
-  }
-  
-  if (!userSettings.quizLayout) {
-    userSettings.quizLayout = window.innerWidth >= 1024 ? 'horizontal' : 'vertical';
-  }
+    const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`
+    const settings = localStorage.getItem(settingsKey)
+    if (settings) {
+        userSettings = JSON.parse(settings)
+    } else {
+        // 從 config 載入預設設定 (使用深拷貝以避免修改原始設定)
+        userSettings = JSON.parse(JSON.stringify(config.DEFAULT_USER_SETTINGS));
+    }
 
-  if (userSettings.flashcardAutoPlayAudio === undefined) {
-    userSettings.flashcardAutoPlayAudio = true;
-  }
+    if (!userSettings.matchingLayout) {
+        userSettings.matchingLayout = '1col';
+    }
 
-  if (userSettings.flashcardLoop === undefined) {
-    userSettings.flashcardLoop = false;
-  }
+    if (!userSettings.quizLayout) {
+        userSettings.quizLayout = window.innerWidth >= 1024 ? 'horizontal' : 'vertical';
+    }
 
-  currentViewMode = userSettings.viewMode || "card"
+    if (userSettings.flashcardAutoPlayAudio === undefined) {
+        userSettings.flashcardAutoPlayAudio = true;
+    }
 
-  // 載入選取的分類
-  const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`
-  const selectedData = localStorage.getItem(selectedKey)
-  if (selectedData) {
-    selectedCategories = new Set(JSON.parse(selectedData))
-  }
-  
-  // --- 新增：載入星號紀錄 ---
-  const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
-  const starredData = localStorage.getItem(starredKey);
-  if (starredData) {
-    starredCards = new Set(JSON.parse(starredData));
-  } else {
-    starredCards = new Set(); 
-  }
+    if (userSettings.flashcardLoop === undefined) {
+        userSettings.flashcardLoop = false;
+    }
+
+    if (userSettings.pinyinAnnotation === undefined) {
+        userSettings.pinyinAnnotation = false;
+    }
+
+    // --- 新增開始 ---
+    if (userSettings.phoneticSystem === undefined) {
+        userSettings.phoneticSystem = 'pinyin';
+    }
+    // --- 新增結束 ---
+
+    currentViewMode = userSettings.viewMode || "card"
+
+    // 載入選取的分類
+    const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`
+    const selectedData = localStorage.getItem(selectedKey)
+    if (selectedData) {
+        selectedCategories = new Set(JSON.parse(selectedData))
+    }
+
+    // --- 新增：載入星號紀錄 ---
+    const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
+    const starredData = localStorage.getItem(starredKey);
+    if (starredData) {
+        starredCards = new Set(JSON.parse(starredData));
+    } else {
+        starredCards = new Set();
+    }
 }
+
 
 function saveSelectedCategories() {
-  const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`
-  localStorage.setItem(selectedKey, JSON.stringify(Array.from(selectedCategories)))
+    const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`
+    localStorage.setItem(selectedKey, JSON.stringify(Array.from(selectedCategories)))
 }
 
 function saveUserSettings() {
-  const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`
-  localStorage.setItem(settingsKey, JSON.stringify(userSettings))
+    const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`
+    localStorage.setItem(settingsKey, JSON.stringify(userSettings))
 }
 
 
 function updateUserDisplay() {
-  // 首頁用戶顯示
-  document.getElementById("userName").textContent = currentUser.name
-  document.getElementById("userAvatar").textContent = currentUser.avatar
-  document.getElementById("dropdownName").textContent = currentUser.name
-  document.getElementById("dropdownId").textContent = `#${currentUser.id}`
-  document.getElementById("dropdownAvatar").textContent = currentUser.avatar
+    // 首頁用戶顯示
+    document.getElementById("userName").textContent = currentUser.name
+    document.getElementById("userAvatar").textContent = currentUser.avatar
+    document.getElementById("dropdownName").textContent = currentUser.name
+    document.getElementById("dropdownId").textContent = `#${currentUser.id}`
+    document.getElementById("dropdownAvatar").textContent = currentUser.avatar
 
-  // 詳情頁用戶顯示
-  const userNameDetail = document.getElementById("userNameDetail")
-  const userAvatarDetail = document.getElementById("userAvatarDetail")
-  const dropdownNameDetail = document.getElementById("dropdownNameDetail")
-  const dropdownIdDetail = document.getElementById("dropdownIdDetail")
-  const dropdownAvatarDetail = document.getElementById("dropdownAvatarDetail")
+    // 詳情頁用戶顯示
+    const userNameDetail = document.getElementById("userNameDetail")
+    const userAvatarDetail = document.getElementById("userAvatarDetail")
+    const dropdownNameDetail = document.getElementById("dropdownNameDetail")
+    const dropdownIdDetail = document.getElementById("dropdownIdDetail")
+    const dropdownAvatarDetail = document.getElementById("dropdownAvatarDetail")
 
-  if (userNameDetail) userNameDetail.textContent = currentUser.name
-  if (userAvatarDetail) userAvatarDetail.textContent = currentUser.avatar
-  if (dropdownNameDetail) dropdownNameDetail.textContent = currentUser.name
-  if (dropdownIdDetail) dropdownIdDetail.textContent = `#${currentUser.id}`
-  if (dropdownAvatarDetail) dropdownAvatarDetail.textContent = currentUser.avatar
+    if (userNameDetail) userNameDetail.textContent = currentUser.name
+    if (userAvatarDetail) userAvatarDetail.textContent = currentUser.avatar
+    if (dropdownNameDetail) dropdownNameDetail.textContent = currentUser.name
+    if (dropdownIdDetail) dropdownIdDetail.textContent = `#${currentUser.id}`
+    if (dropdownAvatarDetail) dropdownAvatarDetail.textContent = currentUser.avatar
 }
 
 // 搜尋功能
 function handleSearchInput(e) {
-  // 由於此函數現在由 `handleRealtimeTransform` 觸發，`e.target.value` 已是轉換後的值
-  // 【修改】將查詢中的一個或多個 '-' 替換為空格
-  const query = e.target.value.toLowerCase().replace(/-+/g, ' ');
-  const searchResults = document.getElementById("searchResults");
-  const clearSearchBtn = document.getElementById("clearSearch");
+    // 由於此函數現在由 `handleRealtimeTransform` 觸發，`e.target.value` 已是轉換後的值
+    // 【修改】將查詢中的一個或多個 '-' 替換為空格
+    const query = e.target.value.toLowerCase().replace(/-+/g, ' ');
+    const searchResults = document.getElementById("searchResults");
+    const clearSearchBtn = document.getElementById("clearSearch");
 
-  if (clearSearchBtn) {
-    clearSearchBtn.classList.toggle('hidden', query.length === 0);
-  }
-
-  if (query.length < 1) {
-    searchResults.classList.add("hidden");
-    return;
-  }
-
-  let results = [];
-  
-  // --- 規則 1: 彈性元音 (o/oo) 和聲調的正規表示式查詢 ---
-  const createSearchRegex = (pattern, isToneInsensitive = false) => {
-    // 將 'o' 轉換為 '(o|oo)' 以同時匹配 'o' 和 'oo'
-    let regexPattern = pattern.replace(/o/g, '(o|oo)');
-    if (isToneInsensitive) {
-      // 移除所有聲調符號
-      regexPattern = regexPattern.replace(/[ˊˇˋˆ]/g, '');
+    if (clearSearchBtn) {
+        clearSearchBtn.classList.toggle('hidden', query.length === 0);
     }
-    try {
-      return new RegExp(regexPattern, 'i');
-    } catch (error) {
-      // 如果正則表達式錯誤，返回一個簡單的包含查詢
-      console.error("Regex creation failed:", error);
-      return null;
-    }
-  };
-  
-  const searchInSentences = (isToneInsensitive = false) => {
-    const searchRegex = createSearchRegex(query, isToneInsensitive);
-    if (!searchRegex) return []; // 如果正則表達式建立失敗，返回空
 
-    const foundResults = [];
-    Object.entries(categories).forEach(([category, sentences]) => {
-      sentences.forEach((sentence, index) => {
-        // 【修改】將資料庫文本中的一個或多個 '-' 替換為空格
-        let searchText = `${sentence["客語"]} ${sentence["拼音"]} ${sentence["華語"]}`.toLowerCase().replace(/-+/g, ' ');
+    if (query.length < 1) {
+        searchResults.classList.add("hidden");
+        return;
+    }
+
+    let results = [];
+
+    // --- 規則 1: 彈性元音 (o/oo) 和聲調的正規表示式查詢 ---
+    const createSearchRegex = (pattern, isToneInsensitive = false) => {
+        // 將 'o' 轉換為 '(o|oo)' 以同時匹配 'o' 和 'oo'
+        let regexPattern = pattern.replace(/o/g, '(o|oo)');
         if (isToneInsensitive) {
-          searchText = searchText.replace(/[ˊˇˋˆ]/g, ''); // 移除資料中的聲調
+            // 移除所有聲調符號
+            regexPattern = regexPattern.replace(/[ˊˇˋˆ]/g, '');
         }
-
-        if (searchRegex.test(searchText)) {
-          foundResults.push({
-            type: "sentence",
-            title: sentence["客語"],
-            chinese: sentence["華語"],
-            category: category,
-            data: { category, index },
-          });
+        try {
+            return new RegExp(regexPattern, 'i');
+        } catch (error) {
+            // 如果正則表達式錯誤，返回一個簡單的包含查詢
+            console.error("Regex creation failed:", error);
+            return null;
         }
-      });
-    });
-    return foundResults;
-  };
+    };
 
-  // --- 主要搜尋流程 ---
-  // 1. 先進行包含聲調的標準查詢
-  const sentenceResults = searchInSentences(false);
-  results.push(...sentenceResults);
+    const searchInSentences = (isToneInsensitive = false) => {
+        const searchRegex = createSearchRegex(query, isToneInsensitive);
+        if (!searchRegex) return []; // 如果正則表達式建立失敗，返回空
 
-  // 2. 如果沒有句子結果，且使用者有輸入內容，則進行無聲調的後援查詢
-  if (sentenceResults.length === 0 && query.trim() !== '') {
-    const fallbackResults = searchInSentences(true);
-    results.push(...fallbackResults);
-  }
+        const foundResults = [];
+        Object.entries(categories).forEach(([category, sentences]) => {
+            sentences.forEach((sentence, index) => {
+                // 【修改】將資料庫文本中的一個或多個 '-' 替換為空格
+                let searchText = `${sentence["客語"]} ${sentence["拼音"]} ${sentence["華語"]}`.toLowerCase().replace(/-+/g, ' ');
+                if (isToneInsensitive) {
+                    searchText = searchText.replace(/[ˊˇˋˆ]/g, ''); // 移除資料中的聲調
+                }
 
-  // 搜尋分類 (分類搜尋不受聲調影響)
-  Object.keys(categories).forEach((category) => {
-    if (category.toLowerCase().includes(query)) {
-      results.push({
-        type: "category",
-        title: category,
-        subtitle: `${categories[category].length} 句`,
-        data: category,
-      });
+                if (searchRegex.test(searchText)) {
+                    foundResults.push({
+                        type: "sentence",
+                        title: sentence["客語"],
+                        chinese: sentence["華語"],
+                        category: category,
+                        data: {
+                            category,
+                            index
+                        },
+                    });
+                }
+            });
+        });
+        return foundResults;
+    };
+
+    // --- 主要搜尋流程 ---
+    // 1. 先進行包含聲調的標準查詢
+    const sentenceResults = searchInSentences(false);
+    results.push(...sentenceResults);
+
+    // 2. 如果沒有句子結果，且使用者有輸入內容，則進行無聲調的後援查詢
+    if (sentenceResults.length === 0 && query.trim() !== '') {
+        const fallbackResults = searchInSentences(true);
+        results.push(...fallbackResults);
     }
-  });
-  
-  // 去除重複的結果 (例如後援查詢可能找到與分類重疊的內容)
-  const uniqueResults = results.filter((v,i,a)=>a.findIndex(t=>(JSON.stringify(t.data) === JSON.stringify(v.data)))===i);
+
+    // 搜尋分類 (分類搜尋不受聲調影響)
+    Object.keys(categories).forEach((category) => {
+        if (category.toLowerCase().includes(query)) {
+            results.push({
+                type: "category",
+                title: category,
+                subtitle: `${categories[category].length} 句`,
+                data: category,
+            });
+        }
+    });
+
+    // 去除重複的結果 (例如後援查詢可能找到與分類重疊的內容)
+    const uniqueResults = results.filter((v, i, a) => a.findIndex(t => (JSON.stringify(t.data) === JSON.stringify(v.data))) === i);
 
 
-  if (uniqueResults.length > 0) {
-    searchResults.innerHTML = uniqueResults
-      .slice(0, 10)
-      .map(
-        (result, index) => {
-          let contentHtml;
-          if (result.type === 'category') {
-            const emoji = getCategoryEmoji(result.title);
-            contentHtml = `
+    if (uniqueResults.length > 0) {
+        searchResults.innerHTML = uniqueResults
+            .slice(0, 10)
+            .map(
+                (result, index) => {
+                    let contentHtml;
+                    if (result.type === 'category') {
+                        const emoji = getCategoryEmoji(result.title);
+                        contentHtml = `
               <div class="flex items-baseline gap-2 flex-1 min-w-0">
                 <span class="text-xl">${emoji}</span>
                 <span class="font-semibold text-gray-900 truncate">${result.title}</span>
                 <span class="text-sm text-gray-500 truncate flex-shrink-0">${result.subtitle}</span>
               </div>
             `;
-          } else {
-            contentHtml = `
+                    } else {
+                        contentHtml = `
               <div class="min-w-0">
                 <div class="font-semibold text-gray-900 truncate">${result.title}</div>
                 <div class="text-sm text-gray-600 truncate">
@@ -953,22 +999,22 @@ function handleSearchInput(e) {
                 </div>
               </div>
             `;
-          }
-          return `
+                    }
+                    return `
               <div class="search-result-item p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 flex items-start" 
                    onclick="selectSearchResult('${result.type}', '${JSON.stringify(result.data).replace(/"/g, "&quot;")}')">
                   <span class="mr-3 text-gray-500 font-medium pt-0.5">${index + 1}.</span>
                   ${contentHtml}
               </div>
           `;
-        }
-      )
-      .join("");
-    searchResults.classList.remove("hidden");
-  } else {
-    searchResults.innerHTML = '<div class="p-3 text-gray-500 text-center">沒有找到相關結果</div>';
-    searchResults.classList.remove("hidden");
-  }
+                }
+            )
+            .join("");
+        searchResults.classList.remove("hidden");
+    } else {
+        searchResults.innerHTML = '<div class="p-3 text-gray-500 text-center">沒有找到相關結果</div>';
+        searchResults.classList.remove("hidden");
+    }
 }
 
 /**
@@ -977,40 +1023,40 @@ function handleSearchInput(e) {
  * @returns {string} 轉換後的字串。
  */
 function transformHakkaQuery(query) {
-  // 將查詢字串按空格分割成單詞陣列
-  const words = query.split(' ');
-  const transformedWords = words.map(word => {
-    let newWord = word;
-    // 規則 1: 字尾聲調取代
-    newWord = newWord.replace(/([aeioumngbdr])z$/i, '$1ˊ');
-    newWord = newWord.replace(/([aeioumngbdr])v$/i, '$1ˇ');
-    newWord = newWord.replace(/([aeioumngbdr])s$/i, '$1ˋ');
-    newWord = newWord.replace(/([aeioumngbdr])(x|\^)$/i, '$1ˆ');
+    // 將查詢字串按空格分割成單詞陣列
+    const words = query.split(' ');
+    const transformedWords = words.map(word => {
+        let newWord = word;
+        // 規則 1: 字尾聲調取代
+        newWord = newWord.replace(/([aeioumngbdr])z$/i, '$1ˊ');
+        newWord = newWord.replace(/([aeioumngbdr])v$/i, '$1ˇ');
+        newWord = newWord.replace(/([aeioumngbdr])s$/i, '$1ˋ');
+        newWord = newWord.replace(/([aeioumngbdr])(x|\^)$/i, '$1ˆ');
 
-    // 規則 2: 開頭字母取代
-    newWord = newWord.replace(/^v([aeiou])/i, 'bb$1');
-    newWord = newWord.replace(/^r([aeiou])/i, 'rh$1');
-    
-    return newWord;
-  });
-  
-  // 將處理過的單詞重新組合成一個字串
-  return transformedWords.join(' ');
+        // 規則 2: 開頭字母取代
+        newWord = newWord.replace(/^v([aeiou])/i, 'bb$1');
+        newWord = newWord.replace(/^r([aeiou])/i, 'rh$1');
+
+        return newWord;
+    });
+
+    // 將處理過的單詞重新組合成一個字串
+    return transformedWords.join(' ');
 }
 
 
 function selectSearchResult(type, data) {
-  const parsedData = JSON.parse(data)
-  document.getElementById("searchResults").classList.add("hidden")
-  document.getElementById("searchInput").value = ""
-  
-  document.getElementById("closeMobileSearch").click();
+    const parsedData = JSON.parse(data)
+    document.getElementById("searchResults").classList.add("hidden")
+    document.getElementById("searchInput").value = ""
 
-  if (type === "category") {
-    showCategoryDetail(parsedData)
-  } else if (type === "sentence") {
-    showCategoryDetail(parsedData.category)
-  }
+    document.getElementById("closeMobileSearch").click();
+
+    if (type === "category") {
+        showCategoryDetail(parsedData)
+    } else if (type === "sentence") {
+        showCategoryDetail(parsedData.category)
+    }
 }
 
 
@@ -1109,16 +1155,16 @@ function addToCollection() {
     selectedCategories.forEach(categoryName => {
         collectedCategories.add(categoryName);
     });
-    
+
     saveCollectedCategories();
     showResult("💖", `收藏 ${selectedCount} 個主題。`);
-    
+
     parseCatalog();
 
     if (!collectionTabExisted) {
         renderCatalogTabs();
     }
-    
+
     disableMultiSelectMode();
 }
 
@@ -1128,7 +1174,7 @@ function addToCollection() {
 function removeFromCollection() {
     const selectedCount = selectedCategories.size;
     if (selectedCount === 0) return;
-    
+
     let removedCount = 0;
     selectedCategories.forEach(categoryName => {
         if (categoryName !== "星號") {
@@ -1143,19 +1189,19 @@ function removeFromCollection() {
     } else {
         showResult("ℹ️", "提醒", "「星號」為系統預設項目，無法移除。");
     }
-    
+
     disableMultiSelectMode();
 
     // 【新增】檢查「收藏」頁籤在移除後是否應被刪除
     const isCollectionNowEmpty = collectedCategories.size === 0 && starredCards.size === 0;
 
     // 【修改】重新解析目錄，這會移除空的「收藏」頁籤
-    parseCatalog(); 
+    parseCatalog();
 
     if (isCollectionNowEmpty && currentCatalogTab === '收藏') {
         // 【新增】如果收藏已空且當前就在該頁籤，則跳轉到預設頁籤
         const defaultTabName = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
-        
+
         if (defaultTabName) {
             selectCatalogTab(defaultTabName); // selectCatalogTab 會自動處理畫面渲染
         } else {
@@ -1180,21 +1226,17 @@ function startLearning() {
   
   lastVisitedTab = currentCatalogTab;
 
-  // 【修改】如果只選取一個，直接顯示該主題的名稱
   if (selectedCount === 1) {
     const singleCategoryName = selectedCategories.values().next().value;
     
-    // 「星號」是一個動態產生的特殊分類，需要特別處理
     if (singleCategoryName === "星號") {
         showStarredCategory();
     } else {
         startSingleCategoryLearning(singleCategoryName);
     }
-    return; // 完成單一主題的啟動後，結束此函數
+    return;
   }
 
-  // --- 以下為選取超過一個主題時的原始邏輯 ---
-  
   updateUrl('learning', Array.from(selectedCategories));
 
   let combinedSentences = [];
@@ -1227,10 +1269,11 @@ function startLearning() {
     }
   });
   
-  const tempCategoryName = `已選取的 ${selectedCount} 個主題`;
+  const tempCategoryName = `${selectedCount}主題`;
   
+  // 【修改】使用更通用的方式來清除舊的暫存分類
   Object.keys(categories).forEach(key => {
-    if (key.startsWith("已選取的")) {
+    if (key.endsWith("主題")) {
       delete categories[key];
     }
   });
@@ -1241,13 +1284,12 @@ function startLearning() {
 }
 
 
-
 // 清除所有勾選的分類
 function clearAllSelections() {
-  selectedCategories.clear();
-  saveSelectedCategories();
-  renderCategoryList();    
-  updateSelectionToolbar(); 
+    selectedCategories.clear();
+    saveSelectedCategories();
+    renderCategoryList();
+    updateSelectionToolbar();
 }
 
 
@@ -1268,6 +1310,17 @@ function updateSelectionToolbar() {
     const learnSelectedButton = document.getElementById("learnSelected");
     const addToCollectionBtn = document.getElementById("addToCollectionBtn");
     const removeFromCollectionBtn = document.getElementById("removeFromCollectionBtn");
+    
+    // 直接在函數內獲取要修改文字的 span 元素
+    const learnSelectedTextSpan = document.getElementById("learnSelectedText");
+    const addToCollectionTextSpan = document.getElementById("addToCollectionText");
+    const removeFromCollectionTextSpan = document.getElementById("removeFromCollectionText");
+
+    // 加上一道防護，確保所有元素都存在
+    if (!learnSelectedButton || !addToCollectionBtn || !removeFromCollectionBtn || !learnSelectedTextSpan || !addToCollectionTextSpan || !removeFromCollectionTextSpan) {
+        return; // 如果有任何一個元素找不到，就直接退出，避免錯誤
+    }
+
     const count = selectedCategories.size;
 
     // 先隱藏所有按鈕
@@ -1277,17 +1330,17 @@ function updateSelectionToolbar() {
 
     if (count > 0 && isMultiSelectMode) {
         // 無論在哪個頁籤，只要有選取，「學習」按鈕都顯示
-        learnSelectedText.textContent = `學習 ${count} 個選取`;
+        learnSelectedTextSpan.textContent = `學習 ${count} 個`;
         learnSelectedButton.classList.remove("hidden");
         learnSelectedButton.disabled = false;
         learnSelectedButton.classList.remove("opacity-50", "cursor-not-allowed");
 
         // 根據當前頁籤決定顯示「加入」還是「取消」收藏按鈕
         if (currentCatalogTab === '收藏') {
-            document.getElementById('removeFromCollectionText').textContent = `取消收藏 ${count} 個`;
+            removeFromCollectionTextSpan.textContent = `移除 ${count} 個`;
             removeFromCollectionBtn.classList.remove("hidden");
         } else {
-            document.getElementById('addToCollectionText').textContent = `加入收藏 ${count} 個`;
+            addToCollectionTextSpan.textContent = `收藏 ${count} 個`;
             addToCollectionBtn.classList.remove("hidden");
         }
     } else {
@@ -1296,25 +1349,26 @@ function updateSelectionToolbar() {
     }
 }
 
+
 function showStarredCategory() {
-  const categoryName = "星號";
-  
-  // 從所有句子中，篩選出ID存在於 starredCards 中的句子
-  const starredSentences = sentences.filter(sentence => {
-    const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
-    return starredCards.has(sentenceId);
-  });
+    const categoryName = "星號";
 
-  // 為了安全起見，先刪除可能存在的舊暫存分類
-  if (categories[categoryName]) {
-      delete categories[categoryName];
-  }
+    // 從所有句子中，篩選出ID存在於 starredCards 中的句子
+    const starredSentences = sentences.filter(sentence => {
+        const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+        return starredCards.has(sentenceId);
+    });
 
-  // 建立一個暫時的 "星號" 分類
-  categories[categoryName] = starredSentences;
+    // 為了安全起見，先刪除可能存在的舊暫存分類
+    if (categories[categoryName]) {
+        delete categories[categoryName];
+    }
 
-  // 顯示這個暫存分類的詳情頁面
-  showCategoryDetail(categoryName);
+    // 建立一個暫時的 "星號" 分類
+    categories[categoryName] = starredSentences;
+
+    // 顯示這個暫存分類的詳情頁面
+    showCategoryDetail(categoryName);
 }
 
 
@@ -1322,28 +1376,29 @@ function showStarredCategory() {
 // 切換檢視模式
 
 function setViewMode(mode) {
-  currentViewMode = mode
-  userSettings.viewMode = currentViewMode
-  saveUserSettings()
+    currentViewMode = mode
+    userSettings.viewMode = currentViewMode
+    saveUserSettings()
 
-  // 更新按鈕圖示
-  const viewToggle = document.getElementById("viewToggle")
-  const icon = viewToggle.querySelector(".material-icons")
+    // 更新按鈕圖示
+    const viewToggle = document.getElementById("viewToggle")
+    const icon = viewToggle.querySelector(".material-icons")
 
-  // 【核心變更】圖示顯示的是你將要切換到的模式
-  if (mode === "card") {
-    icon.textContent = "view_list"; // 在卡片模式下，顯示 "列表" 圖示
-    viewToggle.title = "切換為清單檢視";
-  } else {
-    icon.textContent = "grid_view"; // 在列表模式下，顯示 "網格" 圖示
-    viewToggle.title = "切換為格狀檢視";
-  }
+    // 【核心變更】圖示顯示的是你將要切換到的模式
+    if (mode === "card") {
+        icon.textContent = "view_list"; // 在卡片模式下，顯示 "列表" 圖示
+        viewToggle.title = "切換為清單檢視";
+    } else {
+        icon.textContent = "grid_view"; // 在列表模式下，顯示 "網格" 圖示
+        viewToggle.title = "切換為格狀檢視";
+    }
 
-  renderCategoryList()
+    renderCategoryList()
 }
 
 
 // 顯示分類詳情
+// 請替換此函數
 function showCategoryDetail(category) {
   currentCategory = category
 
@@ -1371,7 +1426,8 @@ function showCategoryDetail(category) {
 
   const categoryTitleContainer = document.getElementById("categoryTitleContainer");
   
-  if (category.startsWith("已選取的")) {
+  // 【修改】放寬判斷條件，只要以「主題」結尾就渲染互動式標題
+  if (category.endsWith("主題")) {
       renderInteractiveTitle(category);
   } else {
       categoryTitleContainer.innerHTML = `<span>${category}</span>`;
@@ -1384,15 +1440,18 @@ function showCategoryDetail(category) {
   window.scrollTo(0, 0);
 }
 
+
 /**
  * 渲染可互動的標題和下拉選單（用於多選模式）
- * @param {string} initialCategoryName - 初始的分類名稱, e.g., "已選取的 4 個主題"
+ * @param {string} initialCategoryName - 初始的分類名稱, e.g., "4 個主題"
  */
 function renderInteractiveTitle(initialCategoryName) {
     const container = document.getElementById("categoryTitleContainer");
     if (!container) return;
 
-    // 建立下拉選單的 HTML 內容
+    // 【新增】解析初始的主題總數
+    const initialCount = parseInt(initialCategoryName, 10);
+
     let dropdownItemsHtml = Array.from(selectedCategories).sort().map(catName => `
         <div class="category-dropdown-item">
             <label>
@@ -1402,10 +1461,9 @@ function renderInteractiveTitle(initialCategoryName) {
         </div>
     `).join('');
 
-    // 建立完整的互動標題 HTML
     container.innerHTML = `
         <div class="category-dropdown-container">
-            <button id="categoryDropdownBtn" class="category-dropdown-button">
+            <button id="categoryDropdownBtn" class="category-dropdown-button" data-initial-count="${initialCount}">
                 <span id="interactiveTitleText">${initialCategoryName}</span>
                 <span class="material-icons">expand_more</span>
             </button>
@@ -1415,7 +1473,6 @@ function renderInteractiveTitle(initialCategoryName) {
         </div>
     `;
 
-    // 設定事件監聽器
     const dropdownBtn = document.getElementById("categoryDropdownBtn");
     const dropdownContent = document.getElementById("categoryDropdownContent");
     const checkboxes = dropdownContent.querySelectorAll('.category-select-checkbox');
@@ -1425,7 +1482,6 @@ function renderInteractiveTitle(initialCategoryName) {
         dropdownContent.classList.toggle('show');
     });
 
-    // 點擊頁面其他地方關閉選單
     document.addEventListener('click', (e) => {
         if (!dropdownBtn.contains(e.target) && !dropdownContent.contains(e.target)) {
             dropdownContent.classList.remove('show');
@@ -1440,6 +1496,7 @@ function renderInteractiveTitle(initialCategoryName) {
 }
 
 
+
 /**
  * 根據下拉選單的勾選狀態，更新句子內容並重新渲染畫面
  */
@@ -1449,21 +1506,17 @@ function updateCombinedSentencesAndRender() {
 
     const checkedBoxes = dropdownContent.querySelectorAll('.category-select-checkbox:checked');
     
-    // 如果使用者想取消最後一個勾選，跳出提示並阻止
     if (checkedBoxes.length === 0) {
         showResult("⚠️", "提醒", "至少需要保留一個主題。");
-        // 找到剛剛被取消的那個 checkbox，並把它重新勾選回來
         const lastChangedCheckbox = event.target; 
         if(lastChangedCheckbox) lastChangedCheckbox.checked = true;
         return;
     }
 
-    // 1. 更新全域的 selectedCategories 集合
     const newSelectedCategories = new Set();
     checkedBoxes.forEach(box => newSelectedCategories.add(box.value));
     selectedCategories = newSelectedCategories;
 
-    // 2. 重新組合句子
     let combinedSentences = [];
     const combinedSentenceIds = new Set();
 
@@ -1483,33 +1536,154 @@ function updateCombinedSentencesAndRender() {
         }
     });
 
-    // 3. 建立新的暫存分類名稱並更新 categories 物件
+    // 【修改】讀取初始總數，並產生新的標題格式
+    const dropdownBtn = document.getElementById("categoryDropdownBtn");
+    const initialCount = dropdownBtn.dataset.initialCount;
     const newCount = selectedCategories.size;
-    const newTempCategoryName = `已選取的 ${newCount} 個主題`;
 
-    // 刪除舊的暫存分類，以防萬一
+    const newTempCategoryName = (newCount == initialCount)
+        ? `${initialCount}主題`
+        : `${newCount}/${initialCount}主題`;
+
+
     Object.keys(categories).forEach(key => {
-        if (key.startsWith("已選取的")) delete categories[key];
+        if (key.endsWith("主題")) delete categories[key];
     });
 
     categories[newTempCategoryName] = combinedSentences;
-    currentCategory = newTempCategoryName; // 更新當前分類
+    currentCategory = newTempCategoryName; 
 
-    // 4. 更新標題文字
+    selectedSentences.clear();
+    categories[currentCategory].forEach((_, index) => {
+        selectedSentences.add(index);
+    });
+
     document.getElementById("interactiveTitleText").textContent = newTempCategoryName;
     
-    // 5. 更新 URL
-    updateUrl('learning', Array.from(selectedCategories));
+    const currentModeText = document.getElementById("currentMode").textContent;
+    const categoryNames = Array.from(selectedCategories);
 
-    // 6. 重新渲染句子列表
-    showLearningView(); // 重新呼叫 showLearningView 會重置句子並渲染
+    switch (currentModeText) {
+        case "閃卡":
+            updateUrl('flashcard', categoryNames);
+            showFlashcardView();
+            break;
+        case "配對":
+            updateUrl('matching', categoryNames);
+            showMatchingGame();
+            break;
+        case "測驗":
+            updateUrl('quiz', categoryNames);
+            showQuizGame();
+            break;
+        case "排序":
+            updateUrl('sorting', categoryNames);
+            showSortingGame();
+            break;
+        case "學習":
+        default:
+            updateUrl('learning', categoryNames);
+            showLearningView();
+            break;
+    }
 }
-
 
 // 更新當前模式顯示
 function updateCurrentMode(modeName) {
-  document.getElementById("currentMode").textContent = modeName
+  const modeIconEl = document.getElementById("currentModeIcon");
+  const modeTextEl = document.getElementById("currentMode");
+
+  // 建立一個模式資訊的對照表，方便管理圖示和顏色
+  const modeInfo = {
+      "學習": { icon: "book", color: "text-blue-600" },
+      "閃卡": { icon: "style", color: "text-purple-600" },
+      "配對": { icon: "extension", color: "text-orange-600" },
+      "測驗": { icon: "quiz", color: "text-red-600" },
+      "排序": { icon: "sort", color: "text-indigo-600" }
+  };
+  
+  // 根據傳入的模式名稱，取得對應的圖示和顏色，若找不到則預設為「學習」
+  const info = modeInfo[modeName] || modeInfo["學習"];
+
+  // 更新圖示元素的內容和 CSS class
+  if (modeIconEl) {
+      modeIconEl.textContent = info.icon;
+      // 重設 class 以確保只有當前的顏色生效
+      modeIconEl.className = `material-icons ${info.color}`;
+  }
+
+  // 更新文字元素的內容
+  if (modeTextEl) {
+      modeTextEl.textContent = modeName;
+  }
 }
+
+
+/**
+ * 根據客語漢字和拼音字串，生成帶有上方標註的 HTML。
+ * @param {string} hakkaText - 客語漢字字串。
+ * @param {string} pinyinText - 拼音字串。
+ * @param {boolean} isAnnotated - 是否啟用標註模式。
+ * @returns {string} - 處理過的 HTML 或原始文字。
+ */
+function annotateHakkaText(hakkaText, pinyinText, isAnnotated) {
+    if (!isAnnotated || !hakkaText || !pinyinText) {
+        return hakkaText; // 如果未啟用或缺少資料，返回原文
+    }
+
+    // 步驟 1: 預處理拼音字串，在所有指定的標點符號前後加上空格
+    const processedPinyin = pinyinText.replace(/([,.?!;:。！？，、：；()（）])/g, ' $1 ');
+
+    // 步驟 2: 產生正確的片段陣列（用 processedPinyin）
+    const pinyinSegments = processedPinyin.split(/[\s-]+/).filter(p => p.trim() !== "");
+
+    // 使用 Array.from 來正確處理包含擴充漢字的字串
+    const hakkaChars = Array.from(hakkaText);
+
+    // 定義一組對應表，把半形標點對應到全形標點
+    const punctuationMap = {
+        ".": "。",
+        ",": "，",
+        "?": "？",
+        "!": "！",
+        ";": "；",
+        ":": "：",
+        "(": "（",
+        ")": "）"
+    };
+
+    let resultHtml = '';
+    let pinyinIndex = 0;
+
+    hakkaChars.forEach(char => {
+        const currentPinyin = pinyinSegments[pinyinIndex];
+
+        // 如果當前字是標點
+        if (/[，。？！；：、（）]/.test(char)) {
+            // 嘗試找拼音片段是否是對應的半形或全形標點
+            if (pinyinIndex < pinyinSegments.length &&
+                (currentPinyin === char || punctuationMap[currentPinyin] === char)) {
+                resultHtml += `<ruby><rb>${char}</rb><rt>${currentPinyin}</rt></ruby>`;
+                pinyinIndex++;
+            } else {
+                resultHtml += `<span>${char}</span>`;
+            }
+        }
+        // 如果是漢字，且有拼音
+        else if (pinyinIndex < pinyinSegments.length) {
+            resultHtml += `<ruby><rb>${char}</rb><rt>${currentPinyin}</rt></ruby>`;
+            pinyinIndex++;
+        }
+        // 如果拼音已經用完
+        else {
+            resultHtml += `<span>${char}</span>`;
+        }
+    });
+
+    return resultHtml;
+}
+
+
 
 /**
  * 播放音檔，並可選擇性地更新按鈕圖示。
@@ -1573,215 +1747,235 @@ function playAudio(filename, iconElement = null) {
 }
 
 function playCurrentAudio() {
-  if (flashcardSentences.length > 0 && currentCardIndex < flashcardSentences.length) {
-    const sentence = flashcardSentences[currentCardIndex];
-    // 獲取閃示卡主播放按鈕的圖示元素
-    const playButton = document.getElementById('playCardAudio');
-    const iconElement = playButton ? playButton.querySelector('.material-icons') : null;
-    
-    // 呼叫我們修改過的 playAudio 函數並回傳其 Promise
-    return playAudio(sentence["音檔"], iconElement);
-  } else {
-    // 如果沒有可播放的卡片，也回傳一個已解析的 Promise
-    return playAudio(null);
-  }
+    if (flashcardSentences.length > 0 && currentCardIndex < flashcardSentences.length) {
+        const sentence = flashcardSentences[currentCardIndex];
+        // 獲取閃卡主播放按鈕的圖示元素
+        const playButton = document.getElementById('playCardAudio');
+        const iconElement = playButton ? playButton.querySelector('.material-icons') : null;
+
+        // 呼叫我們修改過的 playAudio 函數並回傳其 Promise
+        return playAudio(sentence["音檔"], iconElement);
+    } else {
+        // 如果沒有可播放的卡片，也回傳一個已解析的 Promise
+        return playAudio(null);
+    }
 }
 
 
 // 顯示慶祝特效
 function showCelebration(element) {
-  element.classList.add("celebration")
-  setTimeout(() => element.classList.remove("celebration"), 800)
+    element.classList.add("celebration")
+    setTimeout(() => element.classList.remove("celebration"), 800)
 
-  // 隨機表情符號特效
-  const emoji = config.CELEBRATION_EMOJIS[Math.floor(Math.random() * config.CELEBRATION_EMOJIS.length)]
-  const emojiElement = document.createElement("div")
-  emojiElement.className = "emoji-celebration"
-  emojiElement.textContent = emoji
-  emojiElement.style.left = Math.random() * window.innerWidth + "px"
-  emojiElement.style.top = Math.random() * window.innerHeight + "px"
-  document.body.appendChild(emojiElement)
+    // 隨機表情符號特效
+    const emoji = config.CELEBRATION_EMOJIS[Math.floor(Math.random() * config.CELEBRATION_EMOJIS.length)]
+    const emojiElement = document.createElement("div")
+    emojiElement.className = "emoji-celebration"
+    emojiElement.textContent = emoji
+    emojiElement.style.left = Math.random() * window.innerWidth + "px"
+    emojiElement.style.top = Math.random() * window.innerHeight + "px"
+    document.body.appendChild(emojiElement)
 
-  setTimeout(() => emojiElement.remove(), 2000)
+    setTimeout(() => emojiElement.remove(), 2000)
 }
 
 
-
 // 學習模式
+// 請替換此函數
 function showLearningView() {
-  const contentArea = document.getElementById("contentArea");
+    const contentArea = document.getElementById("contentArea");
 
-  if (userSettings.compactMode) {
-    userSettings.layout = 'compact';
-    delete userSettings.compactMode;
-    saveUserSettings();
-  } else if (!userSettings.layout) {
-    userSettings.layout = 'double';
-  }
+    if (userSettings.compactMode) {
+        userSettings.layout = 'compact';
+        delete userSettings.compactMode;
+        saveUserSettings();
+    } else if (!userSettings.layout) {
+        userSettings.layout = 'double';
+    }
 
-  contentArea.innerHTML = `
-        <div class="max-w-6xl mx-auto">
-            <div id="learningModeToolbar" class="sticky top-0 z-20 mode-toolbar bg-white rounded-lg shadow-sm px-3 py-1.5 mb-6 border border-gray-200">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    
-                    <div id="learningSelectionControls" class="flex items-center gap-1">
-                        <button id="enableLearningSelect" class="control-button">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">check_box_outline_blank</span>
-                        </button>                        
-                        <div id="learningSelectActions" class="hidden items-center gap-1">
-                            <button id="disableLearningSelect" title="關閉選取模式" class="control-button active">
-                                <span class="material-icons text-blue-700 !text-xl align-middle">close</span>
+    // 新的佈局：工具列和句子容器是同層級的兄弟元素
+    contentArea.innerHTML = `
+        <div id="learningModeToolbar" class="sticky top-0 z-20 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200 mb-6 py-2 px-3">
+            <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+
+                <div class="flex items-center gap-2">
+                    <button id="enableLearningSelect" title="啟用選取模式" class="control-button">
+                        <span class="material-icons !text-xl">check_box_outline_blank</span>
+                    </button>
+                    <div id="learningSelectActions" class="hidden items-center gap-2">
+                        <button id="disableLearningSelect" title="關閉選取模式" class="control-button active">
+                            <span class="material-icons !text-xl">close</span>
+                        </button>
+                        <div class="w-px h-5 bg-gray-300"></div>
+                        <button id="learningSelectAll" title="全選/取消全選" class="control-button">
+                            <span class="material-icons !text-xl">select_all</span>
+                        </button>
+                        <div class="relative">
+                            <button id="starMenuToggle" title="星號操作" class="control-button">
+                                <span class="material-icons !text-xl">star_outline</span>
                             </button>
-                            <div class="w-px h-5 bg-gray-300 mx-1"></div>
-                            <button id="learningSelectAll" title="全選/取消全選" class="control-button">
-                                <span class="material-icons text-gray-600 !text-xl align-middle">select_all</span>
-                            </button>
-                            
-                            <div class="relative">
-                                <button id="starMenuToggle" title="星號操作" class="control-button">
-                                    <span class="material-icons text-gray-600 !text-xl align-middle">star_outline</span>
-                                    <span class="hidden sm:inline">星號</span>
+                            <div id="starMenu" class="hidden absolute top-full left-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
+                                <button id="starSelected" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                    <span class="material-icons text-yellow-400 mr-3">star</span>
+                                    <span>全部加星號</span>
                                 </button>
-                                <div id="starMenu" class="hidden absolute top-full left-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
-                                    <button id="starSelected" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
-                                        <span class="material-icons text-yellow-400 mr-3">star</span>
-                                        <span>全部加星號</span>
-                                    </button>
-                                    <button id="unstarSelected" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
-                                        <span class="material-icons text-gray-400 mr-3">star_border</span>
-                                        <span>全部移除星號</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="w-px h-5 bg-gray-300 mx-1"></div>
-
-                        <div class="relative md:flex md:items-center md:gap-1">
-                            <button id="displayMenuToggle" class="control-button md:hidden">
-                                <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                                <span class="inline">顯示</span>
-                            </button>
-
-                            <div id="displayMenu" class="hidden md:!flex md:items-center md:gap-1 md:!static md:!w-auto md:!bg-transparent md:!rounded-none md:!shadow-none md:!border-none md:!p-0 absolute top-full left-0 mt-2 w-28 bg-white rounded-md shadow-lg border z-10 p-1">
-                                
-                                <button id="hideHakka" title="客語顯示/隱藏" class="control-button w-full justify-start md:w-auto">
-                                    <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                                    <span class="inline">客語</span>
-                                </button>
-                                <button id="hidePinyin" title="拼音顯示/隱藏" class="control-button w-full justify-start md:w-auto">
-                                    <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                                    <span class="inline">拼音</span>
-                                </button>
-                                <button id="hideChinese" title="華語顯示/隱藏" class="control-button w-full justify-start md:w-auto">
-                                    <span class="material-icons text-gray-600 !text-xl align-middle">visibility</span>
-                                    <span class="inline">華語</span>
+                                <button id="unstarSelected" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                    <span class="material-icons text-gray-400 mr-3">star_border</span>
+                                    <span>全部移除星號</span>
                                 </button>
                             </div>
                         </div>
                     </div>
+                </div>
 
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-1">
+                        <div class="relative">
+                            <button id="pinyinAnnotationMenuToggle" class="control-button" title="標音設定">
+                                <span class="material-icons !text-xl">translate</span>
+                            </button>
+                            <div id="pinyinAnnotationMenu" class="hidden absolute top-full right-0 mt-2 w-40 bg-white rounded-md shadow-lg border z-10 py-1">
+                                <button id="togglePinyinAnnotation" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 control-button">
+                                    <span class="material-icons text-base mr-2">vertical_align_top</span>
+                                    <span>拼音標字上</span>
+                                </button>
+                            </div>
+                        </div>
+                        <button id="togglePhoneticSystem" class="control-button" title="切換拼音/注音">
+                            <span class="material-icons !text-xl">font_download</span>
+                        </button>
+                         <div class="relative">
+                            <button id="displayMenuToggle" class="control-button" title="顯示設定">
+                                <span class="material-icons !text-xl">visibility</span>
+                            </button>
+                            <div id="displayMenu" class="hidden absolute top-full right-0 mt-2 w-28 bg-white rounded-md shadow-lg border z-10 p-1">
+                                <button id="hideHakka" title="客語" class="control-button w-full justify-start"><span class="material-icons !text-xl">visibility</span><span>客語</span></button>
+                                <button id="hidePinyin" title="拼音" class="control-button w-full justify-start"><span class="material-icons !text-xl">visibility</span><span>拼音</span></button>
+                                <button id="hideChinese" title="華語" class="control-button w-full justify-start"><span class="material-icons !text-xl">visibility</span><span>華語</span></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-px h-6 bg-gray-300 hidden md:block"></div>
                     <div class="flex items-center gap-1">
                         <button id="layoutToggle" class="control-button" title="切換版面">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
+                            <span class="material-icons !text-xl">view_agenda</span>
                         </button>
-                        <div class="w-px h-5 bg-gray-300 mx-1"></div>
                         <button onclick="adjustFontSize(-1, 'learning')" title="縮小字體" class="control-button">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
+                            <span class="material-icons !text-xl">text_decrease</span>
                         </button>
                         <button onclick="adjustFontSize(1, 'learning')" title="放大字體" class="control-button">
-                            <span class="material-icons text-gray-600 !text-xl align-middle">text_increase</span>
+                            <span class="material-icons !text-xl">text_increase</span>
                         </button>
                     </div>
                 </div>
+
             </div>
-            
+        </div>
+
+        <div class="max-w-6xl mx-auto">
             <div id="sentenceContainer"></div>
         </div>
     `;
 
-  renderSentences();
-  setupLearningControls();
-  setStickyTopPosition();
+    renderSentences();
+    setupLearningControls();
 }
+
+
+
 
 // 精簡按鈕狀態的函數
 function updateCompactToggleButton() {
-  const button = document.getElementById("compactToggle")
-  if (button) {
-    if (userSettings.compactMode) {
-      button.classList.add("bg-blue-100", "text-blue-700")
-    } else {
-      button.classList.remove("bg-blue-100", "text-blue-700")
+    const button = document.getElementById("compactToggle")
+    if (button) {
+        if (userSettings.compactMode) {
+            button.classList.add("bg-blue-100", "text-blue-700")
+        } else {
+            button.classList.remove("bg-blue-100", "text-blue-700")
+        }
     }
-  }
 }
 
 function saveStarredCards() {
-  const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
-  localStorage.setItem(starredKey, JSON.stringify(Array.from(starredCards)));
+    const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
+    localStorage.setItem(starredKey, JSON.stringify(Array.from(starredCards)));
 }
 
 function toggleStar(index) {
-  const sentence = categories[currentCategory][index];
-  if (!sentence) return;
+    const sentence = categories[currentCategory][index];
+    if (!sentence) return;
 
-  // 使用與閃示卡相同的ID邏輯以確保同步
-  const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
-
-  if (starredCards.has(sentenceId)) {
-    starredCards.delete(sentenceId);
-  } else {
-    starredCards.add(sentenceId);
-  }
-  
-  saveStarredCards();
-  renderSentences();
-}
-
-function renderSentences() {
-  const container = document.getElementById("sentenceContainer");
-  if (!container) return;
-  const sentences = categories[currentCategory];
-  
-  // 根據選取模式和版面模式設定容器的樣式
-  let containerClasses = [];
-  if (isLearningSelectMode) {
-      containerClasses.push("learning-select-active");
-  }
-  if (userSettings.layout === "double" && window.innerWidth >= 1024) {
-      containerClasses.push("grid grid-cols-1 lg:grid-cols-2 gap-4");
-  } else if (userSettings.layout === "single" || (userSettings.layout === "double" && window.innerWidth < 1024)) {
-      containerClasses.push("grid grid-cols-1 gap-4");
-  } else { // compact layout
-      containerClasses.push("bg-white rounded-xl shadow-sm border");
-  }
-  container.className = containerClasses.join(" ");
-
-  container.innerHTML = "";
-
-  if (!sentences) return;
-
-  sentences.forEach((sentence, index) => {
-    const isSelected = selectedSentences.has(index);
+    // 使用與閃卡相同的ID邏輯以確保同步
     const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
-    const isStarred = starredCards.has(sentenceId);
-    const starIcon = isStarred ? 'star' : 'star_border';
-    const sentenceItem = document.createElement("div");
 
-    // 當啟用選取模式時，卡片點擊行為改為切換勾選
-    if (isLearningSelectMode) {
-        sentenceItem.classList.add('cursor-pointer');
-        sentenceItem.onclick = (e) => {
-            if (e.target.closest('button, input')) return;
-            toggleSentenceSelection(index, !isSelected);
-            renderSentences();
-        };
+    if (starredCards.has(sentenceId)) {
+        starredCards.delete(sentenceId);
+    } else {
+        starredCards.add(sentenceId);
     }
 
-    if (userSettings.layout === 'compact') {
-        sentenceItem.className += " flex items-center gap-3 p-3 border-b last:border-b-0";
-        sentenceItem.innerHTML = `
+    saveStarredCards();
+    renderSentences();
+}
+
+
+// 請替換此函數
+function renderSentences() {
+    const container = document.getElementById("sentenceContainer");
+    if (!container) return;
+    const sentences = categories[currentCategory];
+
+    // 根據選取模式和版面模式設定容器的樣式
+    let containerClasses = [];
+    if (isLearningSelectMode) {
+        containerClasses.push("learning-select-active");
+    }
+    // 【新增】如果標音啟用，則加入 pinyin-annotated class
+    if (userSettings.pinyinAnnotation) {
+        containerClasses.push("pinyin-annotated");
+    }
+
+    if (userSettings.layout === "double" && window.innerWidth >= 1024) {
+        containerClasses.push("grid grid-cols-1 lg:grid-cols-2 gap-4");
+    } else if (userSettings.layout === "single" || (userSettings.layout === "double" && window.innerWidth < 1024)) {
+        containerClasses.push("grid grid-cols-1 gap-4");
+    } else { // compact layout
+        containerClasses.push("bg-white rounded-xl shadow-sm border");
+    }
+    container.className = containerClasses.join(" ");
+
+    container.innerHTML = "";
+
+    if (!sentences) return;
+
+    sentences.forEach((sentence, index) => {
+        const isSelected = selectedSentences.has(index);
+        const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+        const isStarred = starredCards.has(sentenceId);
+        const starIcon = isStarred ? 'star' : 'star_border';
+        const sentenceItem = document.createElement("div");
+
+        if (isLearningSelectMode) {
+            sentenceItem.classList.add('cursor-pointer');
+            sentenceItem.onclick = (e) => {
+                if (e.target.closest('button, input')) return;
+                toggleSentenceSelection(index, !isSelected);
+                renderSentences();
+            };
+        }
+
+        // --- 修改開始 ---
+        let pinyinDisplay = sentence["拼音"];
+        if (userSettings.phoneticSystem === 'zhuyin') {
+            pinyinDisplay = convertPinyinToZhuyin(pinyinDisplay);
+        }
+        const annotatedHakka = annotateHakkaText(sentence["客語"], pinyinDisplay, userSettings.pinyinAnnotation);
+        // --- 修改結束 ---
+
+
+        if (userSettings.layout === 'compact') {
+            sentenceItem.className += " flex items-center gap-3 p-3 border-b last:border-b-0";
+            sentenceItem.innerHTML = `
             <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded flex-shrink-0" 
                    ${isSelected ? "checked" : ""} 
                    onchange="toggleSentenceSelection(${index}, this.checked)">
@@ -1790,17 +1984,17 @@ function renderSentences() {
             </button>
             <span class="text-sm text-gray-500 font-mono flex-shrink-0">${index + 1}</span>
             <div class="flex-1 min-w-0 flex items-baseline gap-4">
-                <span class="hakka-text text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</span>
-                <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</span>
+                <span class="hakka-text text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</span>
+                <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplay}</span>
                 <span class="chinese-text text-gray-800 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</span>
             </div>
             <button onclick="toggleStar(${index})" class="learning-star-btn ml-2" title="標示星號">
                 <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
             </button>
         `;
-    } else { 
-        sentenceItem.className += " sentence-card bg-white rounded-xl shadow-sm p-6";
-        sentenceItem.innerHTML = `
+        } else {
+            sentenceItem.className += " sentence-card bg-white rounded-xl shadow-sm p-6";
+            sentenceItem.innerHTML = `
             <div class="flex items-start justify-between mb-4">
                 <div class="flex items-center gap-3">
                     <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
@@ -1819,182 +2013,264 @@ function renderSentences() {
             </div>
             <div class="space-y-3">
                 <div class="hakka-text text-blue-800 line-spacing-tight" 
-                     style="font-size: ${userSettings.fontSize}px">${sentence["客語"]}</div>
+                     style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</div>
                 <div class="pinyin-text text-gray-600 line-spacing-tight" 
-                     style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${sentence["拼音"]}</div>
+                     style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplay}</div>
                 <div class="chinese-text text-gray-800 line-spacing-tight" 
                      style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</div>
             </div>
         `;
+        }
+        container.appendChild(sentenceItem);
+    });
+
+    // 【新增】更新按鈕狀態
+    const toggleAnnotationBtn = document.getElementById("togglePinyinAnnotation");
+    if (toggleAnnotationBtn) {
+        toggleAnnotationBtn.classList.toggle("annotation-active", userSettings.pinyinAnnotation);
     }
-    container.appendChild(sentenceItem);
-  });
-  updateSelectAllButtonState();
+
+    updateSelectAllButtonState();
 }
 
 
+
 function setupLearningControls() {
-  const hideStates = { hakka: "show", pinyin: "show", chinese: "show" };
-
-  const enableBtn = document.getElementById("enableLearningSelect");
-  const disableBtn = document.getElementById("disableLearningSelect");
-  const actionsContainer = document.getElementById("learningSelectActions");
-
-  // 模式切換
-  const toggleLearningSelectMode = (enable) => {
-    isLearningSelectMode = enable;
-    if (enable) {
-      enableBtn.classList.add("hidden");
-      actionsContainer.classList.remove("hidden");
-      actionsContainer.classList.add("flex");
-      // 預設全選
-      selectedSentences.clear();
-      categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
-    } else {
-      // 【修改】關閉選取模式前，若無選取則自動全選
-      if (selectedSentences.size === 0) {
-        categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
-      }
-      enableBtn.classList.remove("hidden");
-      actionsContainer.classList.add("hidden");
-      actionsContainer.classList.remove("flex");
-      // 注意：此處不清空 selectedSentences，以便其他模式能接收到選取狀態
-    }
-    renderSentences();
-    updateSelectAllButtonState(); // 更新按鈕狀態
-  };
-
-  enableBtn.onclick = () => toggleLearningSelectMode(true);
-  disableBtn.onclick = () => toggleLearningSelectMode(false);
-
-  // 全選/取消全選
-  document.getElementById("learningSelectAll").onclick = () => {
-    const totalCount = categories[currentCategory].length;
-    const selectedCount = selectedSentences.size;
-    
-    if (selectedCount < totalCount) {
-        selectedSentences.clear();
-        categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
-    } else {
-        selectedSentences.clear();
-    }
-    renderSentences();
-    updateSelectAllButtonState(); // 更新按鈕狀態
-  };
-  
-  // START: New Display Dropdown Logic
-  const displayMenuToggle = document.getElementById("displayMenuToggle");
-  const displayMenu = document.getElementById("displayMenu");
-
-  if (displayMenuToggle && displayMenu) {
-      displayMenuToggle.onclick = (e) => {
-          e.stopPropagation();
-          displayMenu.classList.toggle("hidden");
-      };
-
-      // 監聽整個頁面的點擊，如果點擊位置不在選單和觸發按鈕內，就關閉選單
-      document.addEventListener('click', (e) => {
-          if (!displayMenu.classList.contains('hidden') && !displayMenu.contains(e.target) && !displayMenuToggle.contains(e.target)) {
-              displayMenu.classList.add('hidden');
-          }
-      }, true); 
-  }
-  // END: New Display Dropdown Logic
-
-  // 星號下拉選單的控制邏輯
-  const starMenuToggle = document.getElementById("starMenuToggle");
-  const starMenu = document.getElementById("starMenu");
-
-  if (starMenuToggle && starMenu) {
-      starMenuToggle.onclick = (e) => {
-          e.stopPropagation();
-          starMenu.classList.toggle("hidden");
-      };
-      starMenu.querySelectorAll('button').forEach(button => {
-          button.addEventListener('click', () => {
-              starMenu.classList.add('hidden');
-          });
-      });
-      document.addEventListener('click', (e) => {
-          if (!starMenu.classList.contains('hidden') && !starMenu.contains(e.target) && !starMenuToggle.contains(e.target)) {
-              starMenu.classList.add('hidden');
-          }
-      }, true);
-  }
-
-  // 【修改】加入星號 -> 全部加星號
-  document.getElementById("starSelected").onclick = () => {
-      categories[currentCategory].forEach(sentence => {
-          if (!sentence) return;
-          const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
-          starredCards.add(sentenceId);
-      });
-      saveStarredCards();
-      renderSentences();
-  };
-
-  // 【修改】取消星號 -> 全部移除星號
-  document.getElementById("unstarSelected").onclick = () => {
-      categories[currentCategory].forEach(sentence => {
-          if (!sentence) return;
-          const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
-          starredCards.delete(sentenceId);
-      });
-      saveStarredCards();
-      renderSentences();
-  };
-
-  // 排版切換 (三段循環)
-  const layoutToggle = document.getElementById("layoutToggle");
-  if (layoutToggle) {
-    const layouts = ["double", "single", "compact"];
-    const icon = layoutToggle.querySelector(".material-icons");
-    switch (userSettings.layout) {
-        case "double": icon.textContent = "view_agenda"; layoutToggle.title = "切換為單欄"; break;
-        case "single": icon.textContent = "view_list"; layoutToggle.title = "切換為精簡列表"; break;
-        case "compact": icon.textContent = "view_column"; layoutToggle.title = "切換為雙欄"; break;
-    }
-    layoutToggle.onclick = () => {
-      const currentIndex = layouts.indexOf(userSettings.layout);
-      const nextIndex = (currentIndex + 1) % layouts.length;
-      userSettings.layout = layouts[nextIndex];
-      saveUserSettings();
-      showLearningView();
+    const hideStates = {
+        hakka: "show",
+        pinyin: "show",
+        chinese: "show"
     };
-  }
 
-  // 隱藏控制
-  const setupHideButton = (buttonId, textClass, type, label) => {
-    const button = document.getElementById(buttonId);
-    if (!button) return;
-    const icon = button.querySelector(".material-icons");
-    button.onclick = () => {
-      const states = ["show", "blur", "hide"];
-      const currentIndex = states.indexOf(hideStates[type]);
-      hideStates[type] = states[(currentIndex + 1) % states.length];
-      const elements = document.querySelectorAll(`.${textClass}`);
-      elements.forEach((el) => { el.classList.remove("blur-text", "hidden-text"); });
-      button.classList.remove("bg-yellow-100", "text-yellow-700", "bg-red-100", "text-red-700");
-      switch (hideStates[type]) {
-        case "show": button.title = `${label}顯示`; icon.textContent = "visibility"; break;
-        case "blur": elements.forEach((el) => el.classList.add("blur-text")); button.classList.add("bg-yellow-100", "text-yellow-700"); button.title = `${label}模糊`; icon.textContent = "blur_on"; break;
-        case "hide": elements.forEach((el) => el.classList.add("hidden-text")); button.classList.add("bg-red-100", "text-red-700"); button.title = `${label}隱藏`; icon.textContent = "visibility_off"; break;
-      }
+    const enableBtn = document.getElementById("enableLearningSelect");
+    const disableBtn = document.getElementById("disableLearningSelect");
+    const actionsContainer = document.getElementById("learningSelectActions");
+
+    // 模式切換
+    const toggleLearningSelectMode = (enable) => {
+        isLearningSelectMode = enable;
+        if (enable) {
+            enableBtn.classList.add("hidden");
+            actionsContainer.classList.remove("hidden");
+            actionsContainer.classList.add("flex");
+            // 預設全選
+            selectedSentences.clear();
+            categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
+        } else {
+            // 【修改】關閉選取模式前，若無選取則自動全選
+            if (selectedSentences.size === 0) {
+                categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
+            }
+            enableBtn.classList.remove("hidden");
+            actionsContainer.classList.add("hidden");
+            actionsContainer.classList.remove("flex");
+            // 注意：此處不清空 selectedSentences，以便其他模式能接收到選取狀態
+        }
+        renderSentences();
+        updateSelectAllButtonState(); // 更新按鈕狀態
+    };
+
+    enableBtn.onclick = () => toggleLearningSelectMode(true);
+    disableBtn.onclick = () => toggleLearningSelectMode(false);
+
+    // 全選/取消全選
+    document.getElementById("learningSelectAll").onclick = () => {
+        const totalCount = categories[currentCategory].length;
+        const selectedCount = selectedSentences.size;
+
+        if (selectedCount < totalCount) {
+            selectedSentences.clear();
+            categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
+        } else {
+            selectedSentences.clear();
+        }
+        renderSentences();
+        updateSelectAllButtonState(); // 更新按鈕狀態
+    };
+
+    // START: New Display Dropdown Logic
+    const displayMenuToggle = document.getElementById("displayMenuToggle");
+    const displayMenu = document.getElementById("displayMenu");
+
+    if (displayMenuToggle && displayMenu) {
+        displayMenuToggle.onclick = (e) => {
+            e.stopPropagation();
+            displayMenu.classList.toggle("hidden");
+        };
+
+        // 監聽整個頁面的點擊，如果點擊位置不在選單和觸發按鈕內，就關閉選單
+        document.addEventListener('click', (e) => {
+            if (!displayMenu.classList.contains('hidden') && !displayMenu.contains(e.target) && !displayMenuToggle.contains(e.target)) {
+                displayMenu.classList.add('hidden');
+            }
+        }, true);
     }
-  }
-  setupHideButton("hideHakka", "hakka-text", "hakka", "客語");
-  setupHideButton("hidePinyin", "pinyin-text", "pinyin", "拼音");
-  setupHideButton("hideChinese", "chinese-text", "chinese", "華語");
+    // END: New Display Dropdown Logic
+
+    // 星號下拉選單的控制邏輯
+    const starMenuToggle = document.getElementById("starMenuToggle");
+    const starMenu = document.getElementById("starMenu");
+
+    if (starMenuToggle && starMenu) {
+        starMenuToggle.onclick = (e) => {
+            e.stopPropagation();
+            starMenu.classList.toggle("hidden");
+        };
+        starMenu.querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', () => {
+                starMenu.classList.add('hidden');
+            });
+        });
+        document.addEventListener('click', (e) => {
+            if (!starMenu.classList.contains('hidden') && !starMenu.contains(e.target) && !starMenuToggle.contains(e.target)) {
+                starMenu.classList.add('hidden');
+            }
+        }, true);
+    }
+
+    // 【修改】加入星號 -> 全部加星號
+    document.getElementById("starSelected").onclick = () => {
+        categories[currentCategory].forEach(sentence => {
+            if (!sentence) return;
+            const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+            starredCards.add(sentenceId);
+        });
+        saveStarredCards();
+        renderSentences();
+    };
+
+    // 【修改】取消星號 -> 全部移除星號
+    document.getElementById("unstarSelected").onclick = () => {
+        categories[currentCategory].forEach(sentence => {
+            if (!sentence) return;
+            const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+            starredCards.delete(sentenceId);
+        });
+        saveStarredCards();
+        renderSentences();
+    };
+
+    // 排版切換 (三段循環)
+    const layoutToggle = document.getElementById("layoutToggle");
+    if (layoutToggle) {
+        const layouts = ["double", "single", "compact"];
+        const icon = layoutToggle.querySelector(".material-icons");
+        switch (userSettings.layout) {
+            case "double":
+                icon.textContent = "view_agenda";
+                layoutToggle.title = "切換為單欄";
+                break;
+            case "single":
+                icon.textContent = "view_list";
+                layoutToggle.title = "切換為精簡列表";
+                break;
+            case "compact":
+                icon.textContent = "view_column";
+                layoutToggle.title = "切換為雙欄";
+                break;
+        }
+        layoutToggle.onclick = () => {
+            const currentIndex = layouts.indexOf(userSettings.layout);
+            const nextIndex = (currentIndex + 1) % layouts.length;
+            userSettings.layout = layouts[nextIndex];
+            saveUserSettings();
+            showLearningView();
+        };
+    }
+
+    // 隱藏控制
+    const setupHideButton = (buttonId, textClass, type, label) => {
+        const button = document.getElementById(buttonId);
+        if (!button) return;
+        const icon = button.querySelector(".material-icons");
+        button.onclick = () => {
+            const states = ["show", "blur", "hide"];
+            const currentIndex = states.indexOf(hideStates[type]);
+            hideStates[type] = states[(currentIndex + 1) % states.length];
+            const elements = document.querySelectorAll(`.${textClass}`);
+            elements.forEach((el) => {
+                el.classList.remove("blur-text", "hidden-text");
+            });
+            button.classList.remove("bg-yellow-100", "text-yellow-700", "bg-red-100", "text-red-700");
+            switch (hideStates[type]) {
+                case "show":
+                    button.title = `${label}顯示`;
+                    icon.textContent = "visibility";
+                    break;
+                case "blur":
+                    elements.forEach((el) => el.classList.add("blur-text"));
+                    button.classList.add("bg-yellow-100", "text-yellow-700");
+                    button.title = `${label}模糊`;
+                    icon.textContent = "blur_on";
+                    break;
+                case "hide":
+                    elements.forEach((el) => el.classList.add("hidden-text"));
+                    button.classList.add("bg-red-100", "text-red-700");
+                    button.title = `${label}隱藏`;
+                    icon.textContent = "visibility_off";
+                    break;
+            }
+        }
+    }
+    setupHideButton("hideHakka", "hakka-text", "hakka", "客語");
+    setupHideButton("hidePinyin", "pinyin-text", "pinyin", "拼音");
+    setupHideButton("hideChinese", "chinese-text", "chinese", "華語");
+
+    // 【新增以下程式碼】
+    const annotationMenuToggle = document.getElementById("pinyinAnnotationMenuToggle");
+    const annotationMenu = document.getElementById("pinyinAnnotationMenu");
+
+    if (annotationMenuToggle && annotationMenu) {
+        annotationMenuToggle.onclick = (e) => {
+            e.stopPropagation();
+            annotationMenu.classList.toggle("hidden");
+        };
+        document.addEventListener('click', (e) => {
+            if (!annotationMenu.classList.contains('hidden') && !annotationMenu.contains(e.target) && !annotationMenuToggle.contains(e.target)) {
+                annotationMenu.classList.add('hidden');
+            }
+        }, true);
+    }
+
+    const toggleAnnotationBtn = document.getElementById("togglePinyinAnnotation");
+    if (toggleAnnotationBtn) {
+        toggleAnnotationBtn.onclick = () => {
+            userSettings.pinyinAnnotation = !userSettings.pinyinAnnotation;
+            saveUserSettings();
+            renderSentences();
+            annotationMenu.classList.add('hidden');
+        };
+    }
+
+    // --- 新增開始 ---
+    const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
+    if (togglePhoneticBtn) {
+        // 根據目前設定，初始化按鈕樣式
+        togglePhoneticBtn.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
+        togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+        togglePhoneticBtn.onclick = () => {
+            // 切換設定
+            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+            saveUserSettings();
+            // 更新按鈕樣式與標題
+            togglePhoneticBtn.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
+            togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+            // 重新渲染句子列表以顯示變更
+            renderSentences();
+        };
+    }
+    // --- 新增結束 ---
 }
 
 // 切換句子選取
 function toggleSentenceSelection(index, checked) {
-  if (checked) {
-    selectedSentences.add(index)
-  } else {
-    selectedSentences.delete(index)
-  }
-  updateSelectAllButtonState();
+    if (checked) {
+        selectedSentences.add(index)
+    } else {
+        selectedSentences.delete(index)
+    }
+    updateSelectAllButtonState();
 }
 
 
@@ -2019,45 +2295,45 @@ function updateSelectAllButtonState() {
 
 
 
-
 // 字體大小調整
 function adjustFontSize(change, mode = "learning") {
-  const fontSizes = mode === "flashcard" ? config.FONT_SIZES.flashcard : config.FONT_SIZES.learning;
+    const fontSizes = mode === "flashcard" ? config.FONT_SIZES.flashcard : config.FONT_SIZES.learning;
 
-  const settingKey = mode === "flashcard" ? "flashcardFontSize" : "fontSize"
-  const currentIndex = fontSizes.indexOf(userSettings[settingKey])
-  const newIndex = Math.max(0, Math.min(fontSizes.length - 1, currentIndex + change))
-  userSettings[settingKey] = fontSizes[newIndex]
-  saveUserSettings()
+    const settingKey = mode === "flashcard" ? "flashcardFontSize" : "fontSize"
+    const currentIndex = fontSizes.indexOf(userSettings[settingKey])
+    const newIndex = Math.max(0, Math.min(fontSizes.length - 1, currentIndex + change))
+    userSettings[settingKey] = fontSizes[newIndex]
+    saveUserSettings()
 
-  // 重新渲染當前視圖
-  if (mode === "learning") {
-    renderSentences()
-  } else if (mode === "flashcard") {
-    updateFlashcard()
-  } else if (mode === "matching" || mode === "quiz" || mode === "sorting") {
-    // 對於遊戲模式，重新渲染當前題目
-    if (mode === "matching" && matchingGameState.isPlaying) {
-      renderMatchingItems()
-    } else if (mode === "quiz" && quizGameState.isPlaying) {
-      renderQuizQuestion()
-    } else if (mode === "sorting" && sortingGameState.isPlaying) {
-      renderSortingQuestion()
+    // 重新渲染當前視圖
+    if (mode === "learning") {
+        renderSentences()
+    } else if (mode === "flashcard") {
+        updateFlashcard()
+    } else if (mode === "matching" || mode === "quiz" || mode === "sorting") {
+        // 對於遊戲模式，重新渲染當前題目
+        if (mode === "matching" && matchingGameState.isPlaying) {
+            renderMatchingItems()
+        } else if (mode === "quiz" && quizGameState.isPlaying) {
+            renderQuizQuestion()
+        } else if (mode === "sorting" && sortingGameState.isPlaying) {
+            renderSortingQuestion()
+        }
     }
-  }
 }
 
-// 閃示卡模式
+
+// 閃卡模式
 function showFlashcardView() {
-  const contentArea = document.getElementById("contentArea");
-  const sentences = getSelectedSentences();
+    const contentArea = document.getElementById("contentArea");
+    const sentences = getSelectedSentences();
 
-  if (sentences.length === 0) {
-    contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">請先在學習頁面勾選要練習的句子</div>';
-    return;
-  }
+    if (sentences.length === 0) {
+        contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">請先在學習頁面勾選要練習的句子</div>';
+        return;
+    }
 
-  contentArea.innerHTML = `
+    contentArea.innerHTML = `
     <div class="max-w-5xl mx-auto pt-8">
         <div id="flashcardContainer" class="bg-white rounded-xl shadow-lg p-8 mb-4 relative overflow-hidden">
             <div class="absolute top-4 left-4 z-10">
@@ -2091,6 +2367,20 @@ function showFlashcardView() {
                     <div id="filterCardsPopup" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
                         </div>
                 </div>
+                <div class="relative">
+                     <button id="flashcardAnnotationBtn" class="control-btn !p-2" title="標音設定">
+                        <span class="material-icons">translate</span>
+                    </button>
+                    <div id="flashcardAnnotationPopup" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg border z-10 py-1">
+                        <button id="toggleFlashcardAnnotation" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 control-button">
+                            <span class="material-icons text-base mr-2">vertical_align_top</span>
+                            <span>拼音標字上</span>
+                        </button>
+                    </div>
+                </div>
+                <button id="toggleFlashcardPhoneticSystem" class="control-btn !p-2" title="切換拼音/注音">
+                    <span class="material-icons">font_download</span>
+                </button>
             </div>
 
             <div id="flashcardContent" class="text-center space-y-6 min-h-[250px] flex flex-col justify-center items-center pt-8">
@@ -2141,75 +2431,90 @@ function showFlashcardView() {
         </div>
     </div>
     `;
-  setupFlashcardView();
+    setupFlashcardView();
 }
+
+
+
 
 function updateFlashcard() {
-  if (flashcardSentences.length === 0) {
-    document.getElementById("flashcardContent").innerHTML = '<div class="text-gray-500">沒有可練習的卡片</div>';
-    document.getElementById("cardCounter").textContent = "0 / 0";
-    // 禁用所有按鈕
-    const controls = ['prevCard', 'nextCard', 'playCardAudio', 'starCard', 'shuffleCards', 'autoPlayBtn', 'filterCardsBtn', 'goToFirstCard', 'goToLastCard', 'repeatBtn'];
-    controls.forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.disabled = true;
-    });
-    return;
-  } else {
-    // 啟用按鈕 (除了 repeatBtn，它由 autoplay 控制)
-    const controls = ['prevCard', 'nextCard', 'playCardAudio', 'starCard', 'shuffleCards', 'autoPlayBtn', 'filterCardsBtn', 'goToFirstCard', 'goToLastCard'];
-    controls.forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.disabled = false;
-    });
-  }
+    if (flashcardSentences.length === 0) {
+        document.getElementById("flashcardContent").innerHTML = '<div class="text-gray-500">沒有可練習的卡片</div>';
+        document.getElementById("cardCounter").textContent = "0 / 0";
+        // 禁用所有按鈕
+        const controls = ['prevCard', 'nextCard', 'playCardAudio', 'starCard', 'shuffleCards', 'autoPlayBtn', 'filterCardsBtn', 'goToFirstCard', 'goToLastCard', 'repeatBtn'];
+        controls.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.disabled = true;
+        });
+        return;
+    } else {
+        // 啟用按鈕 (除了 repeatBtn，它由 autoplay 控制)
+        const controls = ['prevCard', 'nextCard', 'playCardAudio', 'starCard', 'shuffleCards', 'autoPlayBtn', 'filterCardsBtn', 'goToFirstCard', 'goToLastCard'];
+        controls.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.disabled = false;
+        });
+    }
 
-  const sentence = flashcardSentences[currentCardIndex];
-  const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
-  
-  const hakkaTextEl = document.getElementById("hakkaText");
-  const pinyinTextEl = document.getElementById("pinyinText");
-  const chineseTextEl = document.getElementById("chineseText");
+    const sentence = flashcardSentences[currentCardIndex];
+    const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
 
-  hakkaTextEl.textContent = sentence["客語"];
-  pinyinTextEl.textContent = sentence["拼音"];
-  chineseTextEl.textContent = sentence["華語"];
-  document.getElementById("cardCounter").textContent = `${currentCardIndex + 1} / ${flashcardSentences.length}`;
+    const hakkaTextEl = document.getElementById("hakkaText");
+    const pinyinTextEl = document.getElementById("pinyinText");
+    const chineseTextEl = document.getElementById("chineseText");
 
-  // 根據模糊狀態來切換 class
-  hakkaTextEl.classList.toggle('blur-text', flashcardBlurStates.hakka);
-  pinyinTextEl.classList.toggle('blur-text', flashcardBlurStates.pinyin);
-  chineseTextEl.classList.toggle('blur-text', flashcardBlurStates.chinese);
+    // --- 修改開始 ---
+    let pinyinDisplay = sentence["拼音"];
+    if (userSettings.phoneticSystem === 'zhuyin') {
+        pinyinDisplay = convertPinyinToZhuyin(pinyinDisplay);
+    }
+    const annotatedHakka = annotateHakkaText(sentence["客語"], pinyinDisplay, userSettings.pinyinAnnotation);
+    // --- 修改結束 ---
+
+    hakkaTextEl.innerHTML = annotatedHakka;
+    pinyinTextEl.textContent = pinyinDisplay;
+    chineseTextEl.textContent = sentence["華語"];
+    document.getElementById("cardCounter").textContent = `${currentCardIndex + 1} / ${flashcardSentences.length}`;
+
+    // 【新增】根據標音狀態，切換容器的 class
+    document.getElementById('flashcardContainer').classList.toggle('pinyin-annotated', userSettings.pinyinAnnotation);
+
+    // 根據模糊狀態來切換 class
+    hakkaTextEl.classList.toggle('blur-text', flashcardBlurStates.hakka);
+    pinyinTextEl.classList.toggle('blur-text', flashcardBlurStates.pinyin);
+    chineseTextEl.classList.toggle('blur-text', flashcardBlurStates.chinese);
 
 
-  const starIcon = document.getElementById("starIcon");
-  if (starredCards.has(sentenceId)) {
-    starIcon.textContent = "star";
-    starIcon.classList.remove("text-gray-400");
-    starIcon.classList.add("text-yellow-400");
-  } else {
-    starIcon.textContent = "star_border";
-    starIcon.classList.add("text-gray-400");
-    starIcon.classList.remove("text-yellow-400");
-  }
+    const starIcon = document.getElementById("starIcon");
+    if (starredCards.has(sentenceId)) {
+        starIcon.textContent = "star";
+        starIcon.classList.remove("text-gray-400");
+        starIcon.classList.add("text-yellow-400");
+    } else {
+        starIcon.textContent = "star_border";
+        starIcon.classList.add("text-gray-400");
+        starIcon.classList.remove("text-yellow-400");
+    }
 
-  const progress = ((currentCardIndex + 1) / flashcardSentences.length) * 100;
-  document.getElementById("progressBar").style.width = progress + "%";
-  
-  const isAtFirst = currentCardIndex === 0;
-  const isAtLast = currentCardIndex === flashcardSentences.length - 1;
+    const progress = ((currentCardIndex + 1) / flashcardSentences.length) * 100;
+    document.getElementById("progressBar").style.width = progress + "%";
 
-  document.getElementById("prevCard").disabled = isAtFirst;
-  document.getElementById("nextCard").disabled = isAtLast;
-  
-  // 新增：更新卡片內部導航按鈕的禁用狀態
-  document.getElementById("goToFirstCard").disabled = isAtFirst;
-  document.getElementById("goToLastCard").disabled = isAtLast;
+    const isAtFirst = currentCardIndex === 0;
+    const isAtLast = currentCardIndex === flashcardSentences.length - 1;
 
-  hakkaTextEl.style.fontSize = userSettings.flashcardFontSize + "px";
-  pinyinTextEl.style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.8) + "px";
-  chineseTextEl.style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.9) + "px";
+    document.getElementById("prevCard").disabled = isAtFirst;
+    document.getElementById("nextCard").disabled = isAtLast;
+
+    // 新增：更新卡片內部導航按鈕的禁用狀態
+    document.getElementById("goToFirstCard").disabled = isAtFirst;
+    document.getElementById("goToLastCard").disabled = isAtLast;
+
+    hakkaTextEl.style.fontSize = userSettings.flashcardFontSize + "px";
+    pinyinTextEl.style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.8) + "px";
+    chineseTextEl.style.fontSize = Math.floor(userSettings.flashcardFontSize * 0.9) + "px";
 }
+
 
 function setupFlashcardControls() {
     let currentInterval = 3;
@@ -2225,13 +2530,15 @@ function setupFlashcardControls() {
     const autoPlayPopup = document.getElementById("autoPlayPopup");
     const filterButton = document.getElementById("filterCardsBtn");
     const filterPopup = document.getElementById("filterCardsPopup");
-    
+    const flashcardAnnotationBtn = document.getElementById("flashcardAnnotationBtn");
+    const flashcardAnnotationPopup = document.getElementById("flashcardAnnotationPopup");
+
     const repeatButton = document.getElementById("repeatBtn");
     const goToFirstButton = document.getElementById("goToFirstCard");
     const goToLastButton = document.getElementById("goToLastCard");
-    
+
     const autoPlayAudioCheckbox = document.getElementById("flashcardAutoPlayAudio");
-    
+
     const hakkaTextEl = document.getElementById("hakkaText");
     const pinyinTextEl = document.getElementById("pinyinText");
     const chineseTextEl = document.getElementById("chineseText");
@@ -2262,17 +2569,44 @@ function setupFlashcardControls() {
             saveUserSettings();
         };
     }
-    
-    const popups = [
-        { btn: autoPlayButton, menu: autoPlayPopup },
-        { btn: filterButton, menu: filterPopup }
+
+    // --- 新增開始 ---
+    const togglePhoneticBtn = document.getElementById("toggleFlashcardPhoneticSystem");
+    if (togglePhoneticBtn) {
+        togglePhoneticBtn.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
+        togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+        togglePhoneticBtn.onclick = () => {
+            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+            saveUserSettings();
+            togglePhoneticBtn.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
+            togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+            updateFlashcard(); // 重新渲染卡片
+        };
+    }
+    // --- 新增結束 ---
+
+    const popups = [{
+            btn: autoPlayButton,
+            menu: autoPlayPopup
+        },
+        {
+            btn: filterButton,
+            menu: filterPopup
+        },
+        {
+            btn: flashcardAnnotationBtn,
+            menu: flashcardAnnotationPopup
+        }
     ];
 
     popups.forEach(popup => {
-        if(!popup.btn) return;
+        if (!popup.btn) return;
         popup.btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            popups.forEach(p => { if (p.menu !== popup.menu) p.menu.classList.add('hidden'); });
+            popups.forEach(p => {
+                if (p.menu !== popup.menu) p.menu.classList.add('hidden');
+            });
             popup.menu.classList.toggle('hidden');
         });
     });
@@ -2291,7 +2625,7 @@ function setupFlashcardControls() {
         const allCount = allSentences.length;
         const starredCount = allSentences.filter(s => starredCards.has(s["ID"] || `${s["分類"]}_${s["華語"]}`)).length;
         const unstarredCount = allCount - starredCount;
-        
+
         filterPopup.innerHTML = `
             <button data-mode="all" class="practice-mode-btn w-full text-left px-3 py-2 flex justify-between items-center hover:bg-gray-100 ${flashcardPracticeMode === 'all' ? 'active' : ''}">
                 <span class="flex items-center"><span class="material-icons text-base mr-2">apps</span>全部</span> 
@@ -2321,11 +2655,11 @@ function setupFlashcardControls() {
                 filterPopup.classList.add('hidden');
             };
         });
-        
+
         const clearStarsBtn = document.getElementById('clearStarsBtn');
-        if(clearStarsBtn) {
+        if (clearStarsBtn) {
             clearStarsBtn.onclick = () => {
-                 if (starredCards.size > 0) {
+                if (starredCards.size > 0) {
                     starredCards.clear();
                     saveStarredCards(); // 新增：儲存變更
                     if (flashcardPracticeMode === 'starred') {
@@ -2345,25 +2679,25 @@ function setupFlashcardControls() {
             autoPlayTimer = null;
             const autoPlayButton = document.getElementById("autoPlayBtn");
             const autoPlayIcon = document.getElementById("autoPlayIcon");
-            
-            if(autoPlayButton && autoPlayIcon){
+
+            if (autoPlayButton && autoPlayIcon) {
                 autoPlayIcon.textContent = "play_arrow";
                 autoPlayButton.classList.remove("active");
                 autoPlayButton.title = "自動播放";
             }
-            
-            if(repeatButton) {
+
+            if (repeatButton) {
                 repeatButton.classList.add('hidden');
             }
-            
+
             if (currentAudio) {
                 currentAudio.pause();
             }
         }
     }
-    
+
     function startAutoPlay() {
-        stopAutoPlay(); 
+        stopAutoPlay();
 
         if (currentCardIndex >= flashcardSentences.length - 1) {
             currentCardIndex = -1;
@@ -2375,14 +2709,14 @@ function setupFlashcardControls() {
         autoPlayButton.classList.add("active");
         autoPlayButton.title = "暫停播放";
 
-        if(repeatButton) {
+        if (repeatButton) {
             repeatButton.classList.remove('hidden');
         }
 
-        autoPlayTimer = true; 
+        autoPlayTimer = true;
         const intervalBtn = document.querySelector('.auto-interval-btn.bg-gray-200') || document.querySelector('.auto-interval-btn[data-interval="3"]');
         const interval = parseInt(intervalBtn.dataset.interval, 10) * 1000;
-        
+
         const autoPlayLoop = async () => {
             if (!autoPlayTimer) {
                 return;
@@ -2393,26 +2727,26 @@ function setupFlashcardControls() {
                     stopAutoPlay();
                     return;
                 }
-                currentCardIndex = -1; 
+                currentCardIndex = -1;
             }
 
             currentCardIndex++;
             updateFlashcard();
 
             const delayPromise = new Promise(resolve => setTimeout(resolve, interval));
-            const audioPromise = userSettings.flashcardAutoPlayAudio 
-                ? playCurrentAudio() 
-                : Promise.resolve();
-            
+            const audioPromise = userSettings.flashcardAutoPlayAudio ?
+                playCurrentAudio() :
+                Promise.resolve();
+
             await Promise.all([delayPromise, audioPromise]);
-            
+
             autoPlayLoop();
         };
 
         autoPlayLoop();
     }
-    
-    if(repeatButton) {
+
+    if (repeatButton) {
         // 根據讀取的設定，初始化按鈕外觀
         if (isAutoplayLooping) {
             repeatButton.classList.add("active");
@@ -2446,7 +2780,7 @@ function setupFlashcardControls() {
             startAutoPlay();
         }
     };
-    
+
     document.querySelectorAll('.auto-interval-btn').forEach(btn => {
         btn.onclick = () => {
             currentInterval = parseInt(btn.dataset.interval, 10);
@@ -2459,7 +2793,7 @@ function setupFlashcardControls() {
         };
     });
     const defaultIntervalBtn = autoPlayPopup.querySelector(`[data-interval="3"]`);
-    if(defaultIntervalBtn) defaultIntervalBtn.classList.add('bg-gray-200');
+    if (defaultIntervalBtn) defaultIntervalBtn.classList.add('bg-gray-200');
 
     shuffleButton.onclick = () => {
         isFlashcardShuffled = !isFlashcardShuffled;
@@ -2478,7 +2812,7 @@ function setupFlashcardControls() {
         currentCardIndex = 0;
         updateFlashcard();
     };
-    
+
     playAudioButton.onclick = playCurrentAudio;
 
     prevButton.onclick = () => {
@@ -2504,130 +2838,153 @@ function setupFlashcardControls() {
         const sentence = flashcardSentences[currentCardIndex];
         if (!sentence) return;
         const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
-        if (starredCards.has(sentenceId)) { starredCards.delete(sentenceId); } else { starredCards.add(sentenceId); }
+        if (starredCards.has(sentenceId)) {
+            starredCards.delete(sentenceId);
+        } else {
+            starredCards.add(sentenceId);
+        }
         saveStarredCards(); // 新增：儲存變更
         updateFlashcard();
         updateFilterPopup();
     };
-    
+
     if (goToFirstButton) {
-      goToFirstButton.onclick = () => {
-        if (currentCardIndex !== 0) {
-          stopAutoPlay();
-          currentCardIndex = 0;
-          updateFlashcard();
-        }
-      };
+        goToFirstButton.onclick = () => {
+            if (currentCardIndex !== 0) {
+                stopAutoPlay();
+                currentCardIndex = 0;
+                updateFlashcard();
+            }
+        };
     }
     if (goToLastButton) {
-      goToLastButton.onclick = () => {
-        if (currentCardIndex !== flashcardSentences.length - 1) {
-          stopAutoPlay();
-          currentCardIndex = flashcardSentences.length - 1;
-          updateFlashcard();
-        }
-      };
+        goToLastButton.onclick = () => {
+            if (currentCardIndex !== flashcardSentences.length - 1) {
+                stopAutoPlay();
+                currentCardIndex = flashcardSentences.length - 1;
+                updateFlashcard();
+            }
+        };
     }
 
-    if (flashcardKeyHandler) { document.removeEventListener('keydown', flashcardKeyHandler); }
+    if (flashcardKeyHandler) {
+        document.removeEventListener('keydown', flashcardKeyHandler);
+    }
     flashcardKeyHandler = (event) => {
-      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
-      const key = event.key.toLowerCase();
-      switch(key) {
-          case ' ': event.preventDefault(); playAudioButton.click(); break;
-          case 'arrowright': case 'arrowdown': event.preventDefault(); if (!nextButton.disabled) nextButton.click(); break;
-          case 'arrowleft': case 'arrowup': event.preventDefault(); if (!prevButton.disabled) prevButton.click(); break;
-          case 'home':
-          case 'h':
-            event.preventDefault();
-            if (goToFirstButton) goToFirstButton.click();
-            break;
-          case 'end':
-          case 'e':
-            event.preventDefault();
-            if (goToLastButton) goToLastButton.click();
-            break;
-          case 's':
-            event.preventDefault();
-            if (starButton) starButton.click();
-            break;
-      }
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
+        const key = event.key.toLowerCase();
+        switch (key) {
+            case ' ':
+                event.preventDefault();
+                playAudioButton.click();
+                break;
+            case 'arrowright':
+            case 'arrowdown':
+                event.preventDefault();
+                if (!nextButton.disabled) nextButton.click();
+                break;
+            case 'arrowleft':
+            case 'arrowup':
+                event.preventDefault();
+                if (!prevButton.disabled) prevButton.click();
+                break;
+            case 'home':
+            case 'h':
+                event.preventDefault();
+                if (goToFirstButton) goToFirstButton.click();
+                break;
+            case 'end':
+            case 'e':
+                event.preventDefault();
+                if (goToLastButton) goToLastButton.click();
+                break;
+            case 's':
+                event.preventDefault();
+                if (starButton) starButton.click();
+                break;
+        }
     };
     document.addEventListener('keydown', flashcardKeyHandler);
-    
+    const toggleFlashcardAnnotationBtn = document.getElementById("toggleFlashcardAnnotation");
+    if (toggleFlashcardAnnotationBtn) {
+        toggleFlashcardAnnotationBtn.onclick = () => {
+            userSettings.pinyinAnnotation = !userSettings.pinyinAnnotation;
+            saveUserSettings();
+            updateFlashcard();
+            if (flashcardAnnotationPopup) flashcardAnnotationPopup.classList.add('hidden');
+        };
+    }
+
     updateFilterPopup();
 }
 
-
 function updateFlashcardSentences() {
-  const allSentences = getSelectedSentences()
+    const allSentences = getSelectedSentences()
 
-  // 使用句子的絕對ID進行星號過濾
-  switch (flashcardPracticeMode) {
-    case "starred":
-      flashcardSentences = allSentences.filter((sentence) => {
-        const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`
-        return starredCards.has(sentenceId)
-      })
-      break
-    case "unstarred":
-      flashcardSentences = allSentences.filter((sentence) => {
-        const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`
-        return !starredCards.has(sentenceId)
-      })
-      break
-    default: // all
-      flashcardSentences = allSentences
-  }
-  
-  // 備份原始順序並重設亂數狀態
-  originalFlashcardOrder = [...flashcardSentences]
-  isFlashcardShuffled = false
-  const shuffleButton = document.getElementById("shuffleCards")
-  if (shuffleButton) {
-      shuffleButton.querySelector(".material-icons").textContent = "shuffle"
-      shuffleButton.title = "亂數排序"
-      shuffleButton.classList.remove("bg-purple-200")
-  }
+    // 使用句子的絕對ID進行星號過濾
+    switch (flashcardPracticeMode) {
+        case "starred":
+            flashcardSentences = allSentences.filter((sentence) => {
+                const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`
+                return starredCards.has(sentenceId)
+            })
+            break
+        case "unstarred":
+            flashcardSentences = allSentences.filter((sentence) => {
+                const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`
+                return !starredCards.has(sentenceId)
+            })
+            break
+        default: // all
+            flashcardSentences = allSentences
+    }
+
+    // 備份原始順序並重設亂數狀態
+    originalFlashcardOrder = [...flashcardSentences]
+    isFlashcardShuffled = false
+    const shuffleButton = document.getElementById("shuffleCards")
+    if (shuffleButton) {
+        shuffleButton.querySelector(".material-icons").textContent = "shuffle"
+        shuffleButton.title = "亂數排序"
+        shuffleButton.classList.remove("bg-purple-200")
+    }
 
 
-  if (currentCardIndex >= flashcardSentences.length) {
-    currentCardIndex = 0
-  }
+    if (currentCardIndex >= flashcardSentences.length) {
+        currentCardIndex = 0
+    }
 }
 
 let flashcardPracticeMode = "all"
 
 function setupFlashcardView() {
-  currentCardIndex = 0
-  flashcardPracticeMode = "all" // 每次進入都重設為 "練習全部"
-  updateFlashcardSentences()
-  updateFlashcard()
-  setupFlashcardControls()
+    currentCardIndex = 0
+    flashcardPracticeMode = "all" // 每次進入都重設為 "練習全部"
+    updateFlashcardSentences()
+    updateFlashcard()
+    setupFlashcardControls()
 }
-
-
 
 
 
 
 // 獲取選中的句子
 function getSelectedSentences() {
-  const allSentences = categories[currentCategory]
-  return Array.from(selectedSentences).map((index) => allSentences[index])
+    const allSentences = categories[currentCategory]
+    return Array.from(selectedSentences).map((index) => allSentences[index])
 }
 
-
+// 請替換此函數
 function showMatchingGame() {
-  const contentArea = document.getElementById("contentArea");
-  const sentences = getSelectedSentences();
+    const contentArea = document.getElementById("contentArea");
+    const sentences = getSelectedSentences();
 
-  if (sentences.length < 2) {
-    contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">至少需要2個句子才能進行配對遊戲</div>';
-    return;
-  }
+    if (sentences.length < 2) {
+        contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">至少需要2個句子才能進行配對遊戲</div>';
+        return;
+    }
 
-  contentArea.innerHTML = `
+    contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
             <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
@@ -2639,7 +2996,7 @@ function showMatchingGame() {
                         <button id="startMatching" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
                             開始配對
                         </button>
-                        
+
                         <div id="matchingOptions" class="flex items-center flex-wrap gap-2">
                              <div class="w-px h-5 bg-gray-300 mx-1 hidden sm:block"></div>
                              <select id="matchingType" class="bg-gray-100 border-gray-300 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md p-1.5 transition-colors">
@@ -2683,6 +3040,9 @@ function showMatchingGame() {
                             <button id="matchingLayoutToggle" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換排版">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
                             </button>
+                            <button id="togglePhoneticSystem" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換拼音/注音">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">font_download</span>
+                            </button>
                             <button onclick="adjustFontSize(-1, 'matching')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
                             </button>
@@ -2714,65 +3074,82 @@ function showMatchingGame() {
             </div>
         </div>
     `;
-  setupMatchingGame();
+    setupMatchingGame();
 }
-
-
-
-
 
 function setupMatchingGame() {
-  const isMobile = window.innerWidth < 768;
-  
-  matchingGameState = {
-    isPlaying: false,
-    selectedItems: [],
-    matchedPairs: [],
-    currentRound: 1,
-    totalRounds: 1,
-    score: 0,
-    steps: 0,
-    timeLeft: 0,
-    timerInterval: null,
-    gameData: [],
-    // 【修改】根據螢幕寬度設定預設欄數，手機版為1，電腦版為2
-    columnsPerSide: isMobile ? 1 : (userSettings.matchingColumns || 2),
-  }
+    const isMobile = window.innerWidth < 768;
 
-  const layoutToggleButton = document.getElementById("matchingLayoutToggle");
-  if (layoutToggleButton) {
-      // 【修改】統一圖示邏輯
-      const icon = layoutToggleButton.querySelector(".material-icons");
-      icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'view_agenda';
-  }
-
-  document.getElementById("startMatching").onclick = startMatchingGame;
-  
-  layoutToggleButton.onclick = () => {
-      matchingGameState.columnsPerSide = matchingGameState.columnsPerSide === 1 ? 2 : 1;
-      
-      const icon = layoutToggleButton.querySelector(".material-icons");
-      // 【修改】統一圖示邏輯
-      icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'view_agenda';
-
-      userSettings.matchingColumns = matchingGameState.columnsPerSide;
-      saveUserSettings();
-      
-      if (matchingGameState.isPlaying) {
-          renderMatchingItems(); 
-      }
-  }
-
-  ;["matchingType", "matchingPairs", "matchingCondition"].forEach((id) => {
-    document.getElementById(id).onchange = () => {
-      if (!matchingGameState.isPlaying) {
-        generateMatchingData();
-      }
+    matchingGameState = {
+        isPlaying: false,
+        selectedItems: [],
+        matchedPairs: [],
+        currentRound: 1,
+        totalRounds: 1,
+        score: 0,
+        steps: 0,
+        timeLeft: 0,
+        timerInterval: null,
+        gameData: [],
+        // 【修改】根據螢幕寬度設定預設欄數，手機版為1，電腦版為2
+        columnsPerSide: isMobile ? 1 : (userSettings.matchingColumns || 2),
     }
-  });
 
-  generateMatchingData();
+    const layoutToggleButton = document.getElementById("matchingLayoutToggle");
+    if (layoutToggleButton) {
+        // 【修改】統一圖示邏輯
+        const icon = layoutToggleButton.querySelector(".material-icons");
+        icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'view_agenda';
+    }
+
+    document.getElementById("startMatching").onclick = startMatchingGame;
+
+    layoutToggleButton.onclick = () => {
+        matchingGameState.columnsPerSide = matchingGameState.columnsPerSide === 1 ? 2 : 1;
+
+        const icon = layoutToggleButton.querySelector(".material-icons");
+        // 【修改】統一圖示邏輯
+        icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'view_agenda';
+
+        userSettings.matchingColumns = matchingGameState.columnsPerSide;
+        saveUserSettings();
+
+        if (matchingGameState.isPlaying) {
+            renderMatchingItems();
+        }
+    }
+
+    ;
+    ["matchingType", "matchingPairs", "matchingCondition"].forEach((id) => {
+        document.getElementById(id).onchange = () => {
+            if (!matchingGameState.isPlaying) {
+                generateMatchingData();
+            }
+        }
+    });
+
+    // --- 新增開始 ---
+    const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
+    if (togglePhoneticBtn) {
+        togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
+        togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+        togglePhoneticBtn.onclick = () => {
+            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+            saveUserSettings();
+            togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
+            togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+            // 如果遊戲正在進行，重新生成題目以應用變更
+            if (matchingGameState.isPlaying) {
+                generateMatchingData();
+            }
+        };
+    }
+
+    generateMatchingData();
 }
+
 
 function stopMatchingGame() {
     if (matchingGameState.timerInterval) {
@@ -2781,487 +3158,562 @@ function stopMatchingGame() {
     endMatchingGame("遊戲已中止");
 }
 
+
+// 請替換此函數
 function generateMatchingData() {
-  const sentences = getSelectedSentences()
-  const type = document.getElementById("matchingType").value
-  const pairs = Number.parseInt(document.getElementById("matchingPairs").value)
-  const condition = document.getElementById("matchingCondition").value
+    const sentences = getSelectedSentences()
+    const type = document.getElementById("matchingType").value
+    const pairs = Number.parseInt(document.getElementById("matchingPairs").value)
+    const condition = document.getElementById("matchingCondition").value
 
-  // 隨機選擇句子
-  const shuffled = [...sentences].sort(() => Math.random() - 0.5)
-  const selected = shuffled.slice(0, Math.min(pairs, shuffled.length)) // 確保不會超出範圍
+    // 隨機選擇句子
+    const shuffled = [...sentences].sort(() => Math.random() - 0.5)
+    const selected = shuffled.slice(0, Math.min(pairs, shuffled.length)) // 確保不會超出範圍
 
-  // 根據類型生成配對資料
-  const leftItems = []
-  const rightItems = []
+    // 根據類型生成配對資料
+    const leftItems = []
+    const rightItems = []
 
-  selected.forEach((sentence, index) => {
-    switch (type) {
-      case "hakka-chinese":
-        leftItems.push({ id: index, text: sentence["客語"], type: "hakka" })
-        rightItems.push({ id: index, text: sentence["華語"], type: "chinese" })
-        break
-      case "pinyin-chinese":
-        leftItems.push({ id: index, text: sentence["拼音"], type: "pinyin" })
-        rightItems.push({ id: index, text: sentence["華語"], type: "chinese" })
-        break
-      case "hakka-pinyin":
-        leftItems.push({ id: index, text: sentence["客語"], type: "hakka" })
-        rightItems.push({ id: index, text: sentence["拼音"], type: "pinyin" })
-        break
-      // --- 新增的音檔模式 ---
-      case "audio-hakka":
-        leftItems.push({ id: index, audioFile: sentence["音檔"], type: "audio" });
-        rightItems.push({ id: index, text: sentence["客語"], type: "hakka" });
-        break;
-      case "audio-pinyin":
-        leftItems.push({ id: index, audioFile: sentence["音檔"], type: "audio" });
-        rightItems.push({ id: index, text: sentence["拼音"], type: "pinyin" });
-        break;
-      case "audio-chinese":
-        leftItems.push({ id: index, audioFile: sentence["音檔"], type: "audio" });
-        rightItems.push({ id: index, text: sentence["華語"], type: "chinese" });
-        break;
+    // --- 新增：定義一個幫助函數 ---
+    const getPhonetic = (text) => {
+        if (userSettings.phoneticSystem === 'zhuyin') {
+            return convertPinyinToZhuyin(text);
+        }
+        return text;
+    };
+
+    selected.forEach((sentence, index) => {
+        switch (type) {
+            case "hakka-chinese":
+                leftItems.push({
+                    id: index,
+                    text: sentence["客語"],
+                    type: "hakka"
+                })
+                rightItems.push({
+                    id: index,
+                    text: sentence["華語"],
+                    type: "chinese"
+                })
+                break
+            case "pinyin-chinese":
+                leftItems.push({
+                    id: index,
+                    text: getPhonetic(sentence["拼音"]), // 修改
+                    type: "pinyin"
+                })
+                rightItems.push({
+                    id: index,
+                    text: sentence["華語"],
+                    type: "chinese"
+                })
+                break
+            case "hakka-pinyin":
+                leftItems.push({
+                    id: index,
+                    text: sentence["客語"],
+                    type: "hakka"
+                })
+                rightItems.push({
+                    id: index,
+                    text: getPhonetic(sentence["拼音"]), // 修改
+                    type: "pinyin"
+                })
+                break
+                // --- 新增的音檔模式 ---
+            case "audio-hakka":
+                leftItems.push({
+                    id: index,
+                    audioFile: sentence["音檔"],
+                    type: "audio"
+                });
+                rightItems.push({
+                    id: index,
+                    text: sentence["客語"],
+                    type: "hakka"
+                });
+                break;
+            case "audio-pinyin":
+                leftItems.push({
+                    id: index,
+                    audioFile: sentence["音檔"],
+                    type: "audio"
+                });
+                rightItems.push({
+                    id: index,
+                    text: getPhonetic(sentence["拼音"]), // 修改
+                    type: "pinyin"
+                });
+                break;
+            case "audio-chinese":
+                leftItems.push({
+                    id: index,
+                    audioFile: sentence["音檔"],
+                    type: "audio"
+                });
+                rightItems.push({
+                    id: index,
+                    text: sentence["華語"],
+                    type: "chinese"
+                });
+                break;
+        }
+    })
+
+    // 打亂右側項目
+    rightItems.sort(() => Math.random() - 0.5)
+
+    matchingGameState.gameData = {
+        leftItems,
+        rightItems,
+        sentences: selected
     }
-  })
 
-  // 打亂右側項目
-  rightItems.sort(() => Math.random() - 0.5)
+    // 設定關卡數
+    if (condition.startsWith("round")) {
+        matchingGameState.totalRounds = Number.parseInt(condition.replace("round", ""))
+    } else {
+        matchingGameState.totalRounds = 1
+    }
 
-  matchingGameState.gameData = { leftItems, rightItems, sentences: selected }
-
-  // 設定關卡數
-  if (condition.startsWith("round")) {
-    matchingGameState.totalRounds = Number.parseInt(condition.replace("round", ""))
-  } else {
-    matchingGameState.totalRounds = 1
-  }
-
-  renderMatchingItems()
+    renderMatchingItems()
 }
 
+
+
 function renderMatchingItems() {
-  const leftContainer = document.getElementById("leftColumnContainer");
-  const rightContainer = document.getElementById("rightColumnContainer");
-  const { leftItems, rightItems } = matchingGameState.gameData;
+    const leftContainer = document.getElementById("leftColumnContainer");
+    const rightContainer = document.getElementById("rightColumnContainer");
+    const {
+        leftItems,
+        rightItems
+    } = matchingGameState.gameData;
 
-  leftContainer.innerHTML = "";
-  rightContainer.innerHTML = "";
+    leftContainer.innerHTML = "";
+    rightContainer.innerHTML = "";
 
-  // 根據 columnsPerSide 狀態設定 CSS class
-  const columnClass = matchingGameState.columnsPerSide === 2 ? 'grid-cols-2' : 'grid-cols-1';
-  leftContainer.className = `grid ${columnClass} gap-3`;
-  rightContainer.className = `grid ${columnClass} gap-3`;
+    // 根據 columnsPerSide 狀態設定 CSS class
+    const columnClass = matchingGameState.columnsPerSide === 2 ? 'grid-cols-2' : 'grid-cols-1';
+    leftContainer.className = `grid ${columnClass} gap-3`;
+    rightContainer.className = `grid ${columnClass} gap-3`;
 
-  leftItems.forEach((item) => {
-    const element = createMatchingItem(item, "left");
-    leftContainer.appendChild(element);
-  });
+    leftItems.forEach((item) => {
+        const element = createMatchingItem(item, "left");
+        leftContainer.appendChild(element);
+    });
 
-  rightItems.forEach((item) => {
-    const element = createMatchingItem(item, "right");
-    rightContainer.appendChild(element);
-  });
+    rightItems.forEach((item) => {
+        const element = createMatchingItem(item, "right");
+        rightContainer.appendChild(element);
+    });
 }
 
 function createMatchingItem(item, side) {
-  const element = document.createElement("div")
-  // 增加 flex 相關 class 以便置中內容
-  element.className = "matching-item bg-white rounded-lg p-4 cursor-pointer hover:shadow-md transition-all relative flex items-center justify-center min-h-[80px]"
-  element.style.fontSize = userSettings.fontSize + "px"
-  element.dataset.id = item.id
-  element.dataset.side = side
+    const element = document.createElement("div")
+    // 增加 flex 相關 class 以便置中內容
+    element.className = "matching-item bg-white rounded-lg p-4 cursor-pointer hover:shadow-md transition-all relative flex items-center justify-center min-h-[80px]"
+    element.style.fontSize = userSettings.fontSize + "px"
+    element.dataset.id = item.id
+    element.dataset.side = side
 
-  if (item.type === 'audio') {
-      // 如果項目類型是 'audio'，顯示喇叭圖示
-      element.innerHTML = `<span class="material-icons text-4xl text-orange-600">volume_up</span>`;
-      
-      // 【修改點】修改 onclick 事件處理
-      element.onclick = () => {
-          // 在點擊時，找到這個元素內部的圖示
-          const iconElement = element.querySelector('.material-icons');
-          // 將音檔和圖示元素一起傳給 playAudio 函數
-          playAudio(item.audioFile, iconElement); 
-          selectMatchingItem(element, item);
-      }
-  } else {
-      // 如果是文字項目，則照常顯示文字
-      element.textContent = item.text;
-      element.onclick = () => selectMatchingItem(element, item);
-  }
+    if (item.type === 'audio') {
+        // 如果項目類型是 'audio'，顯示喇叭圖示
+        element.innerHTML = `<span class="material-icons text-4xl text-orange-600">volume_up</span>`;
 
-  return element
+        // 【修改點】修改 onclick 事件處理
+        element.onclick = () => {
+            // 在點擊時，找到這個元素內部的圖示
+            const iconElement = element.querySelector('.material-icons');
+            // 將音檔和圖示元素一起傳給 playAudio 函數
+            playAudio(item.audioFile, iconElement);
+            selectMatchingItem(element, item);
+        }
+    } else {
+        // 如果是文字項目，則照常顯示文字
+        element.textContent = item.text;
+        element.onclick = () => selectMatchingItem(element, item);
+    }
+
+    return element
 }
 
 function selectMatchingItem(element, item) {
-  if (!matchingGameState.isPlaying) return
-  if (element.classList.contains("matching-completed")) return
+    if (!matchingGameState.isPlaying) return
+    if (element.classList.contains("matching-completed")) return
 
-  // 取消選取同一個項目
-  if (element.classList.contains("matching-selected")) {
-    element.classList.remove("matching-selected")
-    matchingGameState.selectedItems = matchingGameState.selectedItems.filter((selected) => selected.element !== element)
-    return
-  }
-
-  // 清除同側的其他選取
-  const side = element.dataset.side
-  matchingGameState.selectedItems = matchingGameState.selectedItems.filter((selected) => {
-    if (selected.element.dataset.side === side) {
-      selected.element.classList.remove("matching-selected")
-      return false
+    // 取消選取同一個項目
+    if (element.classList.contains("matching-selected")) {
+        element.classList.remove("matching-selected")
+        matchingGameState.selectedItems = matchingGameState.selectedItems.filter((selected) => selected.element !== element)
+        return
     }
-    return true
-  })
 
-  // 選取當前項目
-  element.classList.add("matching-selected")
-  matchingGameState.selectedItems.push({ element, item })
+    // 清除同側的其他選取
+    const side = element.dataset.side
+    matchingGameState.selectedItems = matchingGameState.selectedItems.filter((selected) => {
+        if (selected.element.dataset.side === side) {
+            selected.element.classList.remove("matching-selected")
+            return false
+        }
+        return true
+    })
 
-  // 檢查是否有兩個選取的項目
-  if (matchingGameState.selectedItems.length === 2) {
-    checkMatch()
-  }
+    // 選取當前項目
+    element.classList.add("matching-selected")
+    matchingGameState.selectedItems.push({
+        element,
+        item
+    })
+
+    // 檢查是否有兩個選取的項目
+    if (matchingGameState.selectedItems.length === 2) {
+        checkMatch()
+    }
 }
 
 function checkMatch() {
-  const [first, second] = matchingGameState.selectedItems
-  matchingGameState.steps++
-  document.getElementById("matchingSteps").textContent = matchingGameState.steps
+    const [first, second] = matchingGameState.selectedItems
+    matchingGameState.steps++
+    document.getElementById("matchingSteps").textContent = matchingGameState.steps
 
-  if (first.item.id === second.item.id) {
-    // 配對成功
-    matchingGameState.score += 100
-    document.getElementById("matchingScore").textContent = matchingGameState.score
-    
-    // 新增：檢查是否要播放音效
-    if (document.getElementById('matchingPlaySound').checked) {
-        // 從遊戲資料中找到完整的句子物件
-        const matchedSentence = matchingGameState.gameData.sentences.find((s, index) => index === first.item.id);
-        if (matchedSentence) {
-            playAudio(matchedSentence["音檔"]);
+    if (first.item.id === second.item.id) {
+        // 配對成功
+        matchingGameState.score += 100
+        document.getElementById("matchingScore").textContent = matchingGameState.score
+
+        // 新增：檢查是否要播放音效
+        if (document.getElementById('matchingPlaySound').checked) {
+            // 從遊戲資料中找到完整的句子物件
+            const matchedSentence = matchingGameState.gameData.sentences.find((s, index) => index === first.item.id);
+            if (matchedSentence) {
+                playAudio(matchedSentence["音檔"]);
+            }
         }
+
+        first.element.classList.remove("matching-selected")
+        second.element.classList.remove("matching-selected")
+        first.element.classList.add("matching-correct")
+        second.element.classList.add("matching-correct")
+
+        // 添加打勾標記
+        first.element.innerHTML += '<div class="absolute top-2 right-2 text-green-600 font-bold">✓</div>'
+        second.element.innerHTML += '<div class="absolute top-2 right-2 text-green-600 font-bold">✓</div>'
+
+        // 慶祝特效
+        showCelebration(first.element)
+        showCelebration(second.element)
+
+        matchingGameState.matchedPairs.push({
+            first: first.item,
+            second: second.item
+        })
+
+        setTimeout(() => {
+            first.element.classList.remove("matching-correct")
+            second.element.classList.remove("matching-correct")
+            first.element.classList.add("matching-completed")
+            second.element.classList.add("matching-completed")
+        }, 1500)
+
+        // 檢查是否完成
+        if (matchingGameState.matchedPairs.length === matchingGameState.gameData.leftItems.length) {
+            setTimeout(() => checkRoundComplete(), 1500)
+        }
+    } else {
+        // 配對錯誤
+        matchingGameState.score = Math.max(0, matchingGameState.score - 50)
+        document.getElementById("matchingScore").textContent = matchingGameState.score
+
+        first.element.classList.remove("matching-selected")
+        second.element.classList.remove("matching-selected")
+        first.element.classList.add("matching-incorrect")
+        second.element.classList.add("matching-incorrect")
+
+        // 添加錯誤標記
+        first.element.innerHTML += '<div class="absolute top-2 right-2 text-red-600 font-bold">✗</div>'
+        second.element.innerHTML += '<div class="absolute top-2 right-2 text-red-600 font-bold">✗</div>'
+
+        setTimeout(() => {
+            first.element.classList.remove("matching-incorrect")
+            second.element.classList.remove("matching-incorrect")
+            // 移除錯誤標記
+            first.element.querySelector(".absolute")?.remove()
+            second.element.querySelector(".absolute")?.remove()
+        }, 1500)
     }
 
-    first.element.classList.remove("matching-selected")
-    second.element.classList.remove("matching-selected")
-    first.element.classList.add("matching-correct")
-    second.element.classList.add("matching-correct")
-
-    // 添加打勾標記
-    first.element.innerHTML += '<div class="absolute top-2 right-2 text-green-600 font-bold">✓</div>'
-    second.element.innerHTML += '<div class="absolute top-2 right-2 text-green-600 font-bold">✓</div>'
-
-    // 慶祝特效
-    showCelebration(first.element)
-    showCelebration(second.element)
-
-    matchingGameState.matchedPairs.push({ first: first.item, second: second.item })
-
-    setTimeout(() => {
-      first.element.classList.remove("matching-correct")
-      second.element.classList.remove("matching-correct")
-      first.element.classList.add("matching-completed")
-      second.element.classList.add("matching-completed")
-    }, 1500)
-
-    // 檢查是否完成
-    if (matchingGameState.matchedPairs.length === matchingGameState.gameData.leftItems.length) {
-      setTimeout(() => checkRoundComplete(), 1500)
-    }
-  } else {
-    // 配對錯誤
-    matchingGameState.score = Math.max(0, matchingGameState.score - 50)
-    document.getElementById("matchingScore").textContent = matchingGameState.score
-
-    first.element.classList.remove("matching-selected")
-    second.element.classList.remove("matching-selected")
-    first.element.classList.add("matching-incorrect")
-    second.element.classList.add("matching-incorrect")
-
-    // 添加錯誤標記
-    first.element.innerHTML += '<div class="absolute top-2 right-2 text-red-600 font-bold">✗</div>'
-    second.element.innerHTML += '<div class="absolute top-2 right-2 text-red-600 font-bold">✗</div>'
-
-    setTimeout(() => {
-      first.element.classList.remove("matching-incorrect")
-      second.element.classList.remove("matching-incorrect")
-      // 移除錯誤標記
-      first.element.querySelector(".absolute")?.remove()
-      second.element.querySelector(".absolute")?.remove()
-    }, 1500)
-  }
-
-  matchingGameState.selectedItems = []
+    matchingGameState.selectedItems = []
 }
 
 function startMatchingGame() {
-  const condition = document.getElementById("matchingCondition").value
-  const button = document.getElementById("startMatching")
-  const optionsContainer = document.getElementById("matchingOptions");
+    const condition = document.getElementById("matchingCondition").value
+    const button = document.getElementById("startMatching")
+    const optionsContainer = document.getElementById("matchingOptions");
 
-  if (matchingGameState.timerInterval) {
-    clearInterval(matchingGameState.timerInterval)
-  }
+    if (matchingGameState.timerInterval) {
+        clearInterval(matchingGameState.timerInterval)
+    }
 
-  matchingGameState.isPlaying = true
-  matchingGameState.currentRound = 1
-  matchingGameState.score = 0
-  matchingGameState.steps = 0
-  matchingGameState.matchedPairs = []
-  
-  // 遊戲開始時，移除禁用 class
-  document.getElementById("matchingArea").classList.remove("game-area-disabled");
+    matchingGameState.isPlaying = true
+    matchingGameState.currentRound = 1
+    matchingGameState.score = 0
+    matchingGameState.steps = 0
+    matchingGameState.matchedPairs = []
 
-  button.innerHTML = `<span class="material-icons">close</span>`;
-  button.title = "停止遊戲";
-  button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-  button.onclick = stopMatchingGame;
+    // 遊戲開始時，移除禁用 class
+    document.getElementById("matchingArea").classList.remove("game-area-disabled");
 
-  optionsContainer.querySelectorAll('select').forEach(el => {
-      el.classList.add('opacity-50', 'pointer-events-none');
-      el.disabled = true;
-  });
-  if (window.innerWidth < 768) {
-      optionsContainer.classList.add('hidden');
-  }
+    button.innerHTML = `<span class="material-icons">close</span>`;
+    button.title = "停止遊戲";
+    button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
+    button.onclick = stopMatchingGame;
+
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.add('opacity-50', 'pointer-events-none');
+        el.disabled = true;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.add('hidden');
+    }
 
 
-  document.getElementById("matchingScore").textContent = "0"
-  document.getElementById("matchingSteps").textContent = "0"
-  document.getElementById("matchingRound").textContent = "1"
-  
-  document.getElementById("matchingArea").classList.remove("hidden");
-  document.getElementById("matchingStartNotice").classList.add("hidden");
+    document.getElementById("matchingScore").textContent = "0"
+    document.getElementById("matchingSteps").textContent = "0"
+    document.getElementById("matchingRound").textContent = "1"
 
-  if (condition.startsWith("time")) {
-    const timeLimit = Number.parseInt(condition.replace("time", ""))
-    matchingGameState.timeLeft = timeLimit
-    startMatchingTimer()
-  } else if (condition.startsWith("round") || condition === "unlimited") {
-    const timerElement = document.getElementById("matchingTimer");
-    matchingGameState.startTime = Date.now();
-    
-    timerElement.textContent = "00:00";
+    document.getElementById("matchingArea").classList.remove("hidden");
+    document.getElementById("matchingStartNotice").classList.add("hidden");
 
-    matchingGameState.timerInterval = setInterval(() => {
-        const elapsedSeconds = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
-        const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
-        const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
-        timerElement.textContent = `${minutes}:${seconds}`;
-    }, 1000);
-  }
+    if (condition.startsWith("time")) {
+        const timeLimit = Number.parseInt(condition.replace("time", ""))
+        matchingGameState.timeLeft = timeLimit
+        startMatchingTimer()
+    } else if (condition.startsWith("round") || condition === "unlimited") {
+        const timerElement = document.getElementById("matchingTimer");
+        matchingGameState.startTime = Date.now();
 
-  generateMatchingData()
+        timerElement.textContent = "00:00";
+
+        matchingGameState.timerInterval = setInterval(() => {
+            const elapsedSeconds = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
+            const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+            const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+            timerElement.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    }
+
+    generateMatchingData()
 }
 
 function restartMatchingGame() {
-  if (matchingGameState.timerInterval) {
-    clearInterval(matchingGameState.timerInterval)
-  }
-  startMatchingGame()
+    if (matchingGameState.timerInterval) {
+        clearInterval(matchingGameState.timerInterval)
+    }
+    startMatchingGame()
 }
 
 function startMatchingTimer() {
-  const timerElement = document.getElementById("matchingTimer")
-  const timerBar = document.getElementById("matchingTimerBar")
-  const condition = document.getElementById("matchingCondition").value
-  const timeLimit = Number.parseInt(condition.replace("time", ""))
+    const timerElement = document.getElementById("matchingTimer")
+    const timerBar = document.getElementById("matchingTimerBar")
+    const condition = document.getElementById("matchingCondition").value
+    const timeLimit = Number.parseInt(condition.replace("time", ""))
 
-  matchingGameState.timerInterval = setInterval(() => {
-    matchingGameState.timeLeft--
-    const minutes = Math.floor(matchingGameState.timeLeft / 60).toString().padStart(2, '0');
-    const seconds = (matchingGameState.timeLeft % 60).toString().padStart(2, '0');
-    timerElement.textContent = `${minutes}:${seconds}`;
+    matchingGameState.timerInterval = setInterval(() => {
+        matchingGameState.timeLeft--
+        const minutes = Math.floor(matchingGameState.timeLeft / 60).toString().padStart(2, '0');
+        const seconds = (matchingGameState.timeLeft % 60).toString().padStart(2, '0');
+        timerElement.textContent = `${minutes}:${seconds}`;
 
-    const percentage = (matchingGameState.timeLeft / timeLimit) * 100
-    timerBar.style.width = percentage + "%"
+        const percentage = (matchingGameState.timeLeft / timeLimit) * 100
+        timerBar.style.width = percentage + "%"
 
-    if (matchingGameState.timeLeft <= 0) {
-      clearInterval(matchingGameState.timerInterval)
-      endMatchingGame("時間到！")
-    }
-  }, 1000)
+        if (matchingGameState.timeLeft <= 0) {
+            clearInterval(matchingGameState.timerInterval)
+            endMatchingGame("時間到！")
+        }
+    }, 1000)
 }
 
 function startQuizTimer() {
-  const timerElement = document.getElementById("quizTimer")
-  const timerBar = document.getElementById("quizTimerBar")
-  const condition = document.getElementById("quizCondition").value
-  const timeLimit = Number.parseInt(condition.replace("time", ""))
+    const timerElement = document.getElementById("quizTimer")
+    const timerBar = document.getElementById("quizTimerBar")
+    const condition = document.getElementById("quizCondition").value
+    const timeLimit = Number.parseInt(condition.replace("time", ""))
 
-  quizGameState.timerInterval = setInterval(() => {
-    quizGameState.timeLeft--
-    const minutes = Math.floor(quizGameState.timeLeft / 60).toString().padStart(2, '0');
-    const seconds = (quizGameState.timeLeft % 60).toString().padStart(2, '0');
-    timerElement.textContent = `${minutes}:${seconds}`;
+    quizGameState.timerInterval = setInterval(() => {
+        quizGameState.timeLeft--
+        const minutes = Math.floor(quizGameState.timeLeft / 60).toString().padStart(2, '0');
+        const seconds = (quizGameState.timeLeft % 60).toString().padStart(2, '0');
+        timerElement.textContent = `${minutes}:${seconds}`;
 
-    const percentage = (quizGameState.timeLeft / timeLimit) * 100
-    timerBar.style.width = percentage + "%"
+        const percentage = (quizGameState.timeLeft / timeLimit) * 100
+        timerBar.style.width = percentage + "%"
 
-    if (quizGameState.timeLeft <= 0) {
-      clearInterval(quizGameState.timerInterval)
-      endQuizGame("時間到！")
-    }
-  }, 1000)
+        if (quizGameState.timeLeft <= 0) {
+            clearInterval(quizGameState.timerInterval)
+            endQuizGame("時間到！")
+        }
+    }, 1000)
 }
 
 function startSortingTimer() {
-  const timerElement = document.getElementById("sortingTimer")
-  const timerBar = document.getElementById("sortingTimerBar")
-  const condition = document.getElementById("sortingCondition").value
-  const timeLimit = Number.parseInt(condition.replace("time", ""))
+    const timerElement = document.getElementById("sortingTimer")
+    const timerBar = document.getElementById("sortingTimerBar")
+    const condition = document.getElementById("sortingCondition").value
+    const timeLimit = Number.parseInt(condition.replace("time", ""))
 
-  sortingGameState.timerInterval = setInterval(() => {
-    sortingGameState.timeLeft--
-    const minutes = Math.floor(sortingGameState.timeLeft / 60).toString().padStart(2, '0');
-    const seconds = (sortingGameState.timeLeft % 60).toString().padStart(2, '0');
-    timerElement.textContent = `${minutes}:${seconds}`;
+    sortingGameState.timerInterval = setInterval(() => {
+        sortingGameState.timeLeft--
+        const minutes = Math.floor(sortingGameState.timeLeft / 60).toString().padStart(2, '0');
+        const seconds = (sortingGameState.timeLeft % 60).toString().padStart(2, '0');
+        timerElement.textContent = `${minutes}:${seconds}`;
 
-    const percentage = (sortingGameState.timeLeft / timeLimit) * 100
-    timerBar.style.width = percentage + "%"
+        const percentage = (sortingGameState.timeLeft / timeLimit) * 100
+        timerBar.style.width = percentage + "%"
 
-    if (sortingGameState.timeLeft <= 0) {
-      clearInterval(sortingGameState.timerInterval)
-      endSortingGame("時間到！")
-    }
-  }, 1000)
+        if (sortingGameState.timeLeft <= 0) {
+            clearInterval(sortingGameState.timerInterval)
+            endSortingGame("時間到！")
+        }
+    }, 1000)
 }
 
 function checkRoundComplete() {
-  const condition = document.getElementById("matchingCondition").value;
+    const condition = document.getElementById("matchingCondition").value;
 
-  // 如果是限時模式，完成一關就直接產生新題目繼續玩
-  if (condition.startsWith("time")) {
-    matchingGameState.matchedPairs = []; // 重置已配對計數
-    generateMatchingData(); // 產生下一關的題目
-    return; // 結束函數，不執行後面的結束邏輯
-  }
-
-  // 「不限時間」模式的邏輯
-  if (condition === "unlimited") {
-    matchingGameState.currentRound++;
-    matchingGameState.matchedPairs = [];
-    document.getElementById("matchingRound").textContent = matchingGameState.currentRound;
-    generateMatchingData();
-    return;
-  }
-
-  // 「n 關」模式的邏輯
-  if (condition.startsWith("round")) {
-    if (matchingGameState.currentRound < matchingGameState.totalRounds) {
-      // 進入下一關
-      matchingGameState.currentRound++;
-      matchingGameState.matchedPairs = [];
-      document.getElementById("matchingRound").textContent = matchingGameState.currentRound;
-      
-      const progress = ((matchingGameState.currentRound - 1) / matchingGameState.totalRounds) * 100;
-      const timerBar = document.getElementById("matchingTimerBar");
-      if (timerBar) {
-        timerBar.style.width = progress + "%";
-      }
-
-      generateMatchingData();
-    } else {
-      // 完成所有關卡
-      const totalTime = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
-      endMatchingGame(`恭喜完成 ${matchingGameState.totalRounds} 關！\n總用時：${totalTime} 秒`, totalTime);
+    // 如果是限時模式，完成一關就直接產生新題目繼續玩
+    if (condition.startsWith("time")) {
+        matchingGameState.matchedPairs = []; // 重置已配對計數
+        generateMatchingData(); // 產生下一關的題目
+        return; // 結束函數，不執行後面的結束邏輯
     }
-  }
+
+    // 「不限時間」模式的邏輯
+    if (condition === "unlimited") {
+        matchingGameState.currentRound++;
+        matchingGameState.matchedPairs = [];
+        document.getElementById("matchingRound").textContent = matchingGameState.currentRound;
+        generateMatchingData();
+        return;
+    }
+
+    // 「n 關」模式的邏輯
+    if (condition.startsWith("round")) {
+        if (matchingGameState.currentRound < matchingGameState.totalRounds) {
+            // 進入下一關
+            matchingGameState.currentRound++;
+            matchingGameState.matchedPairs = [];
+            document.getElementById("matchingRound").textContent = matchingGameState.currentRound;
+
+            const progress = ((matchingGameState.currentRound - 1) / matchingGameState.totalRounds) * 100;
+            const timerBar = document.getElementById("matchingTimerBar");
+            if (timerBar) {
+                timerBar.style.width = progress + "%";
+            }
+
+            generateMatchingData();
+        } else {
+            // 完成所有關卡
+            const totalTime = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
+            endMatchingGame(`恭喜完成 ${matchingGameState.totalRounds} 關！\n總用時：${totalTime} 秒`, totalTime);
+        }
+    }
 }
 
 function endMatchingGame(message, finalTime = null) {
-  matchingGameState.isPlaying = false;
-  const button = document.getElementById("startMatching");
-  const optionsContainer = document.getElementById("matchingOptions");
-  
-  // 遊戲結束時，新增禁用 class
-  document.getElementById("matchingArea").classList.add("game-area-disabled");
+    matchingGameState.isPlaying = false;
+    const button = document.getElementById("startMatching");
+    const optionsContainer = document.getElementById("matchingOptions");
 
-  if (matchingGameState.timerInterval) {
-    clearInterval(matchingGameState.timerInterval);
-  }
-  
-  if (button) {
-    button.innerHTML = "重新開始";
-    button.title = "重新開始";
-    button.className = "bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base";
-    button.onclick = restartMatchingGame; 
-  }
+    // 遊戲結束時，新增禁用 class
+    document.getElementById("matchingArea").classList.add("game-area-disabled");
 
-  optionsContainer.querySelectorAll('select').forEach(el => {
-      el.classList.remove('opacity-50', 'pointer-events-none');
-      el.disabled = false;
-  });
-  if (window.innerWidth < 768) {
-      optionsContainer.classList.remove('hidden');
-  }
+    if (matchingGameState.timerInterval) {
+        clearInterval(matchingGameState.timerInterval);
+    }
 
-  const timerElement = document.getElementById("matchingTimer");
-  if (timerElement && finalTime !== null) {
-    timerElement.textContent = ` ${finalTime}`;
-  }
-  
-  const timerBar = document.getElementById("matchingTimerBar");
-  if (timerBar) {
-    timerBar.style.width = "100%";
-  }
+    if (button) {
+        button.innerHTML = "重新開始";
+        button.title = "重新開始";
+        button.className = "bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base";
+        button.onclick = restartMatchingGame;
+    }
 
-  showResult(
-    "🎉",
-    "配對完成",
-    `${message}\n\n最終分數：${matchingGameState.score}\n操作步數：${matchingGameState.steps}`
-  );
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.remove('opacity-50', 'pointer-events-none');
+        el.disabled = false;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.remove('hidden');
+    }
+
+    const timerElement = document.getElementById("matchingTimer");
+    if (timerElement && finalTime !== null) {
+        timerElement.textContent = ` ${finalTime}`;
+    }
+
+    const timerBar = document.getElementById("matchingTimerBar");
+    if (timerBar) {
+        timerBar.style.width = "100%";
+    }
+
+    showResult(
+        "🎉",
+        "配對完成",
+        `${message}\n\n最終分數：${matchingGameState.score}\n操作步數：${matchingGameState.steps}`
+    );
 }
 
 function showMatchingResults() {
-  const resultsContainer = document.getElementById("matchingResultsList")
-  const { sentences } = matchingGameState.gameData
+    const resultsContainer = document.getElementById("matchingResultsList")
+    const {
+        sentences
+    } = matchingGameState.gameData
 
-  resultsContainer.innerHTML = sentences
-    .map(
-      (sentence) => `
+    resultsContainer.innerHTML = sentences
+        .map(
+            (sentence) => `
         <div class="bg-gray-50 rounded-lg p-4">
             <div class="font-bold text-blue-800 mb-2">${sentence["客語"]}</div>
             <div class="text-gray-600 mb-1">${sentence["拼音"]}</div>
             <div class="text-gray-800">${sentence["華語"]}</div>
         </div>
     `,
-    )
-    .join("")
+        )
+        .join("")
 
-  document.getElementById("matchingResults").classList.remove("hidden")
+    document.getElementById("matchingResults").classList.remove("hidden")
 }
 
 // 測驗遊戲
 function showQuizGame() {
-  const contentArea = document.getElementById("contentArea");
-  const sentences = getSelectedSentences();
+    const contentArea = document.getElementById("contentArea");
+    const sentences = getSelectedSentences();
 
-  if (sentences.length < 2) {
-    contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">至少需要2個句子才能進行測驗</div>';
-    return;
-  }
-  
-  const isWideScreen = window.innerWidth >= 1024;
-  quizLayout = isWideScreen ? "horizontal" : "vertical";
+    if (sentences.length < 2) {
+        contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">至少需要2個句子才能進行測驗</div>';
+        return;
+    }
 
-  contentArea.innerHTML = `
+    const isWideScreen = window.innerWidth >= 1024;
+    quizLayout = isWideScreen ? "horizontal" : "vertical";
+
+    contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
             <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
                     <div id="quizTimerBar" class="timer-bar bg-red-500 h-full rounded-full" style="width: 100%"></div>
                 </div>
-                
+
                 <div class="mode-toolbar flex items-center justify-between flex-wrap gap-x-4 gap-y-3 p-4 md:p-5 border-b border-gray-200">
                      <div class="flex items-center flex-wrap gap-2">
                         <button id="startQuiz" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
                             開始測驗
                         </button>
-                        
+
 
                         <div id="quizOptionsContainer" class="flex items-center flex-wrap gap-2">
-                            
+
                             <select id="quizType" class="bg-gray-100 border-gray-300 focus:ring-red-500 focus:border-red-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="hakka-chinese">客語 → 華語</option>
                                 <option value="chinese-hakka">華語 → 客語</option>
@@ -3289,7 +3741,7 @@ function showQuizGame() {
                                 <option value="correct30">30題</option>
                             </select>
                         </div>
-						<div id="quizTimer" class="text-lg font-mono text-gray-700 min-w-[5rem]"></div>
+                        <div id="quizTimer" class="text-lg font-mono text-gray-700 min-w-[5rem]"></div>
                     </div>
 
                     <div class="flex items-center gap-x-3 gap-y-2 flex-wrap justify-end">
@@ -3300,6 +3752,9 @@ function showQuizGame() {
                             </label>
                             <button id="quizLayoutToggle" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換排版">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
+                            </button>
+                            <button id="togglePhoneticSystem" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換拼音/注音">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">font_download</span>
                             </button>
                             <button onclick="adjustFontSize(-1, 'quiz')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
@@ -3328,124 +3783,146 @@ function showQuizGame() {
             </div>
         </div>
     `;
-  setupQuizGame();
+    setupQuizGame();
 }
 
+
+// 請替換此函數
 function setupQuizGame() {
-  const isMobile = window.innerWidth < 768;
-  if (!userSettings.quizLayout || !['horizontal', 'vertical', 'flow'].includes(userSettings.quizLayout)) {
-      userSettings.quizLayout = isMobile ? 'vertical' : 'horizontal';
-  }
-  quizLayout = userSettings.quizLayout;
-
-  quizGameState = {
-    isPlaying: false,
-    currentQuestion: null,
-    correctAnswer: null,
-    options: [],
-    correct: 0,
-    incorrect: 0,
-    total: 0,
-    timeLeft: 0,
-    timerInterval: null,
-    questions: [],
-    currentIndex: 0,
-    isAnswered: false,
-  }
-
-  document.getElementById("startQuiz").onclick = startQuizGame;
-
-  const layoutToggleButton = document.getElementById("quizLayoutToggle");
-  const layoutIcon = layoutToggleButton.querySelector('.material-icons');
-  
-  function updateLayoutButton() {
-    switch (quizLayout) {
-      case 'horizontal':
-        layoutIcon.textContent = 'view_agenda';
-        layoutToggleButton.title = '切換為垂直列表';
-        break;
-      case 'vertical':
-        layoutIcon.textContent = 'wrap_text';
-        layoutToggleButton.title = '切換為置中排列';
-        break;
-      case 'flow':
-        layoutIcon.textContent = 'view_column';
-        layoutToggleButton.title = '切換為左右平分';
-        break;
+    const isMobile = window.innerWidth < 768;
+    if (!userSettings.quizLayout || !['horizontal', 'vertical', 'flow'].includes(userSettings.quizLayout)) {
+        userSettings.quizLayout = isMobile ? 'vertical' : 'horizontal';
     }
-  }
-  
-  updateLayoutButton();
+    quizLayout = userSettings.quizLayout;
 
-  layoutToggleButton.onclick = () => {
-    const layouts = ['horizontal', 'vertical', 'flow'];
-    const currentIndex = layouts.indexOf(quizLayout);
-    quizLayout = layouts[(currentIndex + 1) % layouts.length];
-    
-    userSettings.quizLayout = quizLayout;
-    saveUserSettings();
+    quizGameState = {
+        isPlaying: false,
+        currentQuestion: null,
+        correctAnswer: null,
+        options: [],
+        correct: 0,
+        incorrect: 0,
+        total: 0,
+        timeLeft: 0,
+        timerInterval: null,
+        questions: [],
+        currentIndex: 0,
+        isAnswered: false,
+    }
+
+    document.getElementById("startQuiz").onclick = startQuizGame;
+
+    const layoutToggleButton = document.getElementById("quizLayoutToggle");
+    const layoutIcon = layoutToggleButton.querySelector('.material-icons');
+
+    function updateLayoutButton() {
+        switch (quizLayout) {
+            case 'horizontal':
+                layoutIcon.textContent = 'view_agenda';
+                layoutToggleButton.title = '切換為垂直列表';
+                break;
+            case 'vertical':
+                layoutIcon.textContent = 'wrap_text';
+                layoutToggleButton.title = '切換為置中排列';
+                break;
+            case 'flow':
+                layoutIcon.textContent = 'view_column';
+                layoutToggleButton.title = '切換為左右平分';
+                break;
+        }
+    }
+
     updateLayoutButton();
 
-    if (quizGameState.isPlaying) {
-      renderQuizQuestion();
+    layoutToggleButton.onclick = () => {
+        const layouts = ['horizontal', 'vertical', 'flow'];
+        const currentIndex = layouts.indexOf(quizLayout);
+        quizLayout = layouts[(currentIndex + 1) % layouts.length];
+
+        userSettings.quizLayout = quizLayout;
+        saveUserSettings();
+        updateLayoutButton();
+
+        if (quizGameState.isPlaying) {
+            renderQuizQuestion();
+        }
     }
-  }
+
+    // --- 新增開始 ---
+    const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
+    if (togglePhoneticBtn) {
+        togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
+        togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+        togglePhoneticBtn.onclick = () => {
+            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+            saveUserSettings();
+            togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
+            togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+            if (quizGameState.isPlaying) {
+                // 重新生成當前題目以應用變更
+                generateQuizQuestion();
+            }
+        };
+    }
+    // --- 新增結束 ---
 }
 
 function startQuizGame() {
-  const sentences = getSelectedSentences()
-  const condition = document.getElementById("quizCondition").value
-  const button = document.getElementById("startQuiz")
-  const optionsContainer = document.getElementById("quizOptionsContainer");
+    const sentences = getSelectedSentences()
+    const condition = document.getElementById("quizCondition").value
+    const button = document.getElementById("startQuiz")
+    const optionsContainer = document.getElementById("quizOptionsContainer");
 
-  quizGameState.isPlaying = true
-  quizGameState.correct = 0
-  quizGameState.incorrect = 0
-  quizGameState.total = 0
-  quizGameState.currentIndex = 0
-  quizGameState.questions = [...sentences].sort(() => Math.random() - 0.5)
-  
-  // 遊戲開始時，移除禁用 class
-  document.getElementById("quizArea").classList.remove("game-area-disabled");
+    quizGameState.isPlaying = true
+    quizGameState.correct = 0
+    quizGameState.incorrect = 0
+    quizGameState.total = 0
+    quizGameState.currentIndex = 0
+    quizGameState.questions = [...sentences].sort(() => Math.random() - 0.5)
 
-  button.innerHTML = `<span class="material-icons">close</span>`;
-  button.title = "停止遊戲";
-  button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-  button.onclick = stopQuizGame;
+    // 遊戲開始時，移除禁用 class
+    document.getElementById("quizArea").classList.remove("game-area-disabled");
 
-  optionsContainer.querySelectorAll('select').forEach(el => {
-      el.classList.add('opacity-50', 'pointer-events-none');
-      el.disabled = true;
-  });
-  if (window.innerWidth < 768) {
-      optionsContainer.classList.add('hidden');
-  }
+    button.innerHTML = `<span class="material-icons">close</span>`;
+    button.title = "停止遊戲";
+    button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
+    button.onclick = stopQuizGame;
 
-  document.getElementById("quizCorrect").textContent = "0"
-  document.getElementById("quizIncorrect").textContent = "0"
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.add('opacity-50', 'pointer-events-none');
+        el.disabled = true;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.add('hidden');
+    }
 
-  document.getElementById("quizArea").classList.remove("hidden");
-  document.getElementById("quizStartNotice").classList.add("hidden");
+    document.getElementById("quizCorrect").textContent = "0"
+    document.getElementById("quizIncorrect").textContent = "0"
 
-  if (condition.startsWith("time")) {
-    const timeLimit = Number.parseInt(condition.replace("time", ""))
-    quizGameState.timeLeft = timeLimit
-    startQuizTimer()
-  } else {
-    const timerElement = document.getElementById("quizTimer");
-    quizGameState.startTime = Date.now();
-    
-    timerElement.textContent = "00:00";
+    document.getElementById("quizArea").classList.remove("hidden");
+    document.getElementById("quizStartNotice").classList.add("hidden");
 
-    quizGameState.timerInterval = setInterval(() => {
-        const elapsedSeconds = Math.floor((Date.now() - quizGameState.startTime) / 1000);
-        const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
-        const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
-        timerElement.textContent = `${minutes}:${seconds}`;
-    }, 1000);
-  }
+    if (condition.startsWith("time")) {
+        const timeLimit = Number.parseInt(condition.replace("time", ""))
+        quizGameState.timeLeft = timeLimit
+        startQuizTimer()
+    } else {
+        const timerElement = document.getElementById("quizTimer");
+        quizGameState.startTime = Date.now();
 
-  generateQuizQuestion()
+        timerElement.textContent = "00:00";
+
+        quizGameState.timerInterval = setInterval(() => {
+            const elapsedSeconds = Math.floor((Date.now() - quizGameState.startTime) / 1000);
+            const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+            const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+            timerElement.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    }
+
+    generateQuizQuestion()
 }
 
 
@@ -3458,153 +3935,163 @@ function stopQuizGame() {
 }
 
 function restartQuizGame() {
-  if (quizGameState.timerInterval) {
-    clearInterval(quizGameState.timerInterval)
-  }
-  startQuizGame()
+    if (quizGameState.timerInterval) {
+        clearInterval(quizGameState.timerInterval)
+    }
+    startQuizGame()
 }
 
 function startQuizTimer() {
-  const timerElement = document.getElementById("quizTimer")
-  const timerBar = document.getElementById("quizTimerBar")
-  const condition = document.getElementById("quizCondition").value
-  const timeLimit = Number.parseInt(condition.replace("time", ""))
+    const timerElement = document.getElementById("quizTimer")
+    const timerBar = document.getElementById("quizTimerBar")
+    const condition = document.getElementById("quizCondition").value
+    const timeLimit = Number.parseInt(condition.replace("time", ""))
 
-  quizGameState.timerInterval = setInterval(() => {
-    quizGameState.timeLeft--
-    timerElement.textContent = ` ${quizGameState.timeLeft}`
+    quizGameState.timerInterval = setInterval(() => {
+        quizGameState.timeLeft--
+        timerElement.textContent = ` ${quizGameState.timeLeft}`
 
-    const percentage = (quizGameState.timeLeft / timeLimit) * 100
-    timerBar.style.width = percentage + "%"
+        const percentage = (quizGameState.timeLeft / timeLimit) * 100
+        timerBar.style.width = percentage + "%"
 
-    if (quizGameState.timeLeft <= 0) {
-      clearInterval(quizGameState.timerInterval)
-      endQuizGame("時間到！")
-    }
-  }, 1000)
+        if (quizGameState.timeLeft <= 0) {
+            clearInterval(quizGameState.timerInterval)
+            endQuizGame("時間到！")
+        }
+    }, 1000)
 }
 
+
+// 請替換此函數
 function generateQuizQuestion() {
-  if (quizGameState.currentIndex >= quizGameState.questions.length) {
-    quizGameState.questions = [...quizGameState.questions].sort(() => Math.random() - 0.5)
-    quizGameState.currentIndex = 0
-  }
+    if (quizGameState.currentIndex >= quizGameState.questions.length) {
+        quizGameState.questions = [...quizGameState.questions].sort(() => Math.random() - 0.5)
+        quizGameState.currentIndex = 0
+    }
 
-  const currentSentence = quizGameState.questions[quizGameState.currentIndex]
-  const type = document.getElementById("quizType").value
-  const optionCount = Number.parseInt(document.getElementById("quizOptions").value)
+    const currentSentence = quizGameState.questions[quizGameState.currentIndex]
+    const type = document.getElementById("quizType").value
+    const optionCount = Number.parseInt(document.getElementById("quizOptions").value)
 
-  // 設定題目和正確答案
-  let question, correctAnswer
-  switch (type) {
-    case "hakka-chinese":
-      question = currentSentence["客語"]
-      correctAnswer = currentSentence["華語"]
-      break
-    case "chinese-hakka":
-      question = currentSentence["華語"]
-      correctAnswer = currentSentence["客語"]
-      break
-    case "pinyin-chinese":
-      question = currentSentence["拼音"]
-      correctAnswer = currentSentence["華語"]
-      break
-    case "chinese-pinyin":
-      question = currentSentence["華語"]
-      correctAnswer = currentSentence["拼音"]
-      break
-    case "hakka-pinyin":
-      question = currentSentence["客語"]
-      correctAnswer = currentSentence["拼音"]
-      break
-    case "pinyin-hakka":
-      question = currentSentence["拼音"]
-      correctAnswer = currentSentence["客語"]
-      break
-  }
+    // --- 新增：定義一個幫助函數 ---
+    const getPhonetic = (text) => {
+        if (userSettings.phoneticSystem === 'zhuyin') {
+            return convertPinyinToZhuyin(text);
+        }
+        return text;
+    };
 
-  // 生成選項
-  const allSentences = getSelectedSentences()
-  const wrongAnswers = allSentences
-    .filter((s) => s !== currentSentence)
-    .map((s) => {
-      switch (type) {
+    // 設定題目和正確答案
+    let question, correctAnswer
+    switch (type) {
         case "hakka-chinese":
-        case "pinyin-chinese":
-          return s["華語"]
+            question = currentSentence["客語"]
+            correctAnswer = currentSentence["華語"]
+            break
         case "chinese-hakka":
-        case "pinyin-hakka":
-          return s["客語"]
-        case "hakka-pinyin":
+            question = currentSentence["華語"]
+            correctAnswer = currentSentence["客語"]
+            break
+        case "pinyin-chinese":
+            question = getPhonetic(currentSentence["拼音"]); // 修改
+            correctAnswer = currentSentence["華語"]
+            break
         case "chinese-pinyin":
-          return s["拼音"]
-        default:
-          return s["華語"]
-      }
-    })
-    .filter((answer, index, arr) => arr.indexOf(answer) === index) // 去重
-    .sort(() => Math.random() - 0.5)
-    .slice(0, optionCount - 1)
+            question = currentSentence["華語"]
+            correctAnswer = getPhonetic(currentSentence["拼音"]); // 修改
+            break
+        case "hakka-pinyin":
+            question = currentSentence["客語"]
+            correctAnswer = getPhonetic(currentSentence["拼音"]); // 修改
+            break
+        case "pinyin-hakka":
+            question = getPhonetic(currentSentence["拼音"]); // 修改
+            correctAnswer = currentSentence["客語"]
+            break
+    }
 
-  const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5)
+    // 生成選項
+    const allSentences = getSelectedSentences()
+    const wrongAnswers = allSentences
+        .filter((s) => s !== currentSentence)
+        .map((s) => {
+            switch (type) {
+                case "hakka-chinese":
+                case "pinyin-chinese":
+                    return s["華語"]
+                case "chinese-hakka":
+                case "pinyin-hakka":
+                    return s["客語"]
+                case "hakka-pinyin":
+                case "chinese-pinyin":
+                    return getPhonetic(s["拼音"]); // 修改
+                default:
+                    return s["華語"]
+            }
+        })
+        .filter((answer, index, arr) => arr.indexOf(answer) === index) // 去重
+        .sort(() => Math.random() - 0.5)
+        .slice(0, optionCount - 1)
 
-  quizGameState.currentQuestion = question
-  quizGameState.correctAnswer = correctAnswer
-  quizGameState.options = options
-  quizGameState.isAnswered = false
+    const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5)
 
-  renderQuizQuestion()
+    quizGameState.currentQuestion = question
+    quizGameState.correctAnswer = correctAnswer
+    quizGameState.options = options
+    quizGameState.isAnswered = false
 
-  // 自動播放音檔
-  if (document.getElementById("autoPlayAudio").checked) {
-    playAudio(currentSentence["音檔"])
-  }
+    renderQuizQuestion()
+
+    // 自動播放音檔
+    if (document.getElementById("autoPlayAudio").checked) {
+        playAudio(currentSentence["音檔"])
+    }
 }
 
 
 function renderQuizQuestion() {
-  const quizArea = document.getElementById("quizArea");
-  const questionNumber = quizGameState.total + 1;
-  
-  let optionsHtml = '';
-  let containerClass = '';
+    const quizArea = document.getElementById("quizArea");
+    const questionNumber = quizGameState.total + 1;
 
-  switch (quizLayout) {
-    case 'horizontal':
-      containerClass = 'quiz-horizontal grid grid-cols-2 gap-4';
-      optionsHtml = quizGameState.options.map((option, index) => `
+    let optionsHtml = '';
+    let containerClass = '';
+
+    switch (quizLayout) {
+        case 'horizontal':
+            containerClass = 'quiz-horizontal grid grid-cols-2 gap-4';
+            optionsHtml = quizGameState.options.map((option, index) => `
         <button class="quiz-option bg-white rounded-lg text-left hover:shadow-md transition-all" 
                 style="font-size: ${userSettings.fontSize}px"
                 onclick="selectQuizOption('${option.replace(/'/g, "\\'")}', this)">
             ${String.fromCharCode(65 + index)}. ${option}
         </button>
       `).join("");
-      break;
+            break;
 
-    case 'vertical':
-      containerClass = 'quiz-vertical space-y-3';
-      optionsHtml = quizGameState.options.map((option, index) => `
+        case 'vertical':
+            containerClass = 'quiz-vertical space-y-3';
+            optionsHtml = quizGameState.options.map((option, index) => `
         <button class="quiz-option bg-white rounded-lg text-left hover:shadow-md transition-all" 
                 style="font-size: ${userSettings.fontSize}px"
                 onclick="selectQuizOption('${option.replace(/'/g, "\\'")}', this)">
             ${String.fromCharCode(65 + index)}. ${option}
         </button>
       `).join("");
-      break;
+            break;
 
-    case 'flow':
-      containerClass = 'flex flex-wrap justify-center gap-3';
-      optionsHtml = quizGameState.options.map(option => `
+        case 'flow':
+            containerClass = 'flex flex-wrap justify-center gap-3';
+            optionsHtml = quizGameState.options.map(option => `
         <button class="quiz-option bg-white rounded-lg px-4 py-2 text-center hover:shadow-md transition-all" 
                 style="font-size: ${userSettings.fontSize}px"
                 onclick="selectQuizOption('${option.replace(/'/g, "\\'")}', this)">
             ${option}
         </button>
       `).join("");
-      break;
-  }
+            break;
+    }
 
-  quizArea.innerHTML = `
+    quizArea.innerHTML = `
     <div class="text-center mb-8">
         <div class="flex items-center justify-center gap-4 mb-6">
             <button onclick="playAudio('${quizGameState.questions[quizGameState.currentIndex]["音檔"]}', this.querySelector('.material-icons'))" 
@@ -3622,163 +4109,163 @@ function renderQuizQuestion() {
     </div>
   `;
 
-  const questionContainer = document.getElementById('quizQuestion');
-  const questionTextEl = questionContainer?.querySelector('.question-text');
+    const questionContainer = document.getElementById('quizQuestion');
+    const questionTextEl = questionContainer?.querySelector('.question-text');
 
-  if (questionContainer && questionTextEl) {
-      questionTextEl.classList.toggle('blur-text', quizIsBlurred);
+    if (questionContainer && questionTextEl) {
+        questionTextEl.classList.toggle('blur-text', quizIsBlurred);
 
-      questionContainer.onclick = () => {
-          quizIsBlurred = !quizIsBlurred; 
-          questionTextEl.classList.toggle('blur-text', quizIsBlurred);
-      };
-  }
+        questionContainer.onclick = () => {
+            quizIsBlurred = !quizIsBlurred;
+            questionTextEl.classList.toggle('blur-text', quizIsBlurred);
+        };
+    }
 }
 
 function selectQuizOption(selectedAnswer, element) {
-  if (quizGameState.isAnswered) return;
+    if (quizGameState.isAnswered) return;
 
-  quizGameState.isAnswered = true;
-  quizGameState.total++;
+    quizGameState.isAnswered = true;
+    quizGameState.total++;
 
-  const isCorrect = selectedAnswer.trim() === quizGameState.correctAnswer.trim();
+    const isCorrect = selectedAnswer.trim() === quizGameState.correctAnswer.trim();
 
-  document.querySelectorAll(".quiz-option").forEach((option) => {
-    option.classList.add("quiz-answered");
-    
-    // 【修改】使用更穩健的方式來獲取選項的純文字內容，以進行比對
-    let rawOptionText = option.textContent.trim();
-    if (rawOptionText.match(/^[A-H]\.\s/)) { // 處理 "A. " 或 "B. " 這種前綴
-        rawOptionText = rawOptionText.substring(3).trim();
+    document.querySelectorAll(".quiz-option").forEach((option) => {
+        option.classList.add("quiz-answered");
+
+        // 【修改】使用更穩健的方式來獲取選項的純文字內容，以進行比對
+        let rawOptionText = option.textContent.trim();
+        if (rawOptionText.match(/^[A-H]\.\s/)) { // 處理 "A. " 或 "B. " 這種前綴
+            rawOptionText = rawOptionText.substring(3).trim();
+        }
+
+        if (rawOptionText === quizGameState.correctAnswer) {
+            option.classList.add("quiz-correct");
+            // 當使用者答對時，在正確的選項上觸發慶祝特效
+            if (isCorrect) {
+                showCelebration(option);
+            }
+        } else if (option === element && !isCorrect) {
+            option.classList.add("quiz-incorrect");
+        }
+    });
+
+    if (isCorrect) {
+        quizGameState.correct++;
+        document.getElementById("quizCorrect").textContent = quizGameState.correct;
+    } else {
+        quizGameState.incorrect++;
+        document.getElementById("quizIncorrect").textContent = quizGameState.incorrect;
     }
 
-    if (rawOptionText === quizGameState.correctAnswer) {
-      option.classList.add("quiz-correct");
-      // 當使用者答對時，在正確的選項上觸發慶祝特效
-      if (isCorrect) {
-        showCelebration(option);
-      }
-    } else if (option === element && !isCorrect) {
-      option.classList.add("quiz-incorrect");
+    const condition = document.getElementById("quizCondition").value;
+    if (condition.startsWith("correct")) {
+        const target = Number.parseInt(condition.replace("correct", ""));
+        if (quizGameState.correct >= target) {
+            setTimeout(() => endQuizGame(`恭喜達成目標！\n答對 ${target} 題`), 1500);
+            return;
+        }
     }
-  });
 
-  if (isCorrect) {
-    quizGameState.correct++;
-    document.getElementById("quizCorrect").textContent = quizGameState.correct;
-  } else {
-    quizGameState.incorrect++;
-    document.getElementById("quizIncorrect").textContent = quizGameState.incorrect;
-  }
-
-  const condition = document.getElementById("quizCondition").value;
-  if (condition.startsWith("correct")) {
-    const target = Number.parseInt(condition.replace("correct", ""));
-    if (quizGameState.correct >= target) {
-      setTimeout(() => endQuizGame(`恭喜達成目標！\n答對 ${target} 題`), 1500);
-      return;
-    }
-  }
-
-  setTimeout(() => {
-    quizGameState.currentIndex++;
-    generateQuizQuestion();
-  }, 1500);
+    setTimeout(() => {
+        quizGameState.currentIndex++;
+        generateQuizQuestion();
+    }, 1500);
 }
 
 function endQuizGame(message) {
-  quizGameState.isPlaying = false;
-  const button = document.getElementById("startQuiz");
-  const optionsContainer = document.getElementById("quizOptionsContainer");
-  
-  // 遊戲結束時，新增禁用 class
-  document.getElementById("quizArea").classList.add("game-area-disabled");
+    quizGameState.isPlaying = false;
+    const button = document.getElementById("startQuiz");
+    const optionsContainer = document.getElementById("quizOptionsContainer");
 
-  if (quizGameState.timerInterval) {
-    clearInterval(quizGameState.timerInterval);
-  }
-  
-  if (button) {
-    button.innerHTML = "重新開始";
-    button.title = "重新開始";
-    button.className = "bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
-    button.onclick = restartQuizGame;
-  }
+    // 遊戲結束時，新增禁用 class
+    document.getElementById("quizArea").classList.add("game-area-disabled");
 
-  optionsContainer.querySelectorAll('select').forEach(el => {
-      el.classList.remove('opacity-50', 'pointer-events-none');
-      el.disabled = false;
-  });
-  if (window.innerWidth < 768) {
-      optionsContainer.classList.remove('hidden');
-  }
+    if (quizGameState.timerInterval) {
+        clearInterval(quizGameState.timerInterval);
+    }
 
-  const accuracy = quizGameState.total > 0 ? Math.round((quizGameState.correct / quizGameState.total) * 100) : 0;
+    if (button) {
+        button.innerHTML = "重新開始";
+        button.title = "重新開始";
+        button.className = "bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
+        button.onclick = restartQuizGame;
+    }
 
-  showResult(
-    "🎯",
-    "測驗結束",
-    `${message}\n\n` +
-      `答對：${quizGameState.correct} 題\n` +
-      `答錯：${quizGameState.incorrect} 題\n` +
-      `總題數：${quizGameState.total} 題\n` +
-      `正確率：${accuracy}%`
-  );
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.remove('opacity-50', 'pointer-events-none');
+        el.disabled = false;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.remove('hidden');
+    }
+
+    const accuracy = quizGameState.total > 0 ? Math.round((quizGameState.correct / quizGameState.total) * 100) : 0;
+
+    showResult(
+        "🎯",
+        "測驗結束",
+        `${message}\n\n` +
+        `答對：${quizGameState.correct} 題\n` +
+        `答錯：${quizGameState.incorrect} 題\n` +
+        `總題數：${quizGameState.total} 題\n` +
+        `正確率：${accuracy}%`
+    );
 }
 
 // 替換 endSortingGame()
 function endSortingGame(message) {
-  sortingGameState.isPlaying = false;
-  const button = document.getElementById("startSorting");
-  const optionsContainer = document.getElementById("sortingOptions");
+    sortingGameState.isPlaying = false;
+    const button = document.getElementById("startSorting");
+    const optionsContainer = document.getElementById("sortingOptions");
 
-  // 遊戲結束時，新增禁用 class
-  document.getElementById("sortingArea").classList.add("game-area-disabled");
+    // 遊戲結束時，新增禁用 class
+    document.getElementById("sortingArea").classList.add("game-area-disabled");
 
-  if (sortingGameState.timerInterval) {
-    clearInterval(sortingGameState.timerInterval);
-  }
+    if (sortingGameState.timerInterval) {
+        clearInterval(sortingGameState.timerInterval);
+    }
 
-  if(button) {
-      button.innerHTML = "重新開始";
-      button.title = "重新開始";
-      button.className = "bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
-      button.onclick = restartSortingGame;
-  }
+    if (button) {
+        button.innerHTML = "重新開始";
+        button.title = "重新開始";
+        button.className = "bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
+        button.onclick = restartSortingGame;
+    }
 
-  optionsContainer.querySelectorAll('select').forEach(el => {
-      el.classList.remove('opacity-50', 'pointer-events-none');
-      el.disabled = false;
-  });
-  if (window.innerWidth < 768) {
-      optionsContainer.classList.remove('hidden');
-  }
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.remove('opacity-50', 'pointer-events-none');
+        el.disabled = false;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.remove('hidden');
+    }
 
-  const totalQuestions = sortingGameState.correct + sortingGameState.incorrect;
-  const accuracy = totalQuestions > 0 ? Math.round((sortingGameState.correct / totalQuestions) * 100) : 0;
+    const totalQuestions = sortingGameState.correct + sortingGameState.incorrect;
+    const accuracy = totalQuestions > 0 ? Math.round((sortingGameState.correct / totalQuestions) * 100) : 0;
 
-  showResult(
-    "🎯",
-    "排序結束",
-    `${message}\n\n` +
-      `最終分數：${sortingGameState.score}\n` +
-      `答對題數：${sortingGameState.correct}\n` +
-      `答錯題數：${sortingGameState.incorrect}\n` +
-      `正確率：${accuracy}%`
-  );
+    showResult(
+        "🎯",
+        "排序結束",
+        `${message}\n\n` +
+        `最終分數：${sortingGameState.score}\n` +
+        `答對題數：${sortingGameState.correct}\n` +
+        `答錯題數：${sortingGameState.incorrect}\n` +
+        `正確率：${accuracy}%`
+    );
 }
 
 // 排序遊戲
 function showSortingGame() {
-  const contentArea = document.getElementById("contentArea")
-  const sentences = getSelectedSentences()
+    const contentArea = document.getElementById("contentArea")
+    const sentences = getSelectedSentences()
 
-  if (sentences.length < 1) {
-    contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">請先選擇要練習的句子</div>'
-    return
-  }
+    if (sentences.length < 1) {
+        contentArea.innerHTML = '<div class="text-center py-12 text-gray-500">請先選擇要練習的句子</div>'
+        return
+    }
 
-  contentArea.innerHTML = `
+    contentArea.innerHTML = `
         <div class="max-w-6xl mx-auto">
             <div class="bg-white rounded-xl shadow-lg relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-gray-200">
@@ -3790,10 +4277,10 @@ function showSortingGame() {
                         <button id="startSorting" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
                             開始排序
                         </button>
-                        
-                        
+
+
                         <div id="sortingOptions" class="flex items-center flex-wrap gap-2">
-       
+
                             <select id="sortingType" class="bg-gray-100 border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="hakka-pinyin">客語 ↔ 拼音</option>
                                 <option value="chinese-pinyin">華語 ↔ 拼音</option>
@@ -3821,6 +4308,9 @@ function showSortingGame() {
                                 <input type="checkbox" id="sortingPlaySound" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300" checked>
                                 <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
                             </label>
+                            <button id="togglePhoneticSystem" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換拼音/注音">
+                                <span class="material-icons text-gray-600 !text-xl align-middle">font_download</span>
+                            </button>
                             <button onclick="adjustFontSize(-1, 'sorting')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
                             </button>
@@ -3849,30 +4339,49 @@ function showSortingGame() {
             </div>
         </div>
     `;
-  setupSortingGame();
+    setupSortingGame();
 }
 
+
 function setupSortingGame() {
-  sortingGameState = {
-    isPlaying: false,
-    currentSentence: null,
-    questionText: "",
-    originalWords: [],
-    shuffledWords: [],
-    userOrder: [],
-    fixedWords: [],
-    correct: 0,
-    incorrect: 0,
-    score: 0,
-    timeLeft: 0,
-    timerInterval: null,
-    sentences: [],
-    usedSentences: [],
-    availableSentences: [],
-    total: 0 
-  }
-  
-  document.getElementById("startSorting").onclick = startSortingGame;
+    sortingGameState = {
+        isPlaying: false,
+        currentSentence: null,
+        questionText: "",
+        originalWords: [],
+        shuffledWords: [],
+        userOrder: [],
+        fixedWords: [],
+        correct: 0,
+        incorrect: 0,
+        score: 0,
+        timeLeft: 0,
+        timerInterval: null,
+        sentences: [],
+        usedSentences: [],
+        availableSentences: [],
+        total: 0
+    }
+
+    document.getElementById("startSorting").onclick = startSortingGame;
+
+    // --- 新增開始 ---
+    const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
+    if (togglePhoneticBtn) {
+        togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
+        togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+        togglePhoneticBtn.onclick = () => {
+            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+            saveUserSettings();
+            togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
+            togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
+
+            if (sortingGameState.isPlaying) {
+                generateSortingQuestion(false);
+            }
+        };
+    }
 }
 
 
@@ -3884,180 +4393,183 @@ function stopSortingGame() {
 }
 
 function startSortingGame() {
-  const sentences = getSelectedSentences()
-  const condition = document.getElementById("sortingCondition").value
-  const button = document.getElementById("startSorting")
-  const optionsContainer = document.getElementById("sortingOptions");
+    const sentences = getSelectedSentences()
+    const condition = document.getElementById("sortingCondition").value
+    const button = document.getElementById("startSorting")
+    const optionsContainer = document.getElementById("sortingOptions");
 
-  sortingGameState.isPlaying = true
-  sortingGameState.correct = 0
-  sortingGameState.incorrect = 0
-  sortingGameState.score = 0
-  sortingGameState.total = 0;
-  sortingGameState.sentences = sentences
-  sortingGameState.usedSentences = []
-  sortingGameState.availableSentences = [...sentences].sort(() => Math.random() - 0.5)
+    sortingGameState.isPlaying = true
+    sortingGameState.correct = 0
+    sortingGameState.incorrect = 0
+    sortingGameState.score = 0
+    sortingGameState.total = 0;
+    sortingGameState.sentences = sentences
+    sortingGameState.usedSentences = []
+    sortingGameState.availableSentences = [...sentences].sort(() => Math.random() - 0.5)
 
-  // 遊戲開始時，移除禁用 class
-  document.getElementById("sortingArea").classList.remove("game-area-disabled");
+    // 遊戲開始時，移除禁用 class
+    document.getElementById("sortingArea").classList.remove("game-area-disabled");
 
-  button.innerHTML = `<span class="material-icons">close</span>`;
-  button.title = "停止遊戲";
-  button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-  button.onclick = stopSortingGame
+    button.innerHTML = `<span class="material-icons">close</span>`;
+    button.title = "停止遊戲";
+    button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
+    button.onclick = stopSortingGame
 
-  optionsContainer.querySelectorAll('select').forEach(el => {
-      el.classList.add('opacity-50', 'pointer-events-none');
-      el.disabled = true;
-  });
-  if (window.innerWidth < 768) {
-      optionsContainer.classList.add('hidden');
-  }
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.add('opacity-50', 'pointer-events-none');
+        el.disabled = true;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.add('hidden');
+    }
 
-  document.getElementById("sortingScore").textContent = "0"
-  document.getElementById("sortingCorrect").textContent = "0"
-  document.getElementById("sortingIncorrect").textContent = "0"
-  
-  document.getElementById("sortingArea").classList.remove("hidden");
-  document.getElementById("sortingStartNotice").classList.add("hidden");
+    document.getElementById("sortingScore").textContent = "0"
+    document.getElementById("sortingCorrect").textContent = "0"
+    document.getElementById("sortingIncorrect").textContent = "0"
 
-  if (condition.startsWith("time")) {
-    const timeLimit = Number.parseInt(condition.replace("time", ""))
-    sortingGameState.timeLeft = timeLimit
-    startSortingTimer()
-  } else {
-    const timerElement = document.getElementById("sortingTimer");
-    sortingGameState.startTime = Date.now();
-    
-    timerElement.textContent = "00:00";
+    document.getElementById("sortingArea").classList.remove("hidden");
+    document.getElementById("sortingStartNotice").classList.add("hidden");
 
-    sortingGameState.timerInterval = setInterval(() => {
-        const elapsedSeconds = Math.floor((Date.now() - sortingGameState.startTime) / 1000);
-        const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
-        const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
-        timerElement.textContent = `${minutes}:${seconds}`;
-    }, 1000);
-  }
+    if (condition.startsWith("time")) {
+        const timeLimit = Number.parseInt(condition.replace("time", ""))
+        sortingGameState.timeLeft = timeLimit
+        startSortingTimer()
+    } else {
+        const timerElement = document.getElementById("sortingTimer");
+        sortingGameState.startTime = Date.now();
 
-  generateSortingQuestion()
+        timerElement.textContent = "00:00";
+
+        sortingGameState.timerInterval = setInterval(() => {
+            const elapsedSeconds = Math.floor((Date.now() - sortingGameState.startTime) / 1000);
+            const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+            const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+            timerElement.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    }
+
+    generateSortingQuestion()
 }
 
 
 function restartSortingGame() {
-  if (sortingGameState.timerInterval) {
-    clearInterval(sortingGameState.timerInterval)
-  }
-  startSortingGame()
+    if (sortingGameState.timerInterval) {
+        clearInterval(sortingGameState.timerInterval)
+    }
+    startSortingGame()
 }
 
 function startSortingTimer() {
-  const timerElement = document.getElementById("sortingTimer")
-  const timerBar = document.getElementById("sortingTimerBar")
-  const condition = document.getElementById("sortingCondition").value
-  const timeLimit = Number.parseInt(condition.replace("time", ""))
+    const timerElement = document.getElementById("sortingTimer")
+    const timerBar = document.getElementById("sortingTimerBar")
+    const condition = document.getElementById("sortingCondition").value
+    const timeLimit = Number.parseInt(condition.replace("time", ""))
 
-  sortingGameState.timerInterval = setInterval(() => {
-    sortingGameState.timeLeft--
-    timerElement.textContent = ` ${sortingGameState.timeLeft}`
+    sortingGameState.timerInterval = setInterval(() => {
+        sortingGameState.timeLeft--
+        timerElement.textContent = ` ${sortingGameState.timeLeft}`
 
-    const percentage = (sortingGameState.timeLeft / timeLimit) * 100
-    timerBar.style.width = percentage + "%"
+        const percentage = (sortingGameState.timeLeft / timeLimit) * 100
+        timerBar.style.width = percentage + "%"
 
-    if (sortingGameState.timeLeft <= 0) {
-      clearInterval(sortingGameState.timerInterval)
-      endSortingGame("時間到！")
-    }
-  }, 1000)
-}
-
-function generateSortingQuestion() {
-  // 如果沒有可用題目，重新洗牌
-  if (sortingGameState.availableSentences.length === 0) {
-    sortingGameState.availableSentences = [...sortingGameState.sentences].sort(() => Math.random() - 0.5)
-    sortingGameState.usedSentences = []
-  }
-
-  sortingGameState.total++; // 【新增】累加題號
-
-  // 取出下一個題目
-  const sentence = sortingGameState.availableSentences.shift()
-  sortingGameState.usedSentences.push(sentence)
-  const type = document.getElementById("sortingType").value
-
-  let questionText, answerText
-  let isPinyinAnswer = false; 
-
-  switch (type) {
-    case "hakka-pinyin":
-      questionText = sentence["客語"]
-      answerText = sentence["拼音"]
-      isPinyinAnswer = true;
-      break
-    case "chinese-pinyin":
-      questionText = sentence["華語"]
-      answerText = sentence["拼音"]
-      isPinyinAnswer = true;
-      break
-    case "pinyin-hakka":
-      questionText = sentence["拼音"]
-      answerText = sentence["客語"]
-      break
-    case "chinese-hakka":
-      questionText = sentence["華語"]
-      answerText = sentence["客語"]
-      break
-  }
-
-  let words
-  
-  if (isPinyinAnswer) {
-    let tempWords = answerText.split(/\s+/).filter((w) => w.trim() !== "")
-
-    if (tempWords.length === 1 && tempWords[0].includes('-')) {
-        let hyphenSplitWords = tempWords[0].split(/-+/).filter((w) => w.trim() !== "");
-        
-        if (hyphenSplitWords.length > 1) {
-            words = hyphenSplitWords;
-        } else {
-            words = tempWords;
+        if (sortingGameState.timeLeft <= 0) {
+            clearInterval(sortingGameState.timerInterval)
+            endSortingGame("時間到！")
         }
-    } else {
-        words = tempWords;
-    }
-  } else {
-    words = Array.from(answerText).filter((char) => char.trim() !== "")
-  }
-
-  let fixedWords = []
-  let shuffleWords = words
-  if (words.length > 6) {
-    const fixedCount = words.length - 6
-    fixedWords = words.slice(0, fixedCount)
-    shuffleWords = words.slice(fixedCount)
-  }
-
-  const shuffledWords = [...shuffleWords].sort(() => Math.random() - 0.5)
-
-  sortingGameState.currentSentence = sentence
-  sortingGameState.questionText = questionText
-  sortingGameState.originalWords = words
-  sortingGameState.fixedWords = fixedWords
-  sortingGameState.shuffledWords = shuffledWords
-  sortingGameState.userOrder = [...fixedWords] 
-
-  renderSortingQuestion()
-  
-  if (document.getElementById('sortingPlaySound').checked) {
-      playAudio(sentence["音檔"]);
-  }
+    }, 1000)
 }
+
+
+function generateSortingQuestion(isNewQuestion = true) {
+    let sentence;
+
+    if (isNewQuestion) {
+        // 如果沒有可用題目，重新洗牌
+        if (sortingGameState.availableSentences.length === 0) {
+            sortingGameState.availableSentences = [...sortingGameState.sentences].sort(() => Math.random() - 0.5)
+            sortingGameState.usedSentences = []
+        }
+        sortingGameState.total++; // 只有在新題目時才累加題號
+        // 取出下一個題目
+        sentence = sortingGameState.availableSentences.shift();
+        sortingGameState.usedSentences.push(sentence);
+        sortingGameState.currentSentence = sentence; // 更新當前題目
+    } else {
+        sentence = sortingGameState.currentSentence; // 使用已經儲存的當前題目
+    }
+
+    const type = document.getElementById("sortingType").value;
+
+    const getPhonetic = (text) => {
+        if (userSettings.phoneticSystem === 'zhuyin') {
+            return convertPinyinToZhuyin(text);
+        }
+        return text;
+    };
+
+    let questionText, answerText;
+    let isPinyinAnswer = false;
+
+    switch (type) {
+        case "hakka-pinyin":
+            questionText = sentence["客語"];
+            answerText = getPhonetic(sentence["拼音"]);
+            isPinyinAnswer = true;
+            break;
+        case "chinese-pinyin":
+            questionText = sentence["華語"];
+            answerText = getPhonetic(sentence["拼音"]);
+            isPinyinAnswer = true;
+            break;
+        case "pinyin-hakka":
+            questionText = getPhonetic(sentence["拼音"]);
+            answerText = sentence["客語"];
+            break;
+        case "chinese-hakka":
+            questionText = sentence["華語"];
+            answerText = sentence["客語"];
+            break;
+    }
+
+    let words;
+
+    if (isPinyinAnswer) {
+        let tempWords = answerText.split(/\s+/).filter((w) => w.trim() !== "");
+        words = tempWords;
+    } else {
+        words = Array.from(answerText).filter((char) => char.trim() !== "");
+    }
+
+    let fixedWords = [];
+    let shuffleWords = words;
+    if (words.length > 6) {
+        const fixedCount = words.length - 6;
+        fixedWords = words.slice(0, fixedCount);
+        shuffleWords = words.slice(fixedCount);
+    }
+
+    const shuffledWords = [...shuffleWords].sort(() => Math.random() - 0.5);
+
+    sortingGameState.questionText = questionText;
+    sortingGameState.originalWords = words;
+    sortingGameState.fixedWords = fixedWords;
+    sortingGameState.shuffledWords = shuffledWords;
+    sortingGameState.userOrder = [...fixedWords];
+
+    renderSortingQuestion();
+
+    if (document.getElementById('sortingPlaySound').checked && isNewQuestion) {
+        playAudio(sentence["音檔"]);
+    }
+}
+
 
 function renderSortingQuestion() {
-  const sortingArea = document.getElementById("sortingArea");
-  const canCheck = sortingGameState.userOrder.length === sortingGameState.originalWords.length;
-  const questionNumber = sortingGameState.total;
+    const sortingArea = document.getElementById("sortingArea");
+    const canCheck = sortingGameState.userOrder.length === sortingGameState.originalWords.length;
+    const questionNumber = sortingGameState.total;
 
-  sortingArea.innerHTML = `
+    sortingArea.innerHTML = `
         <div class="text-center mb-8">
             <div class="flex items-center justify-center gap-4 mb-6">
                 <button onclick="playAudio('${sortingGameState.currentSentence["音檔"]}', this.querySelector('.material-icons'))" 
@@ -4128,123 +4640,133 @@ function renderSortingQuestion() {
 }
 
 function addToTarget(word, index) {
-  sortingGameState.userOrder.push(word)
-  sortingGameState.shuffledWords.splice(index, 1)
-  renderSortingQuestion()
+    sortingGameState.userOrder.push(word)
+    sortingGameState.shuffledWords.splice(index, 1)
+    renderSortingQuestion()
 }
 
 function removeFromTarget(index) {
-  // 不能移除固定字詞
-  if (index < sortingGameState.fixedWords.length) {
-    return
-  }
+    // 不能移除固定字詞
+    if (index < sortingGameState.fixedWords.length) {
+        return
+    }
 
-  const word = sortingGameState.userOrder[index]
-  sortingGameState.userOrder.splice(index, 1)
-  sortingGameState.shuffledWords.push(word)
-  renderSortingQuestion()
+    const word = sortingGameState.userOrder[index]
+    sortingGameState.userOrder.splice(index, 1)
+    sortingGameState.shuffledWords.push(word)
+    renderSortingQuestion()
 }
 
 function checkSortingAnswer() {
-  if (sortingGameState.userOrder.length !== sortingGameState.originalWords.length) {
-    showResult("⚠️", "提醒", "請完成排列");
-    return;
-  }
-
-  const userAnswer = sortingGameState.userOrder.join("");
-  const correctAnswer = sortingGameState.originalWords.join("");
-
-  if (userAnswer === correctAnswer) {
-    // --- 答案正確的處理邏輯 ---
-    sortingGameState.correct++;
-    sortingGameState.score += 100;
-
-    document.getElementById("sortingCorrect").textContent = sortingGameState.correct;
-    document.getElementById("sortingScore").textContent = sortingGameState.score;
-
-    const targetDiv = document.getElementById("sortingTarget");
-    showCelebration(targetDiv);
-
-    // 禁用檢查按鈕
-    document.querySelector('#sortingArea button[onclick="checkSortingAnswer()"]').disabled = true;
-
-    // 將使用者排好的答案變為綠色
-    targetDiv.querySelectorAll('.sorting-word').forEach(wordEl => {
-        wordEl.classList.remove('bg-indigo-500', 'cursor-pointer');
-        wordEl.classList.add('bg-green-600', 'cursor-default');
-        wordEl.onclick = null;
-    });
-
-    const wordBankContainer = document.getElementById('sortingWordBankContainer');
-    const sentence = sortingGameState.currentSentence;
-    const type = document.getElementById("sortingType").value;
-    let revealedText = '';
-
-    if (type.includes('hakka') && type.includes('pinyin')) {
-        revealedText = sentence['華語'];
-    } else if (type.includes('chinese') && type.includes('pinyin')) {
-        revealedText = sentence['客語'];
-    } else if (type.includes('chinese') && type.includes('hakka')) {
-        revealedText = sentence['拼音'];
+    if (sortingGameState.userOrder.length !== sortingGameState.originalWords.length) {
+        showResult("⚠️", "提醒", "請完成排列");
+        return;
     }
 
-    if (revealedText && wordBankContainer) {
-        wordBankContainer.innerHTML = `
+    const userAnswer = sortingGameState.userOrder.join("");
+    const correctAnswer = sortingGameState.originalWords.join("");
+
+    if (userAnswer === correctAnswer) {
+        // --- 答案正確的處理邏輯 ---
+        sortingGameState.correct++;
+        sortingGameState.score += 100;
+
+        document.getElementById("sortingCorrect").textContent = sortingGameState.correct;
+        document.getElementById("sortingScore").textContent = sortingGameState.score;
+
+        const targetDiv = document.getElementById("sortingTarget");
+        showCelebration(targetDiv);
+
+        // 禁用檢查按鈕
+        document.querySelector('#sortingArea button[onclick="checkSortingAnswer()"]').disabled = true;
+
+        // 將使用者排好的答案變為綠色
+        targetDiv.querySelectorAll('.sorting-word').forEach(wordEl => {
+            wordEl.classList.remove('bg-indigo-500', 'cursor-pointer');
+            wordEl.classList.add('bg-green-600', 'cursor-default');
+            wordEl.onclick = null;
+        });
+
+        const wordBankContainer = document.getElementById('sortingWordBankContainer');
+        const sentence = sortingGameState.currentSentence;
+        const type = document.getElementById("sortingType").value;
+        let revealedText = '';
+
+        if (type.includes('hakka') && type.includes('pinyin')) {
+            revealedText = sentence['華語'];
+        } else if (type.includes('chinese') && type.includes('pinyin')) {
+            revealedText = sentence['客語'];
+        } else if (type.includes('chinese') && type.includes('hakka')) {
+            revealedText = sentence['拼音'];
+        }
+
+        if (revealedText && wordBankContainer) {
+            wordBankContainer.innerHTML = `
             <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center transition-all duration-300 w-full animate-pulse">
                 <p class="text-green-900 mt-1" style="font-size: ${userSettings.fontSize + 2}px">${revealedText}</p>
             </div>
         `;
+        }
+
+        // 檢查是否達成過關條件
+        const condition = document.getElementById("sortingCondition").value;
+        if (condition.startsWith("correct")) {
+            const target = Number.parseInt(condition.replace("correct", ""));
+            if (sortingGameState.correct >= target) {
+                setTimeout(() => endSortingGame(`恭喜完成目標！\n答對 ${target} 題`), 2500);
+                return;
+            }
+        }
+
+        // 延遲 2.5 秒後進入下一題
+        setTimeout(() => {
+            generateSortingQuestion();
+        }, 2500);
+
+    } else {
+        // --- 答案錯誤的處理邏輯 ---
+        sortingGameState.incorrect++;
+        sortingGameState.score = Math.max(0, sortingGameState.score - 20);
+
+        document.getElementById("sortingIncorrect").textContent = sortingGameState.incorrect;
+        document.getElementById("sortingScore").textContent = sortingGameState.score;
+
+        // 【新增邏輯】檢查「自動播放音效」是否勾選，若是且答案錯誤，則重播音檔
+        const playSoundCheckbox = document.getElementById('sortingPlaySound');
+        if (playSoundCheckbox && playSoundCheckbox.checked) {
+            const sentence = sortingGameState.currentSentence;
+            if (sentence && sentence["音檔"]) {
+                playAudio(sentence["音檔"]);
+            }
+        }
+        
+        let correctCount = sortingGameState.fixedWords.length;
+        for (let i = sortingGameState.fixedWords.length; i < sortingGameState.userOrder.length; i++) {
+            if (sortingGameState.userOrder[i] === sortingGameState.originalWords[i]) {
+                correctCount++;
+            } else {
+                break;
+            }
+        }
+
+        const correctPart = sortingGameState.userOrder.slice(0, correctCount);
+        const wrongPart = sortingGameState.userOrder.slice(correctCount);
+
+        sortingGameState.userOrder = correctPart;
+        sortingGameState.shuffledWords.push(...wrongPart);
+
+        renderSortingQuestion();
     }
-
-    // 檢查是否達成過關條件
-    const condition = document.getElementById("sortingCondition").value;
-    if (condition.startsWith("correct")) {
-      const target = Number.parseInt(condition.replace("correct", ""));
-      if (sortingGameState.correct >= target) {
-        setTimeout(() => endSortingGame(`恭喜完成目標！\n答對 ${target} 題`), 2500);
-        return;
-      }
-    }
-
-    // 延遲 2.5 秒後進入下一題
-    setTimeout(() => {
-      generateSortingQuestion();
-    }, 2500);
-
-  } else {
-    // --- 答案錯誤的處理邏輯 (維持不變) ---
-    sortingGameState.incorrect++;
-    sortingGameState.score = Math.max(0, sortingGameState.score - 20);
-
-    document.getElementById("sortingIncorrect").textContent = sortingGameState.incorrect;
-    document.getElementById("sortingScore").textContent = sortingGameState.score;
-
-    let correctCount = sortingGameState.fixedWords.length;
-    for (let i = sortingGameState.fixedWords.length; i < sortingGameState.userOrder.length; i++) {
-      if (sortingGameState.userOrder[i] === sortingGameState.originalWords[i]) {
-        correctCount++;
-      } else {
-        break;
-      }
-    }
-
-    const correctPart = sortingGameState.userOrder.slice(0, correctCount);
-    const wrongPart = sortingGameState.userOrder.slice(correctCount);
-
-    sortingGameState.userOrder = correctPart;
-    sortingGameState.shuffledWords.push(...wrongPart);
-
-    renderSortingQuestion();
-  }
 }
 
 
+
 // 顯示結果視窗
-function showResult(icon, title ,message) {
-  document.getElementById("resultIcon").textContent = icon
-  document.getElementById("resultTitle").textContent = title
-  document.getElementById("resultMessage").textContent = message
-  document.getElementById("resultModal").classList.remove("hidden")
+function showResult(icon, title, message) {
+    document.getElementById("resultIcon").textContent = icon
+    document.getElementById("resultTitle").textContent = title
+    document.getElementById("resultMessage").textContent = message
+    document.getElementById("resultModal").classList.remove("hidden")
 }
 
 
@@ -4260,62 +4782,68 @@ function setStickyTopPosition() {
 
 // 設置事件監聽器
 function setupEventListeners() {
-  const mainTitle = document.getElementById("mainTitle");
-  const mobileSearchBox = document.getElementById("mobileSearchBox");
-  const searchToggle = document.getElementById("searchToggle");
-  const viewToggle = document.getElementById("viewToggle");
-  const searchResults = document.getElementById("searchResults");
-  const searchBox = document.getElementById("searchBox");
-  const searchInput = document.getElementById("searchInput");
-  const mobileSearchInput = document.getElementById("mobileSearchInput");
-  const closeMobileSearch = document.getElementById("closeMobileSearch");
-  const clearSearchBtn = document.getElementById("clearSearch");
-  const searchOverlay = document.getElementById("searchOverlay");
+    const mainTitle = document.getElementById("mainTitle");
+    const mobileSearchBox = document.getElementById("mobileSearchBox");
+    const searchToggle = document.getElementById("searchToggle");
+    const viewToggle = document.getElementById("viewToggle");
+    const searchResults = document.getElementById("searchResults");
+    const searchBox = document.getElementById("searchBox");
+    const searchInput = document.getElementById("searchInput");
+    const mobileSearchInput = document.getElementById("mobileSearchInput");
+    const closeMobileSearch = document.getElementById("closeMobileSearch");
+    const clearSearchBtn = document.getElementById("clearSearch");
+    const searchOverlay = document.getElementById("searchOverlay");
 
-	const handleRealtimeTransform = (e) => {
-		const input = e.target;
-		const originalValue = input.value;
-		const cursorPosition = input.selectionStart;
-		const transformedValue = transformHakkaQuery(originalValue);
-		if (originalValue !== transformedValue) {
-			const lengthDifference = transformedValue.length - originalValue.length;
-			const newCursorPosition = cursorPosition + lengthDifference;
-			input.value = transformedValue;
-			input.setSelectionRange(newCursorPosition, newCursorPosition);
-		}
-		handleSearchInput(e);
-	};
-  searchInput.addEventListener("input", handleRealtimeTransform);
-  mobileSearchInput.addEventListener("input", handleRealtimeTransform);
-  searchToggle.onclick = () => {
-    mainTitle.classList.add("hidden");
-    viewToggle.classList.add("hidden");
-    searchToggle.classList.add("hidden");
-    mobileSearchBox.classList.remove("hidden");
-    searchOverlay.classList.remove("hidden");
-    mobileSearchInput.focus();
-  };
-  closeMobileSearch.onclick = () => {
-    mainTitle.classList.remove("hidden");
-    viewToggle.classList.remove("hidden");
-    searchToggle.classList.remove("hidden");
-    mobileSearchBox.classList.add("hidden");
-    searchOverlay.classList.add("hidden");
-    mobileSearchInput.value = "";
-    searchResults.classList.add("hidden");
-  };
-  searchOverlay.onclick = () => { closeMobileSearch.click(); };
-  clearSearchBtn.addEventListener('click', () => {
-    searchInput.value = '';
-    searchResults.classList.add('hidden');
-    clearSearchBtn.classList.add('hidden');
-    searchInput.focus();
-    handleSearchInput({ target: searchInput });
-  });
-  document.addEventListener("click", (e) => {
-    const isClickInsideSearch = searchBox.contains(e.target) || mobileSearchBox.contains(e.target) || searchResults.contains(e.target);
-    if (!isClickInsideSearch) { searchResults.classList.add("hidden"); }
-  });
+    const handleRealtimeTransform = (e) => {
+        const input = e.target;
+        const originalValue = input.value;
+        const cursorPosition = input.selectionStart;
+        const transformedValue = transformHakkaQuery(originalValue);
+        if (originalValue !== transformedValue) {
+            const lengthDifference = transformedValue.length - originalValue.length;
+            const newCursorPosition = cursorPosition + lengthDifference;
+            input.value = transformedValue;
+            input.setSelectionRange(newCursorPosition, newCursorPosition);
+        }
+        handleSearchInput(e);
+    };
+    searchInput.addEventListener("input", handleRealtimeTransform);
+    mobileSearchInput.addEventListener("input", handleRealtimeTransform);
+    searchToggle.onclick = () => {
+        mainTitle.classList.add("hidden");
+        viewToggle.classList.add("hidden");
+        searchToggle.classList.add("hidden");
+        mobileSearchBox.classList.remove("hidden");
+        searchOverlay.classList.remove("hidden");
+        mobileSearchInput.focus();
+    };
+    closeMobileSearch.onclick = () => {
+        mainTitle.classList.remove("hidden");
+        viewToggle.classList.remove("hidden");
+        searchToggle.classList.remove("hidden");
+        mobileSearchBox.classList.add("hidden");
+        searchOverlay.classList.add("hidden");
+        mobileSearchInput.value = "";
+        searchResults.classList.add("hidden");
+    };
+    searchOverlay.onclick = () => {
+        closeMobileSearch.click();
+    };
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchResults.classList.add('hidden');
+        clearSearchBtn.classList.add('hidden');
+        searchInput.focus();
+        handleSearchInput({
+            target: searchInput
+        });
+    });
+    document.addEventListener("click", (e) => {
+        const isClickInsideSearch = searchBox.contains(e.target) || mobileSearchBox.contains(e.target) || searchResults.contains(e.target);
+        if (!isClickInsideSearch) {
+            searchResults.classList.add("hidden");
+        }
+    });
     const moreTabsButton = document.getElementById("moreTabsButton");
     const moreTabsDropdown = document.getElementById("moreTabsDropdown");
     if (moreTabsButton && moreTabsDropdown) {
@@ -4332,124 +4860,136 @@ function setupEventListeners() {
     let resizeTimeout;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => { renderCatalogTabs(); }, 150);
+        resizeTimeout = setTimeout(() => {
+            renderCatalogTabs();
+        }, 150);
     });
-  document.getElementById("viewToggle").onclick = () => {
-    const newMode = currentViewMode === "card" ? "list" : "card";
-    setViewMode(newMode);
-  }
-  document.getElementById("userButton").onclick = (e) => {
-    e.stopPropagation();
-    document.getElementById("userDropdown").classList.toggle("hidden");
-  }
-  document.addEventListener("click", (e) => {
-    if (!document.getElementById("userButton").contains(e.target)) {
-      document.getElementById("userDropdown").classList.add("hidden");
+    document.getElementById("viewToggle").onclick = () => {
+        const newMode = currentViewMode === "card" ? "list" : "card";
+        setViewMode(newMode);
     }
-  })
-  document.getElementById("editProfile").onclick = () => {
-    document.getElementById("userDropdown").classList.add("hidden");
-    document.getElementById("editName").value = currentUser.name;
-    document.getElementById("editId").value = currentUser.id;
-    document.getElementById("editAvatar").value = currentUser.avatar;
-    document.getElementById("userModal").classList.remove("hidden");
-  }
-  document.getElementById("saveProfile").onclick = () => {
-    const newName = document.getElementById("editName").value.trim();
-    const newId = document.getElementById("editId").value.trim();
-    const newAvatar = document.getElementById("editAvatar").value.trim();
-    if (newName && newId && newAvatar) {
-      currentUser.name = newName;
-      currentUser.id = newId;
-      currentUser.avatar = newAvatar;
-      saveUserData();
-      updateUserDisplay();
-      document.getElementById("userModal").classList.add("hidden");
-      loadUserSettings();
-    }
-  }
-  document.getElementById("cancelEdit").onclick = () => { document.getElementById("userModal").classList.add("hidden"); }
-  document.getElementById("clearData").onclick = () => {
-    document.getElementById("userDropdown").classList.add("hidden");
-    document.getElementById("clearModal").classList.remove("hidden");
-  }
-  document.getElementById("confirmClear").onclick = () => {
-    const password = document.getElementById("clearPassword").value;
-    if (password === config.CLEAR_DATA_PASSWORD) {
-      const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`;
-      const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
-      const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`;
-      const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
-      localStorage.removeItem(settingsKey);
-      localStorage.removeItem(starredKey);
-      localStorage.removeItem(selectedKey);
-      localStorage.removeItem(collectedKey);
-      starredCards.clear();
-      selectedCategories.clear();
-      selectedSentences.clear();
-      collectedCategories.clear();
-      document.getElementById("clearModal").classList.add("hidden");
-      document.getElementById("clearPassword").value = "";
-      showResult("✅", "清除完成", "所有學習記錄已清除");
-    } else {
-      showResult("❌", "密碼錯誤", "請輸入正確的密碼");
-    }
-  }
-  document.getElementById("cancelClear").onclick = () => {
-    document.getElementById("clearModal").classList.add("hidden");
-    document.getElementById("clearPassword").value = "";
-  }
-  document.getElementById("logout").onclick = () => {
-    currentUser = { id: "guest", name: "訪客", avatar: "U" };
-    saveUserData();
-    updateUserDisplay();
-    loadUserSettings();
-    document.getElementById("userDropdown").classList.add("hidden");
-    showResult("👋", "已登出", "已切換為訪客模式");
-  }
-  const userButtonDetail = document.getElementById("userButtonDetail");
-  const userDropdownDetail = document.getElementById("userDropdownDetail");
-  if (userButtonDetail && userDropdownDetail) {
-    userButtonDetail.onclick = (e) => {
-      e.stopPropagation();
-      userDropdownDetail.classList.toggle("hidden");
+    document.getElementById("userButton").onclick = (e) => {
+        e.stopPropagation();
+        document.getElementById("userDropdown").classList.toggle("hidden");
     }
     document.addEventListener("click", (e) => {
-      if (!userButtonDetail.contains(e.target)) {
-        userDropdownDetail.classList.add("hidden");
-      }
+        if (!document.getElementById("userButton").contains(e.target)) {
+            document.getElementById("userDropdown").classList.add("hidden");
+        }
     })
-    document.getElementById("editProfileDetail").onclick = () => {
-      userDropdownDetail.classList.add("hidden");
-      document.getElementById("editName").value = currentUser.name;
-      document.getElementById("editId").value = currentUser.id;
-      document.getElementById("editAvatar").value = currentUser.avatar;
-      document.getElementById("userModal").classList.remove("hidden");
+    document.getElementById("editProfile").onclick = () => {
+        document.getElementById("userDropdown").classList.add("hidden");
+        document.getElementById("editName").value = currentUser.name;
+        document.getElementById("editId").value = currentUser.id;
+        document.getElementById("editAvatar").value = currentUser.avatar;
+        document.getElementById("userModal").classList.remove("hidden");
     }
-    document.getElementById("clearDataDetail").onclick = () => {
-      userDropdownDetail.classList.add("hidden");
-      document.getElementById("clearModal").classList.remove("hidden");
+    document.getElementById("saveProfile").onclick = () => {
+        const newName = document.getElementById("editName").value.trim();
+        const newId = document.getElementById("editId").value.trim();
+        const newAvatar = document.getElementById("editAvatar").value.trim();
+        if (newName && newId && newAvatar) {
+            currentUser.name = newName;
+            currentUser.id = newId;
+            currentUser.avatar = newAvatar;
+            saveUserData();
+            updateUserDisplay();
+            document.getElementById("userModal").classList.add("hidden");
+            loadUserSettings();
+        }
     }
-    document.getElementById("logoutDetail").onclick = () => {
-      currentUser = { id: "guest", name: "訪客", avatar: "U" };
-      saveUserData();
-      updateUserDisplay();
-      loadUserSettings();
-      userDropdownDetail.classList.add("hidden");
-      showResult("👋", "已登出", "已切換為訪客模式");
+    document.getElementById("cancelEdit").onclick = () => {
+        document.getElementById("userModal").classList.add("hidden");
     }
-  }
-  document.getElementById("menuToggle").onclick = (e) => {
-    e.stopPropagation();
-    document.getElementById("menuDropdown").classList.toggle("hidden");
-  }
-  document.addEventListener("click", (e) => {
-    if (!document.getElementById("menuToggle").contains(e.target)) {
-      document.getElementById("menuDropdown").classList.add("hidden");
+    document.getElementById("clearData").onclick = () => {
+        document.getElementById("userDropdown").classList.add("hidden");
+        document.getElementById("clearModal").classList.remove("hidden");
     }
-  })
+    document.getElementById("confirmClear").onclick = () => {
+        const password = document.getElementById("clearPassword").value;
+        if (password === config.CLEAR_DATA_PASSWORD) {
+            const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`;
+            const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
+            const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`;
+            const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
+            localStorage.removeItem(settingsKey);
+            localStorage.removeItem(starredKey);
+            localStorage.removeItem(selectedKey);
+            localStorage.removeItem(collectedKey);
+            starredCards.clear();
+            selectedCategories.clear();
+            selectedSentences.clear();
+            collectedCategories.clear();
+            document.getElementById("clearModal").classList.add("hidden");
+            document.getElementById("clearPassword").value = "";
+            showResult("✅", "清除完成", "所有學習記錄已清除");
+        } else {
+            showResult("❌", "密碼錯誤", "請輸入正確的密碼");
+        }
+    }
+    document.getElementById("cancelClear").onclick = () => {
+        document.getElementById("clearModal").classList.add("hidden");
+        document.getElementById("clearPassword").value = "";
+    }
+    document.getElementById("logout").onclick = () => {
+        currentUser = {
+            id: "guest",
+            name: "訪客",
+            avatar: "U"
+        };
+        saveUserData();
+        updateUserDisplay();
+        loadUserSettings();
+        document.getElementById("userDropdown").classList.add("hidden");
+        showResult("👋", "已登出", "已切換為訪客模式");
+    }
+    const userButtonDetail = document.getElementById("userButtonDetail");
+    const userDropdownDetail = document.getElementById("userDropdownDetail");
+    if (userButtonDetail && userDropdownDetail) {
+        userButtonDetail.onclick = (e) => {
+            e.stopPropagation();
+            userDropdownDetail.classList.toggle("hidden");
+        }
+        document.addEventListener("click", (e) => {
+            if (!userButtonDetail.contains(e.target)) {
+                userDropdownDetail.classList.add("hidden");
+            }
+        })
+        document.getElementById("editProfileDetail").onclick = () => {
+            userDropdownDetail.classList.add("hidden");
+            document.getElementById("editName").value = currentUser.name;
+            document.getElementById("editId").value = currentUser.id;
+            document.getElementById("editAvatar").value = currentUser.avatar;
+            document.getElementById("userModal").classList.remove("hidden");
+        }
+        document.getElementById("clearDataDetail").onclick = () => {
+            userDropdownDetail.classList.add("hidden");
+            document.getElementById("clearModal").classList.remove("hidden");
+        }
+        document.getElementById("logoutDetail").onclick = () => {
+            currentUser = {
+                id: "guest",
+                name: "訪客",
+                avatar: "U"
+            };
+            saveUserData();
+            updateUserDisplay();
+            loadUserSettings();
+            userDropdownDetail.classList.add("hidden");
+            showResult("👋", "已登出", "已切換為訪客模式");
+        }
+    }
+    document.getElementById("menuToggle").onclick = (e) => {
+        e.stopPropagation();
+        document.getElementById("menuDropdown").classList.toggle("hidden");
+    }
+    document.addEventListener("click", (e) => {
+        if (!document.getElementById("menuToggle").contains(e.target)) {
+            document.getElementById("menuDropdown").classList.add("hidden");
+        }
+    })
 
-
+// 請替換此函數
 document.getElementById("goHome").onclick = () => {
     stopAllTimers();
     
@@ -4458,7 +4998,8 @@ document.getElementById("goHome").onclick = () => {
 	isLearningSelectMode = false
     
     Object.keys(categories).forEach((key) => {
-      if (key.startsWith("已選取的") || key === "星號") {
+      // 【修改】判斷條件變更
+      if ((key.endsWith("主題") && !isNaN(parseInt(key))) || key === "星號") {
         delete categories[key];
       }
     });
@@ -4483,96 +5024,149 @@ document.getElementById("goHome").onclick = () => {
     setStickyTopPosition();
     window.scrollTo(0, 0);
   }
-  
-  const ensureSentencesAreSelected = () => {
-      if (selectedSentences.size === 0) {
-          selectedSentences.clear();
-          categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
-          return false;
-      }
-      return true; 
-  };
 
-  document.getElementById("viewSentences").onclick = () => {
-    stopAllTimers();
-    showLearningView();
-    updateCurrentMode("學習");
-    document.getElementById("menuDropdown").classList.add("hidden");
-    updateUrl('learning', Array.from(selectedCategories));
-  }
+    const ensureSentencesAreSelected = () => {
+        if (selectedSentences.size === 0) {
+            selectedSentences.clear();
+            categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
+            return false;
+        }
+        return true;
+    };
 
-  document.getElementById("flashcardMode").onclick = () => {
-    ensureSentencesAreSelected(); // 自動全選
-    stopAllTimers();
-    showFlashcardView();
-    updateCurrentMode("閃示卡");
-    document.getElementById("menuDropdown").classList.add("hidden");
-    updateUrl('flashcard', Array.from(selectedCategories));
-  }
+    document.getElementById("viewSentences").onclick = () => {
+        stopAllTimers();
+        showLearningView();
+        updateCurrentMode("學習");
+        document.getElementById("menuDropdown").classList.add("hidden");
+        updateUrl('learning', Array.from(selectedCategories));
+    }
 
-  document.getElementById("matchingGame").onclick = () => {
-    ensureSentencesAreSelected(); // 自動全選
-    stopAllTimers();
-    showMatchingGame();
-    updateCurrentMode("配對");
-    document.getElementById("menuDropdown").classList.add("hidden");
-    updateUrl('matching', Array.from(selectedCategories));
-  }
+    document.getElementById("flashcardMode").onclick = () => {
+        ensureSentencesAreSelected(); // 自動全選
+        stopAllTimers();
+        showFlashcardView();
+        updateCurrentMode("閃卡");
+        document.getElementById("menuDropdown").classList.add("hidden");
+        updateUrl('flashcard', Array.from(selectedCategories));
+    }
 
-  document.getElementById("quizGame").onclick = () => {
-    ensureSentencesAreSelected(); // 自動全選
-    stopAllTimers();
-    showQuizGame();
-    updateCurrentMode("測驗");
-    document.getElementById("menuDropdown").classList.add("hidden");
-    updateUrl('quiz', Array.from(selectedCategories));
-  }
+    document.getElementById("matchingGame").onclick = () => {
+        ensureSentencesAreSelected(); // 自動全選
+        stopAllTimers();
+        showMatchingGame();
+        updateCurrentMode("配對");
+        document.getElementById("menuDropdown").classList.add("hidden");
+        updateUrl('matching', Array.from(selectedCategories));
+    }
 
-  document.getElementById("sortingGame").onclick = () => {
-    ensureSentencesAreSelected(); // 自動全選
-    stopAllTimers();
-    showSortingGame();
-    updateCurrentMode("排序");
-    document.getElementById("menuDropdown").classList.add("hidden");
-    updateUrl('sorting', Array.from(selectedCategories));
-  }
+    document.getElementById("quizGame").onclick = () => {
+        ensureSentencesAreSelected(); // 自動全選
+        stopAllTimers();
+        showQuizGame();
+        updateCurrentMode("測驗");
+        document.getElementById("menuDropdown").classList.add("hidden");
+        updateUrl('quiz', Array.from(selectedCategories));
+    }
 
-  document.getElementById("closeResult").onclick = () => { document.getElementById("resultModal").classList.add("hidden"); }
-  document.getElementById("addToCollectionBtn").onclick = addToCollection;
-  document.getElementById("removeFromCollectionBtn").onclick = removeFromCollection;
-	setStickyTopPosition();
-	window.addEventListener('resize', setStickyTopPosition);
+    document.getElementById("sortingGame").onclick = () => {
+        ensureSentencesAreSelected(); // 自動全選
+        stopAllTimers();
+        showSortingGame();
+        updateCurrentMode("排序");
+        document.getElementById("menuDropdown").classList.add("hidden");
+        updateUrl('sorting', Array.from(selectedCategories));
+    }
+
+    document.getElementById("closeResult").onclick = () => {
+        document.getElementById("resultModal").classList.add("hidden");
+    }
+    document.getElementById("addToCollectionBtn").onclick = addToCollection;
+    document.getElementById("removeFromCollectionBtn").onclick = removeFromCollection;
+    setStickyTopPosition();
+    window.addEventListener('resize', setStickyTopPosition);
 }
 
 
 // 停止所有計時器
 function stopAllTimers() {
-  if (gameTimer) {
-    clearInterval(gameTimer)
-    gameTimer = null
-  }
-  if (autoPlayTimer) {
-    clearInterval(autoPlayTimer)
-    autoPlayTimer = null
-  }
-  if (matchingGameState.timerInterval) {
-    clearInterval(matchingGameState.timerInterval)
-    matchingGameState.timerInterval = null
-  }
-  if (quizGameState.timerInterval) {
-    clearInterval(quizGameState.timerInterval)
-    quizGameState.timerInterval = null
-  }
-  if (sortingGameState.timerInterval) {
-    clearInterval(sortingGameState.timerInterval)
-    sortingGameState.timerInterval = null
-  }
-  // 移除閃示卡鍵盤監聽
-  if (flashcardKeyHandler) {
-    document.removeEventListener('keydown', flashcardKeyHandler)
-    flashcardKeyHandler = null
-  }
+    if (gameTimer) {
+        clearInterval(gameTimer)
+        gameTimer = null
+    }
+    if (autoPlayTimer) {
+        clearInterval(autoPlayTimer)
+        autoPlayTimer = null
+    }
+    if (matchingGameState.timerInterval) {
+        clearInterval(matchingGameState.timerInterval)
+        matchingGameState.timerInterval = null
+    }
+    if (quizGameState.timerInterval) {
+        clearInterval(quizGameState.timerInterval)
+        quizGameState.timerInterval = null
+    }
+    if (sortingGameState.timerInterval) {
+        clearInterval(sortingGameState.timerInterval)
+        sortingGameState.timerInterval = null
+    }
+    // 移除閃卡鍵盤監聽
+    if (flashcardKeyHandler) {
+        document.removeEventListener('keydown', flashcardKeyHandler)
+        flashcardKeyHandler = null
+    }
 }
+// =================================================================
+// 新增：拼音注音轉換工具 (Phonetic Conversion Utility)
+// =================================================================
+let pinyinToZhuyinMap = null;
+
+/**
+ * 建立一個從拼音到注音的映射表，並依拼音長度排序以確保轉換正確性。
+ * @returns {Array<[string, string]>} 排序後的轉換陣列。
+ */
+function buildPinyinToZhuyinMap() {
+    if (pinyinToZhuyinMap) return pinyinToZhuyinMap;
+
+    const conversionPairs = [];
+    // 從 arr_pz 全域變數中每兩個元素建立一個配對
+    for (let i = 0; i < arr_pz.length; i += 2) {
+        if (arr_pz[i] && arr_pz[i + 1] !== undefined) {
+            conversionPairs.push([arr_pz[i], arr_pz[i + 1]]);
+        }
+    }
+
+    // 關鍵步驟：依拼音長度從長到短排序，避免 "iang" 被 "ang" 錯誤地先轉換
+    conversionPairs.sort((a, b) => b[0].length - a[0].length);
+
+    pinyinToZhuyinMap = conversionPairs;
+    return pinyinToZhuyinMap;
+}
+
+/**
+ * 將拼音字串轉換為注音字串。
+ * @param {string} pinyinString - 原始的拼音字串。
+ * @returns {string} 轉換後的注音字串。
+ */
+function convertPinyinToZhuyin(pinyinString) {
+    if (!pinyinString) return "";
+
+    const map = buildPinyinToZhuyinMap();
+    let result = pinyinString;
+
+    // 規則：一個或多個連字號 (-) 取代為一個空格
+    result = result.replace(/-+/g, ' ');
+
+    // 依據預先排序好的映射表進行批次取代
+    for (const [pinyin, zhuyin] of map) {
+        // 使用 RegExp 的 'g' 旗標來取代所有出現的實例
+        result = result.replace(new RegExp(pinyin, 'g'), zhuyin);
+    }
+
+    return result;
+}
+// =================================================================
+const arr_pz = ["ainn","","iang","","iong","","iung","","uang","","inn","","eeu","","een","","eem","","eed","","eeb","","enn","","onn","","ang","","iag","","ied","","ien","","ong","","ung","","iid","","iim","","iin","","iab","","iam","","iau","","iog","","ieb","","iem","","ieu","","iug","","iun","","uad","","uai","","uan","","ued","","uen","","iui","","ioi","","iud","","ion","","iib","","ab","","ad","","ag","","ai","","am","","an","","au","","ed","","en","","eu","","ee","","oo","","er","","id","","in","","iu","","od","","og","","oi","","ud","","ug","","un","","em","","ii","","on","","ui","","eb","","io","","ia","","ib","","ie","","im","","ua","","bb","","a","","e","","i","","o","","u","","ng","","rh","","r","","zh","","ch","","sh","","b","","p","","m","","f","","d","","t","","n","","l","","g","","k","","h","","j","","q","","x","","z","","c","","s","","v",""];
 
 // 啟動應用
 init()
