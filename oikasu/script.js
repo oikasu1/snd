@@ -3,7 +3,7 @@
 // =================================================================
 const config = {
     // Local Storage 的獨特前綴，避免與其他應用程式衝突
-    STORAGE_PREFIX: "hakkaLearningApp_v3_",
+    STORAGE_PREFIX: "hakkaLearningApp_v4_",
 
     // 清除學習記錄時需要輸入的密碼
     CLEAR_DATA_PASSWORD: "kasu",
