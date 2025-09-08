@@ -684,3 +684,64 @@
     padding: 0.25rem 0.5rem;
     margin: -0.25rem -0.5rem; /* 抵銷內距，維持外觀大小 */
 }
+
+
+
+
+/* 重新定義控制按鈕的樣式，使其變為方形且有固定大小 */
+#learningModeToolbar .control-button {
+    @apply h-9 px-2 flex items-center justify-center gap-1.5 rounded-md text-gray-600 transition-colors duration-150;
+}
+
+/* 統一的懸浮效果 */
+#learningModeToolbar .control-button:hover {
+    @apply bg-gray-200 text-gray-800;
+}
+
+/* 按鈕啟用 (Active) 狀態，例如「關閉選取」按鈕 */
+#learningModeToolbar .control-button.active {
+    @apply bg-blue-100 text-blue-700;
+}
+#learningModeToolbar .control-button.active:hover {
+    @apply bg-blue-200;
+}
+
+
+/* 為每個群組與分隔線之間創造空間 */
+#learningModeToolbar .border-r {
+    @apply px-2;
+}
+#learningModeToolbar .pl-1 {
+    padding-left: 0.5rem; /* 8px */
+}
+#learningModeToolbar .pr-2 {
+    padding-right: 0.5rem; /* 8px */
+}
+
+/* 讓「語言顯示」這類帶有文字的按鈕可以自動調整寬度 */
+#learningModeToolbar #displayMenuToggle {
+    @apply w-auto px-2;
+}
+
+/* --- 下拉選單項目啟用狀態 (Dropdown Item Active State) --- */
+
+/* 通用啟用狀態：淡藍色底 + 深藍色文字 */
+.setting-option.active,
+.layout-option.active,
+.font-size-option.active {
+    @apply bg-blue-50 text-blue-800 font-semibold;
+}
+
+/* 讓勾選圖示的顏色與文字一致 */
+.setting-option.active .check-icon,
+.layout-option.active .check-icon,
+/* 【新增這裡】為字體選項的勾勾加上顏色 */
+.font-size-option.active .check-icon {
+    @apply text-blue-600;
+}
+
+/* 調整勾選圖示的大小 */
+.check-icon.material-icons {
+    /* 【修改這裡】將圖示從 20px 縮小為 18px */
+    font-size: 1.125rem; /* 18px */
+}

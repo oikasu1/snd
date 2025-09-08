@@ -22,9 +22,9 @@ const config = {
         quizLayout: 'horizontal', // 將在初次載入時根據螢幕寬度動態調整
         flashcardAutoPlayAudio: true,
         matchingColumns: 2, // 配對遊戲在電腦版的預設欄數
-        pinyinAnnotation: false,
+        pinyinAnnotation: true,
         phoneticSystem: 'pinyin',
-		playPinyinOnClick: false
+		playPinyinOnClick: true
     },
 
     // 不同模式下的字體大小級距
@@ -1823,6 +1823,8 @@ function showCelebration(element) {
 
 
 // 學習模式
+// script.js
+
 function showLearningView() {
     const contentArea = document.getElementById("contentArea");
 
@@ -1834,26 +1836,28 @@ function showLearningView() {
         userSettings.layout = 'double';
     }
 
-    // 新的佈局：工具列和句子容器是同層級的兄弟元素
     contentArea.innerHTML = `
-        <div id="learningModeToolbar" class="sticky top-0 z-20 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200 mb-6 py-2 px-3">
-            <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-
-                <div class="flex items-center gap-2">
+        <div id="learningModeToolbar" class="sticky top-0 z-20 bg-gray-50/80 backdrop-blur-sm border-b border-gray-200 mb-6 py-1 px-3">
+            <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-start gap-x-6 gap-y-2" role="toolbar">
+                
+                <div class="flex items-center gap-4">
                     <button id="enableLearningSelect" title="啟用選取模式" class="control-button">
-                        <span class="material-icons !text-xl">check_box_outline_blank</span>
+                        <span class="material-icons !text-lg">check_box_outline_blank</span>
+                        <span class="hidden md:inline text-sm">選取</span>
                     </button>
-                    <div id="learningSelectActions" class="hidden items-center gap-2">
+                    <div id="learningSelectActions" class="hidden items-center gap-4">
                         <button id="disableLearningSelect" title="關閉選取模式" class="control-button active">
-                            <span class="material-icons !text-xl">close</span>
+                            <span class="material-icons !text-lg">close</span>
+                            <span class="hidden md:inline text-sm">關閉</span>
                         </button>
-                        <div class="w-px h-5 bg-gray-300"></div>
                         <button id="learningSelectAll" title="全選/取消全選" class="control-button">
-                            <span class="material-icons !text-xl">select_all</span>
+                            <span class="material-icons !text-lg">select_all</span>
+                            <span class="hidden md:inline text-sm">勾選</span>
                         </button>
                         <div class="relative">
                             <button id="starMenuToggle" title="星號操作" class="control-button">
-                                <span class="material-icons !text-xl">star_outline</span>
+                                <span class="material-icons !text-lg">star_outline</span>
+                                <span class="hidden md:inline text-sm">星號</span>
                             </button>
                             <div id="starMenu" class="hidden absolute top-full left-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
                                 <button id="starSelected" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
@@ -1869,53 +1873,122 @@ function showLearningView() {
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-1">
+                <div id="learningModeStandardControls" class="flex flex-wrap items-center gap-x-6 gap-y-2">
+
+                    <div class="flex items-center gap-4 border-l border-gray-300 pl-6">
                         <div class="relative">
-                            <button id="pinyinAnnotationMenuToggle" class="control-button" title="標音設定">
-                                <span class="material-icons !text-xl">translate</span>
+                            <button id="annotationMenuToggle" class="control-button" title="標音位置">
+                                <span class="material-icons !text-lg">title</span>
+                                <span class="hidden md:inline text-sm">音位</span>
                             </button>
-                            <div id="pinyinAnnotationMenu" class="hidden absolute top-full right-0 mt-2 w-40 bg-white rounded-md shadow-lg border z-10 py-1">
-                                <button id="togglePinyinAnnotation" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 control-button">
-                                    <span class="material-icons text-base mr-2">vertical_align_top</span>
-                                    <span>拼音標字上</span>
+                            <div id="annotationMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
+                                <button data-setting="pinyinAnnotation" data-value="true" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons text-base mr-2">text_rotate_up</span>
+                                    <span>標在字上</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
+                                <button data-setting="pinyinAnnotation" data-value="false" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons text-base mr-2">text_rotation_none</span>
+                                    <span>獨立一行</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                             </div>
                         </div>
-                        <button id="togglePhoneticSystem" class="control-button" title="切換拼音/注音">
-                            <span class="material-icons !text-xl">font_download</span>
-                        </button>
-                        <button id="togglePlayPinyinOnClick" class="control-button" title="啟用點擊拼音播放">
-                            <span class="material-icons !text-xl">mic</span>
-                        </button>
-                         <div class="relative">
-                            <button id="displayMenuToggle" class="control-button" title="顯示設定">
-                                <span class="material-icons !text-xl">visibility</span>
+                        <div class="relative">
+                            <button id="phoneticMenuToggle" class="control-button" title="拼音注音">
+                                <span class="material-icons !text-lg">translate</span>
+                                <span class="hidden md:inline text-sm">拼注</span>
                             </button>
-                            <div id="displayMenu" class="hidden absolute top-full right-0 mt-2 w-28 bg-white rounded-md shadow-lg border z-10 p-1">
-                                <button id="hideHakka" title="客語" class="control-button w-full justify-start"><span class="material-icons !text-xl">visibility</span><span>客語</span></button>
-                                <button id="hidePinyin" title="拼音" class="control-button w-full justify-start"><span class="material-icons !text-xl">visibility</span><span>拼音</span></button>
-                                <button id="hideChinese" title="華語" class="control-button w-full justify-start"><span class="material-icons !text-xl">visibility</span><span>華語</span></button>
+                            <div id="phoneticMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
+                                <button data-setting="phoneticSystem" data-value="pinyin" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons text-base mr-2">text_fields</span>
+                                    <span>拼音</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
+                                <button data-setting="phoneticSystem" data-value="zhuyin" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons text-base mr-2">sticky_note_2</span>
+                                    <span>注音</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <button id="clickPlayMenuToggle" class="control-button" title="點音播放">
+                                <span class="material-icons !text-lg">touch_app</span>
+                                <span class="hidden md:inline text-sm">點播</span>
+                            </button>
+                            <div id="clickPlayMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
+                                <button data-setting="playPinyinOnClick" data-value="true" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons text-base mr-2">music_note</span>
+                                    <span>啟用點音播放</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
+                                <button data-setting="playPinyinOnClick" data-value="false" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons text-base mr-2">music_off</span>
+                                    <span>關閉點音播放</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
                             </div>
                         </div>
                     </div>
-                    <div class="w-px h-6 bg-gray-300 hidden md:block"></div>
-                    <div class="flex items-center gap-1">
-                        <button id="layoutToggle" class="control-button" title="切換版面">
-                            <span class="material-icons !text-xl">view_agenda</span>
-                        </button>
-                        <button onclick="adjustFontSize(-1, 'learning')" title="縮小字體" class="control-button">
-                            <span class="material-icons !text-xl">text_decrease</span>
-                        </button>
-                        <button onclick="adjustFontSize(1, 'learning')" title="放大字體" class="control-button">
-                            <span class="material-icons !text-xl">text_increase</span>
-                        </button>
+
+                    <div class="flex items-center gap-4 border-l border-gray-300 pl-6">
+                         <div class="relative">
+                            <button id="displayMenuToggle" class="control-button" title="顯示設定">
+                                <span class="material-icons !text-lg">visibility</span>
+                                <span class="hidden md:inline text-sm">顯示</span>
+                            </button>
+                            <div id="displayMenu" class="hidden absolute top-full right-0 mt-2 w-32 bg-white rounded-md shadow-lg border z-10 p-1">
+                                <button id="hideHakka" title="客語" class="control-button w-full justify-start"><span class="material-icons !text-lg">visibility</span><span class="text-sm">客語</span></button>
+                                <button id="hidePinyin" title="拼音" class="control-button w-full justify-start"><span class="material-icons !text-lg">visibility</span><span class="text-sm">拼音</span></button>
+                                <button id="hideChinese" title="華語" class="control-button w-full justify-start"><span class="material-icons !text-lg">visibility</span><span class="text-sm">華語</span></button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-4 border-l border-gray-300 pl-6">
+                        <div class="relative">
+                            <button id="layoutMenuToggle" class="control-button" title="切換版面">
+                                <span id="layoutIcon" class="material-icons !text-lg"></span>
+                                <span class="hidden md:inline text-sm">版面</span>
+                            </button>
+                            <div id="layoutMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
+                                <button data-layout="double" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons text-base mr-2">view_column</span>
+                                    <span>雙欄</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
+                                <button data-layout="single" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons text-base mr-2">view_agenda</span>
+                                    <span>單欄</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
+                                <button data-layout="compact" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons text-base mr-2">view_list</span>
+                                    <span>精簡</span>
+                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <button id="fontSizeMenuToggle" class="control-button" title="調整字體">
+                                <span class="material-icons !text-lg">format_size</span>
+                                <span class="hidden md:inline text-sm">字體</span>
+                            </button>
+                            <div id="fontSizeMenu" class="hidden absolute top-full right-0 mt-2 w-32 bg-white rounded-md shadow-lg border z-10 p-1">
+                                ${config.FONT_SIZES.learning.map(size => `
+                                    <button data-size="${size}" class="w-full flex items-center justify-between px-3 py-1.5 hover:bg-gray-100 text-sm rounded-md font-size-option">
+                                        <span>${size}px</span>
+                                        <span class="material-icons check-icon"></span>
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
             </div>
         </div>
-
         <div class="max-w-6xl mx-auto">
             <div id="sentenceContainer"></div>
         </div>
@@ -1924,9 +1997,6 @@ function showLearningView() {
     renderSentences();
     setupLearningControls();
 }
-
-
-
 
 // 精簡按鈕狀態的函數
 function updateCompactToggleButton() {
@@ -2073,48 +2143,40 @@ function renderSentences() {
 
 
 function setupLearningControls() {
-    const hideStates = {
-        hakka: "show",
-        pinyin: "show",
-        chinese: "show"
-    };
-
+    const hideStates = { hakka: "show", pinyin: "show", chinese: "show" };
     const enableBtn = document.getElementById("enableLearningSelect");
     const disableBtn = document.getElementById("disableLearningSelect");
     const actionsContainer = document.getElementById("learningSelectActions");
+    const standardControls = document.getElementById("learningModeStandardControls");
 
-    // 模式切換
     const toggleLearningSelectMode = (enable) => {
         isLearningSelectMode = enable;
         if (enable) {
             enableBtn.classList.add("hidden");
             actionsContainer.classList.remove("hidden");
             actionsContainer.classList.add("flex");
-            // 預設全選
+            standardControls.classList.add("hidden"); // 隱藏其他按鈕
             selectedSentences.clear();
             categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
         } else {
-            // 【修改】關閉選取模式前，若無選取則自動全選
             if (selectedSentences.size === 0) {
                 categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
             }
             enableBtn.classList.remove("hidden");
             actionsContainer.classList.add("hidden");
             actionsContainer.classList.remove("flex");
-            // 注意：此處不清空 selectedSentences，以便其他模式能接收到選取狀態
+            standardControls.classList.remove("hidden"); // 顯示其他按鈕
         }
         renderSentences();
-        updateSelectAllButtonState(); // 更新按鈕狀態
+        updateSelectAllButtonState();
     };
 
     enableBtn.onclick = () => toggleLearningSelectMode(true);
     disableBtn.onclick = () => toggleLearningSelectMode(false);
 
-    // 全選/取消全選
     document.getElementById("learningSelectAll").onclick = () => {
         const totalCount = categories[currentCategory].length;
         const selectedCount = selectedSentences.size;
-
         if (selectedCount < totalCount) {
             selectedSentences.clear();
             categories[currentCategory].forEach((_, index) => selectedSentences.add(index));
@@ -2122,50 +2184,145 @@ function setupLearningControls() {
             selectedSentences.clear();
         }
         renderSentences();
-        updateSelectAllButtonState(); // 更新按鈕狀態
+        updateSelectAllButtonState();
     };
 
-    // START: New Display Dropdown Logic
-    const displayMenuToggle = document.getElementById("displayMenuToggle");
-    const displayMenu = document.getElementById("displayMenu");
+    // --- Helper function to manage multiple dropdowns ---
+    const dropdowns = [
+        { toggle: 'starMenuToggle', menu: 'starMenu' },
+        { toggle: 'annotationMenuToggle', menu: 'annotationMenu' },
+        { toggle: 'phoneticMenuToggle', menu: 'phoneticMenu' },
+        { toggle: 'clickPlayMenuToggle', menu: 'clickPlayMenu' },
+        { toggle: 'displayMenuToggle', menu: 'displayMenu' },
+        { toggle: 'layoutMenuToggle', menu: 'layoutMenu' },
+        { toggle: 'fontSizeMenuToggle', menu: 'fontSizeMenu' },
+    ];
 
-    if (displayMenuToggle && displayMenu) {
-        displayMenuToggle.onclick = (e) => {
-            e.stopPropagation();
-            displayMenu.classList.toggle("hidden");
-        };
-
-        // 監聽整個頁面的點擊，如果點擊位置不在選單和觸發按鈕內，就關閉選單
-        document.addEventListener('click', (e) => {
-            if (!displayMenu.classList.contains('hidden') && !displayMenu.contains(e.target) && !displayMenuToggle.contains(e.target)) {
-                displayMenu.classList.add('hidden');
+    const closeAllDropdowns = (exceptMenuId = null) => {
+        dropdowns.forEach(d => {
+            const menu = document.getElementById(d.menu);
+            if (menu && d.menu !== exceptMenuId) {
+                menu.classList.add('hidden');
             }
-        }, true);
-    }
-    // END: New Display Dropdown Logic
-
-    // 星號下拉選單的控制邏輯
-    const starMenuToggle = document.getElementById("starMenuToggle");
-    const starMenu = document.getElementById("starMenu");
-
-    if (starMenuToggle && starMenu) {
-        starMenuToggle.onclick = (e) => {
-            e.stopPropagation();
-            starMenu.classList.toggle("hidden");
-        };
-        starMenu.querySelectorAll('button').forEach(button => {
-            button.addEventListener('click', () => {
-                starMenu.classList.add('hidden');
-            });
         });
-        document.addEventListener('click', (e) => {
-            if (!starMenu.classList.contains('hidden') && !starMenu.contains(e.target) && !starMenuToggle.contains(e.target)) {
-                starMenu.classList.add('hidden');
-            }
-        }, true);
-    }
+    };
 
-    // 【修改】加入星號 -> 全部加星號
+    dropdowns.forEach(d => {
+        const toggleBtn = document.getElementById(d.toggle);
+        const menu = document.getElementById(d.menu);
+        if (toggleBtn && menu) {
+            toggleBtn.onclick = (e) => {
+                e.stopPropagation();
+                const isHidden = menu.classList.contains('hidden');
+                closeAllDropdowns();
+                if (isHidden) {
+                    menu.classList.remove('hidden');
+                }
+            };
+        }
+    });
+
+    document.addEventListener('click', () => closeAllDropdowns());
+    dropdowns.forEach(d => {
+        const menu = document.getElementById(d.menu);
+        menu?.addEventListener('click', e => e.stopPropagation());
+    });
+
+    // --- New Dropdown Logic ---
+    const updateLearningControlsUI = () => {
+        // Update setting options (annotation, phonetic, clickPlay)
+        document.querySelectorAll('.setting-option').forEach(button => {
+            const setting = button.dataset.setting;
+            const value = button.dataset.value === 'true' ? true : button.dataset.value === 'false' ? false : button.dataset.value;
+            const checkIcon = button.querySelector('.check-icon');
+            if (userSettings[setting] === value) {
+                button.classList.add('active');
+                checkIcon.textContent = 'check';
+            } else {
+                button.classList.remove('active');
+                checkIcon.textContent = '';
+            }
+        });
+
+        // Update layout options
+        const layoutIcon = document.getElementById('layoutIcon');
+        document.querySelectorAll('.layout-option').forEach(button => {
+            const layout = button.dataset.layout;
+            const checkIcon = button.querySelector('.check-icon');
+            if (userSettings.layout === layout) {
+                button.classList.add('active');
+                checkIcon.textContent = 'check';
+            } else {
+                button.classList.remove('active');
+                checkIcon.textContent = '';
+            }
+        });
+        if (layoutIcon) {
+           switch(userSettings.layout) {
+                case "double": layoutIcon.textContent = "view_column"; break;
+                case "single": layoutIcon.textContent = "view_agenda"; break;
+                case "compact": layoutIcon.textContent = "view_list"; break;
+           }
+        }
+        
+        // Update font size options
+        document.querySelectorAll('.font-size-option').forEach(button => {
+            const size = parseInt(button.dataset.size, 10);
+            const checkIcon = button.querySelector('.check-icon');
+            if (userSettings.fontSize === size) {
+                button.classList.add('active');
+                checkIcon.textContent = 'check';
+            } else {
+                button.classList.remove('active');
+                checkIcon.textContent = '';
+            }
+        });
+    };
+
+    // Generic handler for setting options
+    document.querySelectorAll('.setting-option').forEach(button => {
+        button.onclick = () => {
+            const setting = button.dataset.setting;
+            const value = button.dataset.value === 'true' ? true : button.dataset.value === 'false' ? false : button.dataset.value;
+            
+            if (userSettings[setting] !== value) {
+                userSettings[setting] = value;
+                saveUserSettings();
+                renderSentences();
+                updateLearningControlsUI();
+            }
+            closeAllDropdowns();
+        };
+    });
+
+    // Layout options handler
+    document.querySelectorAll('.layout-option').forEach(button => {
+        button.onclick = () => {
+            const layout = button.dataset.layout;
+            if (userSettings.layout !== layout) {
+                userSettings.layout = layout;
+                saveUserSettings();
+                showLearningView(); // Re-render the entire view for layout changes
+            }
+            closeAllDropdowns();
+        };
+    });
+
+    // Font size options handler
+    document.querySelectorAll('.font-size-option').forEach(button => {
+        button.onclick = () => {
+            const size = parseInt(button.dataset.size, 10);
+            if (userSettings.fontSize !== size) {
+                userSettings.fontSize = size;
+                saveUserSettings();
+                renderSentences();
+                updateLearningControlsUI();
+            }
+            closeAllDropdowns();
+        };
+    });
+    
+    // --- Existing unchanged logic for star and display ---
     document.getElementById("starSelected").onclick = () => {
         categories[currentCategory].forEach(sentence => {
             if (!sentence) return;
@@ -2174,9 +2331,9 @@ function setupLearningControls() {
         });
         saveStarredCards();
         renderSentences();
+        closeAllDropdowns();
     };
 
-    // 【修改】取消星號 -> 全部移除星號
     document.getElementById("unstarSelected").onclick = () => {
         categories[currentCategory].forEach(sentence => {
             if (!sentence) return;
@@ -2185,37 +2342,9 @@ function setupLearningControls() {
         });
         saveStarredCards();
         renderSentences();
+        closeAllDropdowns();
     };
 
-    // 排版切換 (三段循環)
-    const layoutToggle = document.getElementById("layoutToggle");
-    if (layoutToggle) {
-        const layouts = ["double", "single", "compact"];
-        const icon = layoutToggle.querySelector(".material-icons");
-        switch (userSettings.layout) {
-            case "double":
-                icon.textContent = "view_agenda";
-                layoutToggle.title = "切換為單欄";
-                break;
-            case "single":
-                icon.textContent = "view_list";
-                layoutToggle.title = "切換為精簡列表";
-                break;
-            case "compact":
-                icon.textContent = "view_column";
-                layoutToggle.title = "切換為雙欄";
-                break;
-        }
-        layoutToggle.onclick = () => {
-            const currentIndex = layouts.indexOf(userSettings.layout);
-            const nextIndex = (currentIndex + 1) % layouts.length;
-            userSettings.layout = layouts[nextIndex];
-            saveUserSettings();
-            showLearningView();
-        };
-    }
-
-    // 隱藏控制
     const setupHideButton = (buttonId, textClass, type, label) => {
         const button = document.getElementById(buttonId);
         if (!button) return;
@@ -2230,90 +2359,17 @@ function setupLearningControls() {
             });
             button.classList.remove("bg-yellow-100", "text-yellow-700", "bg-red-100", "text-red-700");
             switch (hideStates[type]) {
-                case "show":
-                    button.title = `${label}顯示`;
-                    icon.textContent = "visibility";
-                    break;
-                case "blur":
-                    elements.forEach((el) => el.classList.add("blur-text"));
-                    button.classList.add("bg-yellow-100", "text-yellow-700");
-                    button.title = `${label}模糊`;
-                    icon.textContent = "blur_on";
-                    break;
-                case "hide":
-                    elements.forEach((el) => el.classList.add("hidden-text"));
-                    button.classList.add("bg-red-100", "text-red-700");
-                    button.title = `${label}隱藏`;
-                    icon.textContent = "visibility_off";
-                    break;
+                case "show": button.title = `${label}顯示`; icon.textContent = "visibility"; break;
+                case "blur": elements.forEach((el) => el.classList.add("blur-text")); button.classList.add("bg-yellow-100", "text-yellow-700"); button.title = `${label}模糊`; icon.textContent = "blur_on"; break;
+                case "hide": elements.forEach((el) => el.classList.add("hidden-text")); button.classList.add("bg-red-100", "text-red-700"); button.title = `${label}隱藏`; icon.textContent = "visibility_off"; break;
             }
-        }
-    }
+        };
+    };
     setupHideButton("hideHakka", "hakka-text", "hakka", "客語");
     setupHideButton("hidePinyin", "pinyin-text", "pinyin", "拼音");
     setupHideButton("hideChinese", "chinese-text", "chinese", "華語");
 
-    // 【新增以下程式碼】
-    const annotationMenuToggle = document.getElementById("pinyinAnnotationMenuToggle");
-    const annotationMenu = document.getElementById("pinyinAnnotationMenu");
-
-    if (annotationMenuToggle && annotationMenu) {
-        annotationMenuToggle.onclick = (e) => {
-            e.stopPropagation();
-            annotationMenu.classList.toggle("hidden");
-        };
-        document.addEventListener('click', (e) => {
-            if (!annotationMenu.classList.contains('hidden') && !annotationMenu.contains(e.target) && !annotationMenuToggle.contains(e.target)) {
-                annotationMenu.classList.add('hidden');
-            }
-        }, true);
-    }
-
-    const toggleAnnotationBtn = document.getElementById("togglePinyinAnnotation");
-    if (toggleAnnotationBtn) {
-        toggleAnnotationBtn.onclick = () => {
-            userSettings.pinyinAnnotation = !userSettings.pinyinAnnotation;
-            saveUserSettings();
-            renderSentences();
-            annotationMenu.classList.add('hidden');
-        };
-    }
-
-    // --- 新增開始 ---
-    const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
-    if (togglePhoneticBtn) {
-        // 根據目前設定，初始化按鈕樣式
-        togglePhoneticBtn.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
-        togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
-
-        togglePhoneticBtn.onclick = () => {
-            // 切換設定
-            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
-            saveUserSettings();
-            // 更新按鈕樣式與標題
-            togglePhoneticBtn.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
-            togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
-            // 重新渲染句子列表以顯示變更
-            renderSentences();
-        };
-    }
-    // --- 新增開始 ---
-    const togglePlayPinyinBtn = document.getElementById("togglePlayPinyinOnClick");
-    if (togglePlayPinyinBtn) {
-        const updateBtnState = () => {
-            togglePlayPinyinBtn.classList.toggle('active', userSettings.playPinyinOnClick);
-            togglePlayPinyinBtn.title = userSettings.playPinyinOnClick ? '停用點擊拼音播放' : '啟用點擊拼音播放';
-        };
-        updateBtnState(); // 初始化按鈕狀態
-
-        togglePlayPinyinBtn.onclick = () => {
-            userSettings.playPinyinOnClick = !userSettings.playPinyinOnClick;
-            saveUserSettings();
-            updateBtnState();
-            renderSentences(); // 重新渲染以應用點擊功能
-        };
-    }
-    // --- 新增結束 ---
+    updateLearningControlsUI();
 }
 
 // 切換句子選取
@@ -2422,7 +2478,7 @@ function showFlashcardView() {
                 </div>
                 <div class="relative">
                      <button id="flashcardAnnotationBtn" class="control-btn !p-2" title="標音設定">
-                        <span class="material-icons">translate</span>
+                        <span class="material-icons">text_rotation_none</span>
                     </button>
                     <div id="flashcardAnnotationPopup" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg border z-10 py-1">
                         <button id="toggleFlashcardAnnotation" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 control-button">
@@ -2432,7 +2488,7 @@ function showFlashcardView() {
                     </div>
                 </div>
                 <button id="toggleFlashcardPhoneticSystem" class="control-btn !p-2" title="切換拼音/注音">
-                    <span class="material-icons">font_download</span>
+                    <span class="material-icons">translate</span>
                 </button>
             </div>
 
@@ -3094,7 +3150,7 @@ function showMatchingGame() {
                                 <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
                             </button>
                             <button id="togglePhoneticSystem" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換拼音/注音">
-                                <span class="material-icons text-gray-600 !text-xl align-middle">font_download</span>
+                                <span class="material-icons text-gray-600 !text-xl align-middle">translate</span>
                             </button>
                             <button onclick="adjustFontSize(-1, 'matching')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
@@ -3807,7 +3863,7 @@ function showQuizGame() {
                                 <span class="material-icons text-gray-600 !text-xl align-middle">view_agenda</span>
                             </button>
                             <button id="togglePhoneticSystem" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換拼音/注音">
-                                <span class="material-icons text-gray-600 !text-xl align-middle">font_download</span>
+                                <span class="material-icons text-gray-600 !text-xl align-middle">translate</span>
                             </button>
                             <button onclick="adjustFontSize(-1, 'quiz')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
@@ -4362,10 +4418,10 @@ function showSortingGame() {
                                 <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
                             </label>
                              <button id="togglePlayPinyinOnClickSorting" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="啟用點擊拼音播放">
-                                <span class="material-icons text-gray-600 !text-xl align-middle">mic</span>
+                                <span class="material-icons text-gray-600 !text-xl align-middle">touch_app</span>
                             </button>
                             <button id="togglePhoneticSystem" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換拼音/注音">
-                                <span class="material-icons text-gray-600 !text-xl align-middle">font_download</span>
+                                <span class="material-icons text-gray-600 !text-xl align-middle">translate</span>
                             </button>
                             <button onclick="adjustFontSize(-1, 'sorting')" title="縮小字體" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
                                 <span class="material-icons text-gray-600 !text-xl align-middle">text_decrease</span>
@@ -4753,6 +4809,33 @@ function checkSortingAnswer() {
             wordEl.classList.add('bg-green-600', 'cursor-default');
             wordEl.onclick = null;
         });
+
+        // --- START: 已加入的修改 ---
+        const wordBankContainer = document.getElementById('sortingWordBankContainer');
+        const sentence = sortingGameState.currentSentence;
+        const type = document.getElementById("sortingType").value;
+        let revealedText = '';
+        
+        // 輔助函數，用於處理拼音/注音轉換
+        const getPhonetic = (text) => userSettings.phoneticSystem === 'zhuyin' ? convertPinyinToZhuyin(text) : text;
+
+        if (type.includes('hakka') && type.includes('pinyin')) {
+            revealedText = sentence['華語'];
+        } else if (type.includes('chinese') && type.includes('pinyin')) {
+            revealedText = sentence['客語'];
+        } else if (type.includes('chinese') && type.includes('hakka')) {
+            // 當第三語言是拼音時，也需要根據用戶設定轉換為注音
+            revealedText = getPhonetic(sentence['拼音']);
+        }
+
+        if (revealedText && wordBankContainer) {
+            wordBankContainer.innerHTML = `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center transition-all duration-300 w-full animate-pulse">
+                    <p class="text-green-900 mt-1" style="font-size: ${userSettings.fontSize + 2}px">${revealedText}</p>
+                </div>
+            `;
+        }
+        // --- END: 已加入的修改 ---
 
         const condition = document.getElementById("sortingCondition").value;
         if (condition.startsWith("correct")) {
