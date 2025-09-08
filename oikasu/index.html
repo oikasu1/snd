@@ -257,7 +257,15 @@
                     <div id="resultIcon" class="text-5xl mb-3"></div>
                     <h3 id="resultTitle" class="text-xl font-bold mb-3"></h3>
                     <p id="resultMessage" class="text-gray-600 mb-5 whitespace-pre-line"></p>
-                    <button id="closeResult" class="bg-blue-500 text-white px-5 py-2 rounded-lg hover:bg-blue-600">確定</button>
+                    
+                    <div class="flex items-center justify-center gap-3">
+                        <button id="closeResult" class="bg-blue-500 text-white px-5 py-2 rounded-lg hover:bg-blue-600">確定</button>
+                        
+                        <button id="submitResult" class="hidden bg-green-500 text-white px-5 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2">
+                            <span class="material-icons !text-xl">cloud_upload</span>
+                            <span>送出成績</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

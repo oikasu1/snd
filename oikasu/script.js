@@ -3,10 +3,28 @@
 // =================================================================
 const config = {
     // Local Storage 的獨特前綴，避免與其他應用程式衝突
-    STORAGE_PREFIX: "hakkaLearningApp_v4_",
+    STORAGE_PREFIX: "hakkaLearningApp_v3_",
 
     // 清除學習記錄時需要輸入的密碼
     CLEAR_DATA_PASSWORD: "kasu",
+
+    // 【新增】GOOGLE 表單設定
+    GOOGLE_FORM_CONFIG: {
+        // 【請替換】將 YOUR_FORM_URL 換成您自己的 Google 表單回應網址
+        formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSeAHb2ovqcJsQnOhuEqVjk_9ORt9mcfGvqvNpwBA7FgOCXTzw/formResponse", 
+        
+        // 【請替換】以下 entry.xxxxxx 為欄位 ID，請換成您表單對應的 ID
+        nameField: "entry.390906906",      // 姓名 (文字)
+        idField: "entry.766582104",        // 班號/ID (文字)
+        gameTypeField: "entry.1584239140",   // 遊戲類型 (文字: matching, quiz, sorting)
+        scoreField: "entry.774071075",      // 分數 (數字)
+        durationField: "entry.125296714",   // 遊戲時間 (秒) (數字)
+        correctField: "entry.1437468126",    // 答對題數 (數字)
+        incorrectField: "entry.998835752",  // 答錯題數 (數字)
+        stepsField: "entry.928414443",      // 步數 (配對遊戲) (數字)
+        accuracyField: "entry.500179980",   // 正確率 (%) (數字)
+        settingsField: "entry.1928836665"    // 遊戲設定 (文字, JSON 格式)
+    },
 
     // 慶祝動畫中隨機顯示的表情符號
     CELEBRATION_EMOJIS: ["🌈", "🌟", "🎊", "🎉", "✨", "💖", "😍", "🥰"],
@@ -1272,9 +1290,10 @@ function startLearning() {
   
   const tempCategoryName = `${selectedCount}主題`;
   
-  // 【修改】使用更通用的方式來清除舊的暫存分類
+  // 【修改處】使用更嚴謹的方式來清除舊的暫存分類
   Object.keys(categories).forEach(key => {
-    if (key.endsWith("主題")) {
+    // 確保只刪除由數字開頭的暫存主題，例如 "4主題", "3/4主題"
+    if (key.endsWith("主題") && !isNaN(parseInt(key, 10))) {
       delete categories[key];
     }
   });
@@ -3729,49 +3748,7 @@ function checkRoundComplete() {
     }
 }
 
-function endMatchingGame(message, finalTime = null) {
-    matchingGameState.isPlaying = false;
-    const button = document.getElementById("startMatching");
-    const optionsContainer = document.getElementById("matchingOptions");
 
-    // 遊戲結束時，新增禁用 class
-    document.getElementById("matchingArea").classList.add("game-area-disabled");
-
-    if (matchingGameState.timerInterval) {
-        clearInterval(matchingGameState.timerInterval);
-    }
-
-    if (button) {
-        button.innerHTML = "重新開始";
-        button.title = "重新開始";
-        button.className = "bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base";
-        button.onclick = restartMatchingGame;
-    }
-
-    optionsContainer.querySelectorAll('select').forEach(el => {
-        el.classList.remove('opacity-50', 'pointer-events-none');
-        el.disabled = false;
-    });
-    if (window.innerWidth < 768) {
-        optionsContainer.classList.remove('hidden');
-    }
-
-    const timerElement = document.getElementById("matchingTimer");
-    if (timerElement && finalTime !== null) {
-        timerElement.textContent = ` ${finalTime}`;
-    }
-
-    const timerBar = document.getElementById("matchingTimerBar");
-    if (timerBar) {
-        timerBar.style.width = "100%";
-    }
-
-    showResult(
-        "🎉",
-        "配對完成",
-        `${message}\n\n最終分數：${matchingGameState.score}\n操作步數：${matchingGameState.steps}`
-    );
-}
 
 function showMatchingResults() {
     const resultsContainer = document.getElementById("matchingResultsList")
@@ -4282,87 +4259,10 @@ function selectQuizOption(selectedAnswer, element) {
     }, 1500);
 }
 
-function endQuizGame(message) {
-    quizGameState.isPlaying = false;
-    const button = document.getElementById("startQuiz");
-    const optionsContainer = document.getElementById("quizOptionsContainer");
 
-    // 遊戲結束時，新增禁用 class
-    document.getElementById("quizArea").classList.add("game-area-disabled");
 
-    if (quizGameState.timerInterval) {
-        clearInterval(quizGameState.timerInterval);
-    }
 
-    if (button) {
-        button.innerHTML = "重新開始";
-        button.title = "重新開始";
-        button.className = "bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
-        button.onclick = restartQuizGame;
-    }
 
-    optionsContainer.querySelectorAll('select').forEach(el => {
-        el.classList.remove('opacity-50', 'pointer-events-none');
-        el.disabled = false;
-    });
-    if (window.innerWidth < 768) {
-        optionsContainer.classList.remove('hidden');
-    }
-
-    const accuracy = quizGameState.total > 0 ? Math.round((quizGameState.correct / quizGameState.total) * 100) : 0;
-
-    showResult(
-        "🎯",
-        "測驗結束",
-        `${message}\n\n` +
-        `答對：${quizGameState.correct} 題\n` +
-        `答錯：${quizGameState.incorrect} 題\n` +
-        `總題數：${quizGameState.total} 題\n` +
-        `正確率：${accuracy}%`
-    );
-}
-
-// 替換 endSortingGame()
-function endSortingGame(message) {
-    sortingGameState.isPlaying = false;
-    const button = document.getElementById("startSorting");
-    const optionsContainer = document.getElementById("sortingOptions");
-
-    // 遊戲結束時，新增禁用 class
-    document.getElementById("sortingArea").classList.add("game-area-disabled");
-
-    if (sortingGameState.timerInterval) {
-        clearInterval(sortingGameState.timerInterval);
-    }
-
-    if (button) {
-        button.innerHTML = "重新開始";
-        button.title = "重新開始";
-        button.className = "bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
-        button.onclick = restartSortingGame;
-    }
-
-    optionsContainer.querySelectorAll('select').forEach(el => {
-        el.classList.remove('opacity-50', 'pointer-events-none');
-        el.disabled = false;
-    });
-    if (window.innerWidth < 768) {
-        optionsContainer.classList.remove('hidden');
-    }
-
-    const totalQuestions = sortingGameState.correct + sortingGameState.incorrect;
-    const accuracy = totalQuestions > 0 ? Math.round((sortingGameState.correct / totalQuestions) * 100) : 0;
-
-    showResult(
-        "🎯",
-        "排序結束",
-        `${message}\n\n` +
-        `最終分數：${sortingGameState.score}\n` +
-        `答對題數：${sortingGameState.correct}\n` +
-        `答錯題數：${sortingGameState.incorrect}\n` +
-        `正確率：${accuracy}%`
-    );
-}
 
 // 排序遊戲
 function showSortingGame() {
@@ -4605,7 +4505,6 @@ function startSortingTimer() {
     }, 1000)
 }
 
-
 function generateSortingQuestion(isNewQuestion = true) {
     let sentence;
 
@@ -4628,12 +4527,9 @@ function generateSortingQuestion(isNewQuestion = true) {
     let pinyinSyllables;
 	sentence["拼音"] = sentence["拼音"].replace(/([,.?!;:。！？，、：；()（）])/g, ' $1 ').trim();
 
-    // 【核心修改】根據答案類型（type 字串的結尾），決定拼音的分割方式
     if (type.endsWith('-pinyin')) {
-        // 當答案是「拼音」時(如 chinese-pinyin)，只用一個或多個空格分割
         pinyinSyllables = sentence["拼音"].split(/[\s]+/).filter(w => w.trim() !== "");
     } else {
-        // 當答案是「客語」時(如 pinyin-hakka)，用空格 或 連字號分割，以確保能與漢字對應
         pinyinSyllables = sentence["拼音"].split(/[\s-]+/).filter(w => w.trim() !== "");
     }
 
@@ -4647,13 +4543,12 @@ function generateSortingQuestion(isNewQuestion = true) {
         case "hakka-pinyin":
         case "chinese-pinyin":
 			questionText = (type === "hakka-pinyin") ? sentence["客語"] : sentence["華語"];
-
 			wordObjects = baseWordInfo
-				.filter(item => item.pinyin && item.pinyin.trim() !== "") // 移除 pinyin 為空或空白的項目
+				.filter(item => item.pinyin && item.pinyin.trim() !== "") 
 				.map(item => {
 					return {
-						display: getPhonetic(item.pinyin), // display 是格式化後的版本
-						pinyin: item.pinyin // pinyin 保留原始音節，用於點擊發音
+						display: getPhonetic(item.pinyin),
+						pinyin: item.pinyin
 					};
 				});
             break;
@@ -4670,10 +4565,19 @@ function generateSortingQuestion(isNewQuestion = true) {
 
     wordObjects.forEach((obj, index) => obj.id = index);
 
+    let fixedObjects = [];
+    let shuffleObjects = wordObjects;
+
+    if (wordObjects.length > 6) {
+        const fixedCount = wordObjects.length - 6;
+        fixedObjects = wordObjects.slice(0, fixedCount);
+        shuffleObjects = wordObjects.slice(fixedCount);
+    }
+
     sortingGameState.questionText = questionText;
     sortingGameState.originalWordObjects = [...wordObjects];
-    sortingGameState.shuffledWordObjects = [...wordObjects].sort(() => Math.random() - 0.5);
-    sortingGameState.userOrderObjects = [];
+    sortingGameState.shuffledWordObjects = [...shuffleObjects].sort(() => Math.random() - 0.5);
+    sortingGameState.userOrderObjects = [...fixedObjects];
 
     renderSortingQuestion();
 
@@ -4876,13 +4780,347 @@ function checkSortingAnswer() {
     }
 }
 
+/**
+ * 儲存遊戲結果到 Local Storage
+ * @param {object} resultData - 包含遊戲結果的物件
+ */
+function saveGameResult(resultData) {
+    if (!currentUser || currentUser.id === 'guest') {
+        console.log("訪客模式，不儲存遊戲記錄。");
+        return;
+    }
+    const historyKey = `${config.STORAGE_PREFIX}gameHistory_${currentUser.id}`;
+    let history = [];
+    try {
+        const storedHistory = localStorage.getItem(historyKey);
+        if (storedHistory) {
+            history = JSON.parse(storedHistory);
+        }
+    } catch (e) {
+        console.error("讀取遊戲歷史記錄失敗:", e);
+        history = [];
+    }
+
+    // 新增時間戳記
+    resultData.timestamp = new Date().toISOString();
+
+    // 將新記錄加到最前面
+    history.unshift(resultData);
+
+    // 保持最多 50 筆記錄
+    if (history.length > 50) {
+        history = history.slice(0, 50);
+    }
+
+    localStorage.setItem(historyKey, JSON.stringify(history));
+}
+
+
+/**
+ * 將遊戲結果非同步送到 Google 表單
+ * @param {object} gameResult - 包含遊戲結果的物件
+ * @returns {Promise<boolean>} - 回傳一個表示提交是否成功的 Promise
+ */
+async function submitToGoogleForm(gameResult) {
+    const { GOOGLE_FORM_CONFIG } = config;
+
+    // 檢查 URL 是否為預設值，如果是，則提醒使用者修改
+    if (!GOOGLE_FORM_CONFIG.formUrl || GOOGLE_FORM_CONFIG.formUrl.includes("YOUR_FORM_URL")) {
+        console.error("錯誤：Google 表單 URL 未設定。請在 script.js 的 config 物件中修改 GOOGLE_FORM_CONFIG.formUrl。");
+        showResult("❌", "提交失敗", "開發者尚未設定成績提交網址。");
+        return false;
+    }
+
+    const formData = new FormData();
+    formData.append(GOOGLE_FORM_CONFIG.nameField, currentUser.name);
+    formData.append(GOOGLE_FORM_CONFIG.idField, currentUser.id);
+    formData.append(GOOGLE_FORM_CONFIG.gameTypeField, gameResult.gameType);
+    formData.append(GOOGLE_FORM_CONFIG.scoreField, gameResult.score);
+    formData.append(GOOGLE_FORM_CONFIG.durationField, gameResult.duration);
+    
+    // 根據遊戲類型，附加額外資訊
+    if (gameResult.correct !== undefined) formData.append(GOOGLE_FORM_CONFIG.correctField, gameResult.correct);
+    if (gameResult.incorrect !== undefined) formData.append(GOOGLE_FORM_CONFIG.incorrectField, gameResult.incorrect);
+    if (gameResult.steps !== undefined) formData.append(GOOGLE_FORM_CONFIG.stepsField, gameResult.steps);
+    if (gameResult.accuracy !== undefined) formData.append(GOOGLE_FORM_CONFIG.accuracyField, gameResult.accuracy);
+    
+    // 將設定物件轉換為 JSON 字串
+    if (gameResult.settings) {
+        formData.append(GOOGLE_FORM_CONFIG.settingsField, JSON.stringify(gameResult.settings));
+    }
+
+    try {
+        await fetch(GOOGLE_FORM_CONFIG.formUrl, {
+            method: "POST",
+            body: formData,
+            mode: "no-cors" // Google 表單需要 no-cors 模式
+        });
+        return true; // 提交成功
+    } catch (error) {
+        console.error("提交至 Google 表單時發生錯誤:", error);
+        return false; // 提交失敗
+    }
+}
+
+function endMatchingGame(message, finalTime = null) {
+    matchingGameState.isPlaying = false;
+    const button = document.getElementById("startMatching");
+    const optionsContainer = document.getElementById("matchingOptions");
+
+    // 遊戲結束時，新增禁用 class
+    document.getElementById("matchingArea").classList.add("game-area-disabled");
+
+    if (matchingGameState.timerInterval) {
+        clearInterval(matchingGameState.timerInterval);
+    }
+    
+    // --- 新增：記錄遊戲成果 ---
+    const condition = document.getElementById("matchingCondition").value;
+    let duration = 0;
+    if (condition.startsWith("time")) {
+        const timeLimit = parseInt(condition.replace("time", ""), 10);
+        duration = timeLimit - matchingGameState.timeLeft;
+    } else if (matchingGameState.startTime) {
+        duration = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
+    }
+
+    const gameResult = {
+        gameType: 'matching',
+        score: matchingGameState.score,
+        steps: matchingGameState.steps,
+        duration: finalTime !== null ? finalTime : duration,
+        settings: {
+            categories: Array.from(selectedCategories),
+            type: document.getElementById("matchingType").value,
+            pairs: document.getElementById("matchingPairs").value,
+            condition: condition
+        }
+    };
+    saveGameResult(gameResult);
+    // --- 記錄結束 ---
+
+
+    if (button) {
+        button.innerHTML = "重新開始";
+        button.title = "重新開始";
+        button.className = "bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base";
+        button.onclick = restartMatchingGame;
+    }
+
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.remove('opacity-50', 'pointer-events-none');
+        el.disabled = false;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.remove('hidden');
+    }
+
+    const timerElement = document.getElementById("matchingTimer");
+    if (timerElement && finalTime !== null) {
+        timerElement.textContent = ` ${finalTime}`;
+    }
+
+    const timerBar = document.getElementById("matchingTimerBar");
+    if (timerBar) {
+        timerBar.style.width = "100%";
+    }
+
+    // 【修改】傳遞 gameResult 到 showResult
+    showResult(
+        "🎉",
+        "配對完成",
+        `${message}\n\n最終分數：${matchingGameState.score}\n操作步數：${matchingGameState.steps}`,
+        gameResult
+    );
+}
+
+function endQuizGame(message) {
+    quizGameState.isPlaying = false;
+    const button = document.getElementById("startQuiz");
+    const optionsContainer = document.getElementById("quizOptionsContainer");
+
+    // 遊戲結束時，新增禁用 class
+    document.getElementById("quizArea").classList.add("game-area-disabled");
+
+    if (quizGameState.timerInterval) {
+        clearInterval(quizGameState.timerInterval);
+    }
+
+    // --- 新增：記錄遊戲成果 ---
+    const condition = document.getElementById("quizCondition").value;
+    let duration = 0;
+    if (condition.startsWith("time")) {
+        const timeLimit = parseInt(condition.replace("time", ""), 10);
+        duration = timeLimit - quizGameState.timeLeft;
+    } else if (quizGameState.startTime) {
+        duration = Math.floor((Date.now() - quizGameState.startTime) / 1000);
+    }
+    const accuracy = quizGameState.total > 0 ? Math.round((quizGameState.correct / quizGameState.total) * 100) : 0;
+    
+    const gameResult = {
+        gameType: 'quiz',
+        score: quizGameState.correct, // 以答對題數為分數
+        correct: quizGameState.correct,
+        incorrect: quizGameState.incorrect,
+        accuracy: accuracy,
+        duration: duration,
+        settings: {
+            categories: Array.from(selectedCategories),
+            type: document.getElementById("quizType").value,
+            options: document.getElementById("quizOptions").value,
+            condition: condition,
+        }
+    };
+    saveGameResult(gameResult);
+    // --- 記錄結束 ---
+
+
+    if (button) {
+        button.innerHTML = "重新開始";
+        button.title = "重新開始";
+        button.className = "bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
+        button.onclick = restartQuizGame;
+    }
+    
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.remove('opacity-50', 'pointer-events-none');
+        el.disabled = false;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.remove('hidden');
+    }
+
+    // 【修改】傳遞 gameResult 到 showResult
+    showResult(
+        "🎯",
+        "測驗結束",
+        `${message}\n\n` +
+        `答對：${quizGameState.correct} 題\n` +
+        `答錯：${quizGameState.incorrect} 題\n` +
+        `總題數：${quizGameState.total} 題\n` +
+        `正確率：${accuracy}%`,
+        gameResult
+    );
+}
+
+// 替換 endSortingGame()
+function endSortingGame(message) {
+    sortingGameState.isPlaying = false;
+    const button = document.getElementById("startSorting");
+    const optionsContainer = document.getElementById("sortingOptions");
+
+    // 遊戲結束時，新增禁用 class
+    document.getElementById("sortingArea").classList.add("game-area-disabled");
+
+    if (sortingGameState.timerInterval) {
+        clearInterval(sortingGameState.timerInterval);
+    }
+    
+    // --- 新增：記錄遊戲成果 ---
+    const condition = document.getElementById("sortingCondition").value;
+    let duration = 0;
+    if (condition.startsWith("time")) {
+        const timeLimit = parseInt(condition.replace("time", ""), 10);
+        duration = timeLimit - sortingGameState.timeLeft;
+    } else if (sortingGameState.startTime) {
+        duration = Math.floor((Date.now() - sortingGameState.startTime) / 1000);
+    }
+    const totalQuestions = sortingGameState.correct + sortingGameState.incorrect;
+    const accuracy = totalQuestions > 0 ? Math.round((sortingGameState.correct / totalQuestions) * 100) : 0;
+    
+    const gameResult = {
+        gameType: 'sorting',
+        score: sortingGameState.score,
+        correct: sortingGameState.correct,
+        incorrect: sortingGameState.incorrect,
+        accuracy: accuracy,
+        duration: duration,
+        settings: {
+            categories: Array.from(selectedCategories),
+            type: document.getElementById("sortingType").value,
+            condition: condition,
+        }
+    };
+    saveGameResult(gameResult);
+    // --- 記錄結束 ---
+
+
+    if (button) {
+        button.innerHTML = "重新開始";
+        button.title = "重新開始";
+        button.className = "bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
+        button.onclick = restartSortingGame;
+    }
+
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.remove('opacity-50', 'pointer-events-none');
+        el.disabled = false;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.remove('hidden');
+    }
+
+    // 【修改】傳遞 gameResult 到 showResult
+    showResult(
+        "🎯",
+        "排序結束",
+        `${message}\n\n` +
+        `最終分數：${sortingGameState.score}\n` +
+        `答對題數：${sortingGameState.correct}\n` +
+        `答錯題數：${sortingGameState.incorrect}\n` +
+        `正確率：${accuracy}%`,
+        gameResult
+    );
+}
 
 // 顯示結果視窗
-function showResult(icon, title, message) {
-    document.getElementById("resultIcon").textContent = icon
-    document.getElementById("resultTitle").textContent = title
-    document.getElementById("resultMessage").textContent = message
-    document.getElementById("resultModal").classList.remove("hidden")
+function showResult(icon, title, message, gameResult = null) {
+    document.getElementById("resultIcon").textContent = icon;
+    document.getElementById("resultTitle").textContent = title;
+    document.getElementById("resultMessage").textContent = message;
+
+    const submitButton = document.getElementById("submitResult");
+    
+    // 【新增】處理成績提交按鈕的邏輯
+    if (gameResult && currentUser.id !== 'guest') {
+        submitButton.classList.remove("hidden");
+        submitButton.disabled = false;
+        // 確保按鈕回到初始狀態
+        submitButton.innerHTML = `<span class="material-icons !text-xl">cloud_upload</span><span>送出成績</span>`;
+        submitButton.classList.remove("bg-gray-400", "cursor-not-allowed");
+        submitButton.classList.add("bg-green-500", "hover:bg-green-600");
+
+
+        // 為避免重複綁定，先移除舊的監聽器
+        const newButton = submitButton.cloneNode(true);
+        submitButton.parentNode.replaceChild(newButton, submitButton);
+
+        newButton.addEventListener("click", async () => {
+            // 點擊後禁用按鈕並顯示處理中
+            newButton.disabled = true;
+            newButton.innerHTML = `<span>處理中...</span>`;
+            newButton.classList.remove("bg-green-500", "hover:bg-green-600");
+            newButton.classList.add("bg-gray-400", "cursor-not-allowed");
+
+
+            const success = await submitToGoogleForm(gameResult);
+
+            if (success) {
+                newButton.innerHTML = `<span>已送出</span>`;
+            } else {
+                // 如果失敗，恢復按鈕狀態，讓使用者可以重試
+                newButton.disabled = false;
+                newButton.innerHTML = `<span class="material-icons !text-xl">cloud_upload</span><span>重新送出</span>`;
+                newButton.classList.remove("bg-gray-400", "cursor-not-allowed");
+                newButton.classList.add("bg-green-500", "hover:bg-green-600");
+            }
+        });
+
+    } else {
+        submitButton.classList.add("hidden");
+    }
+    
+    document.getElementById("resultModal").classList.remove("hidden");
 }
 
 
