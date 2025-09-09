@@ -3,17 +3,13 @@
 // =================================================================
 const config = {
     // Local Storage 的獨特前綴，避免與其他應用程式衝突
-    STORAGE_PREFIX: "hakkaLearningApp_v3_",
+    STORAGE_PREFIX: "hakkaLearningApp_v4_",
 
-    // 清除學習記錄時需要輸入的密碼
-    CLEAR_DATA_PASSWORD: "kasu",
 
     // 【新增】GOOGLE 表單設定
     GOOGLE_FORM_CONFIG: {
-        // 【請替換】將 YOUR_FORM_URL 換成您自己的 Google 表單回應網址
         formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSeAHb2ovqcJsQnOhuEqVjk_9ORt9mcfGvqvNpwBA7FgOCXTzw/formResponse", 
         
-        // 【請替換】以下 entry.xxxxxx 為欄位 ID，請換成您表單對應的 ID
         nameField: "entry.390906906",      // 姓名 (文字)
         idField: "entry.766582104",        // 班號/ID (文字)
         gameTypeField: "entry.1584239140",   // 遊戲類型 (文字: matching, quiz, sorting)
@@ -266,13 +262,11 @@ function handleUrlParameters() {
     selectedCategories.clear();
     categoriesToSelect.forEach(name => selectedCategories.add(name));
 
-    // 2. 【修改處】根據選取的主題數量，決定顯示方式
+    // 2. 根據選取的主題數量，決定顯示方式
     if (categoriesToSelect.length === 1) {
-        // 如果只有一個主題，直接顯示該主題的詳情頁
         const singleCategoryName = categoriesToSelect[0];
         showCategoryDetail(singleCategoryName);
     } else {
-        // 如果有多個主題，才組合句子並顯示 "n主題" 的互動式標題
         const tempCategoryName = `${selectedCategories.size}主題`;
         let combinedSentences = [];
         selectedCategories.forEach(categoryName => {
@@ -284,12 +278,19 @@ function handleUrlParameters() {
         showCategoryDetail(tempCategoryName);
     }
 
-
     // 3. 切換到 URL 指定的模式
-    if (selectedSentences.size === 0 && targetMode !== 'learning') {
+    if (selectedSentences.size === 0 && targetMode !== 'learning' && targetMode !== 'flashcard') {
         showResult("⚠️", "提醒", "所選主題內沒有可供練習的句子。");
         return true; 
     }
+
+    // 讀取遊戲設定參數
+    const gameParams = {
+        lang: params.get('lang'),
+        pairs: params.get('pairs'),
+        options: params.get('options'),
+        condition: params.get('condition')
+    };
 
     switch (targetMode) {
         case 'flashcard':
@@ -299,14 +300,17 @@ function handleUrlParameters() {
         case 'matching':
             showMatchingGame();
             updateCurrentMode("配對");
+            applyAndStartGameFromParams('matching', gameParams);
             break;
         case 'quiz':
             showQuizGame();
             updateCurrentMode("測驗");
+            applyAndStartGameFromParams('quiz', gameParams);
             break;
         case 'sorting':
             showSortingGame();
             updateCurrentMode("排序");
+            applyAndStartGameFromParams('sorting', gameParams);
             break;
         default:
             updateCurrentMode("學習");
@@ -901,8 +905,9 @@ function updateUserDisplay() {
 }
 
 // 搜尋功能
+// script.js
+
 function handleSearchInput(e) {
-    // 由於此函數現在由 `handleRealtimeTransform` 觸發，`e.target.value` 已是轉換後的值
     // 【修改】將查詢中的一個或多個 '-' 替換為空格
     const query = e.target.value.toLowerCase().replace(/-+/g, ' ');
     const searchResults = document.getElementById("searchResults");
@@ -917,12 +922,22 @@ function handleSearchInput(e) {
         return;
     }
 
-    let results = [];
-
+    // 輔助函數：轉義正則表達式中的特殊字符
+    const escapeRegex = (string) => {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+    
     // --- 規則 1: 彈性元音 (o/oo) 和聲調的正規表示式查詢 ---
     const createSearchRegex = (pattern, isToneInsensitive = false) => {
-        // 將 'o' 轉換為 '(o|oo)' 以同時匹配 'o' 和 'oo'
-        let regexPattern = pattern.replace(/o/g, '(o|oo)');
+        // 先對輸入的 pattern 進行轉義，避免特殊字符干擾
+        let regexPattern = escapeRegex(pattern);
+        
+        // **修正點：只對看起來像拼音的查詢應用 o/oo 規則**
+        const isPinyinLike = /[a-z]/.test(regexPattern);
+        if (isPinyinLike) {
+            regexPattern = regexPattern.replace(/o/g, '(o|oo)');
+        }
+
         if (isToneInsensitive) {
             // 移除所有聲調符號
             regexPattern = regexPattern.replace(/[ˊˇˋˆ]/g, '');
@@ -967,27 +982,36 @@ function handleSearchInput(e) {
     };
 
     // --- 主要搜尋流程 ---
+    let categoryResults = [];
+    let sentenceResults = [];
+
+    // --- 搜尋分類 (分類搜尋不受聲調影響) ---
+    const categorySearchRegex = createSearchRegex(query, false);
+    if (categorySearchRegex) {
+        Object.keys(categories).forEach((category) => {
+            // 使用 .test() 進行比對
+            if (categorySearchRegex.test(category)) {
+                categoryResults.push({
+                    type: "category",
+                    title: category,
+                    subtitle: `${categories[category].length} 句`,
+                    data: category,
+                });
+            }
+        });
+    }
+
     // 1. 先進行包含聲調的標準查詢
-    const sentenceResults = searchInSentences(false);
-    results.push(...sentenceResults);
+    sentenceResults.push(...searchInSentences(false));
 
     // 2. 如果沒有句子結果，且使用者有輸入內容，則進行無聲調的後援查詢
     if (sentenceResults.length === 0 && query.trim() !== '') {
         const fallbackResults = searchInSentences(true);
-        results.push(...fallbackResults);
+        sentenceResults.push(...fallbackResults);
     }
 
-    // 搜尋分類 (分類搜尋不受聲調影響)
-    Object.keys(categories).forEach((category) => {
-        if (category.toLowerCase().includes(query)) {
-            results.push({
-                type: "category",
-                title: category,
-                subtitle: `${categories[category].length} 句`,
-                data: category,
-            });
-        }
-    });
+    // 合併結果，主題優先
+    let results = [...categoryResults, ...sentenceResults];
 
     // 去除重複的結果 (例如後援查詢可能找到與分類重疊的內容)
     const uniqueResults = results.filter((v, i, a) => a.findIndex(t => (JSON.stringify(t.data) === JSON.stringify(v.data))) === i);
@@ -1035,6 +1059,7 @@ function handleSearchInput(e) {
         searchResults.classList.remove("hidden");
     }
 }
+
 
 /**
  * 根據客語拼音輸入規則，轉換查詢字串。
@@ -1842,8 +1867,6 @@ function showCelebration(element) {
 
 
 // 學習模式
-// script.js
-
 function showLearningView() {
     const contentArea = document.getElementById("contentArea");
 
@@ -1902,14 +1925,14 @@ function showLearningView() {
                             </button>
                             <div id="annotationMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
                                 <button data-setting="pinyinAnnotation" data-value="true" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">text_rotate_up</span>
                                     <span>標在字上</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                                 <button data-setting="pinyinAnnotation" data-value="false" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">text_rotation_none</span>
                                     <span>獨立一行</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                             </div>
                         </div>
@@ -1920,14 +1943,14 @@ function showLearningView() {
                             </button>
                             <div id="phoneticMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
                                 <button data-setting="phoneticSystem" data-value="pinyin" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">text_fields</span>
                                     <span>拼音</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                                 <button data-setting="phoneticSystem" data-value="zhuyin" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">sticky_note_2</span>
                                     <span>注音</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                             </div>
                         </div>
@@ -1938,14 +1961,14 @@ function showLearningView() {
                             </button>
                             <div id="clickPlayMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
                                 <button data-setting="playPinyinOnClick" data-value="true" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">music_note</span>
                                     <span>啟用點音播放</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                                 <button data-setting="playPinyinOnClick" data-value="false" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 setting-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">music_off</span>
                                     <span>關閉點音播放</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                             </div>
                         </div>
@@ -1957,10 +1980,19 @@ function showLearningView() {
                                 <span class="material-icons !text-lg">visibility</span>
                                 <span class="hidden md:inline text-sm">顯示</span>
                             </button>
-                            <div id="displayMenu" class="hidden absolute top-full right-0 mt-2 w-32 bg-white rounded-md shadow-lg border z-10 p-1">
-                                <button id="hideHakka" title="客語" class="control-button w-full justify-start"><span class="material-icons !text-lg">visibility</span><span class="text-sm">客語</span></button>
-                                <button id="hidePinyin" title="拼音" class="control-button w-full justify-start"><span class="material-icons !text-lg">visibility</span><span class="text-sm">拼音</span></button>
-                                <button id="hideChinese" title="華語" class="control-button w-full justify-start"><span class="material-icons !text-lg">visibility</span><span class="text-sm">華語</span></button>
+                            <div id="displayMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
+                                <button id="hideHakka" title="客語" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
+                                    <span>客語</span>
+                                </button>
+                                <button id="hidePinyin" title="拼音" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
+                                    <span>拼音</span>
+                                </button>
+                                <button id="hideChinese" title="華語" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
+                                    <span>華語</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1973,19 +2005,36 @@ function showLearningView() {
                             </button>
                             <div id="layoutMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
                                 <button data-layout="double" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">view_column</span>
                                     <span>雙欄</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                                 <button data-layout="single" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">view_agenda</span>
                                     <span>單欄</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
                                 </button>
                                 <button data-layout="compact" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
                                     <span class="material-icons text-base mr-2">view_list</span>
                                     <span>精簡</span>
-                                    <span class="material-icons check-icon ml-auto"></span>
+                                </button>
+                                <div class="border-t my-1 mx-2"></div>
+                                <button data-layout="3col" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
+                                    <span class="material-icons text-base mr-2">view_module</span>
+                                    <span>三欄</span>
+                                </button>
+                                <button data-layout="4col" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
+                                    <span class="material-icons text-base mr-2">grid_view</span>
+                                    <span>四欄</span>
+                                </button>
+                                <div class="border-t my-1 mx-2"></div>
+                                <button data-layout="table" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 layout-option">
+                                    <span class="material-icons check-icon w-6 mr-1"></span>
+                                    <span class="material-icons text-base mr-2">table_view</span>
+                                    <span>表格</span>
                                 </button>
                             </div>
                         </div>
@@ -1994,13 +2043,15 @@ function showLearningView() {
                                 <span class="material-icons !text-lg">format_size</span>
                                 <span class="hidden md:inline text-sm">字體</span>
                             </button>
-                            <div id="fontSizeMenu" class="hidden absolute top-full right-0 mt-2 w-32 bg-white rounded-md shadow-lg border z-10 p-1">
+                            <div id="fontSizeMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 p-1">
+                                <div class="grid grid-cols-2 gap-1">
                                 ${config.FONT_SIZES.learning.map(size => `
-                                    <button data-size="${size}" class="w-full flex items-center justify-between px-3 py-1.5 hover:bg-gray-100 text-sm rounded-md font-size-option">
+                                    <button data-size="${size}" class="w-full flex items-center justify-start px-3 py-1.5 hover:bg-gray-100 text-sm rounded-md font-size-option">
+                                        <span class="material-icons check-icon w-6 mr-1"></span>
                                         <span>${size}px</span>
-                                        <span class="material-icons check-icon"></span>
                                     </button>
                                 `).join('')}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2016,6 +2067,7 @@ function showLearningView() {
     renderSentences();
     setupLearningControls();
 }
+
 
 // 精簡按鈕狀態的函數
 function updateCompactToggleButton() {
@@ -2057,99 +2109,172 @@ function renderSentences() {
     if (!container) return;
     const sentences = categories[currentCategory];
 
+    // --- 修改開始 ---
+    // 1. 先建立一個基礎的 class 陣列
     let containerClasses = [];
     if (isLearningSelectMode) {
         containerClasses.push("learning-select-active");
     }
     if (userSettings.pinyinAnnotation) {
+        // 確保 pinyin-annotated class 能在任何版面模式下都被加入
         containerClasses.push("pinyin-annotated");
     }
+    // --- 修改結束 ---
 
-    if (userSettings.layout === "double" && window.innerWidth >= 1024) {
-        containerClasses.push("grid grid-cols-1 lg:grid-cols-2 gap-4");
-    } else if (userSettings.layout === "single" || (userSettings.layout === "double" && window.innerWidth < 1024)) {
-        containerClasses.push("grid grid-cols-1 gap-4");
-    } else {
-        containerClasses.push("bg-white rounded-xl shadow-sm border");
+
+    if (userSettings.layout === 'table') {
+        // 2. 將表格模式專用的 class 加入陣列後再設定
+        container.className = containerClasses.concat([
+            'table-responsive-wrapper', 'bg-white', 'rounded-xl', 'shadow-sm', 'border'
+        ]).join(' ');
+
+        if (!sentences) {
+            container.innerHTML = "";
+            return;
+        }
+
+        let tableHtml = `<table class="learning-table" style="font-size: ${userSettings.fontSize * 0.9}px;">
+            <thead>
+                <tr>
+                    <th class="col-index">#</th>
+                    <th class="col-actions">操作</th>
+                    <th class="col-hakka" style="font-size: ${userSettings.fontSize}px">客語</th>
+                    <th class="col-pinyin">拼音</th>
+                    <th class="col-chinese">華語</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        
+        sentences.forEach((sentence, index) => {
+            const isSelected = selectedSentences.has(index);
+            const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+            const isStarred = starredCards.has(sentenceId);
+            const starIcon = isStarred ? 'star' : 'star_border';
+            const originalPinyin = sentence["拼音"];
+            const pinyinDisplayHtml = createClickablePhoneticHtml(originalPinyin);
+            const annotatedHakka = annotateHakkaText(sentence["客語"], originalPinyin, userSettings.pinyinAnnotation);
+
+            tableHtml += `
+                <tr>
+                    <td class="text-gray-500 font-mono">${index + 1}</td>
+                    <td>
+                        <div class="flex items-center gap-1">
+                            <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
+                                   ${isSelected ? "checked" : ""} 
+                                   onchange="toggleSentenceSelection(${index}, this.checked)">
+                            <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-600 hover:text-gray-800 p-1 rounded-full hover:bg-gray-100 transition-colors">
+                                <span class="material-icons text-lg">volume_up</span>
+                            </button>
+                            <button onclick="toggleStar(${index})" class="learning-star-btn" title="標示星號">
+                                <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
+                            </button>
+                        </div>
+                    </td>
+                    <td class="hakka-text text-blue-800" style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</td>
+                    <td class="pinyin-text text-gray-600">${pinyinDisplayHtml}</td>
+                    <td class="chinese-text text-gray-800">${sentence["華語"]}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `</tbody></table>`;
+        container.innerHTML = tableHtml;
+        
+        // After rendering, apply visibility based on select mode
+        document.querySelectorAll('.sentence-checkbox').forEach(cb => {
+            cb.style.display = isLearningSelectMode ? 'block' : 'none';
+        });
+
+    } else { // Keep original logic for other layouts
+        // 3. 將其他版面模式的 class 加入陣列後再設定
+        if (userSettings.layout === "double" && window.innerWidth >= 1024) {
+            containerClasses.push("grid", "grid-cols-1", "lg:grid-cols-2", "gap-4");
+        } else if (userSettings.layout === "3col") {
+            containerClasses.push("grid", "grid-cols-2", "md:grid-cols-3", "gap-2");
+        } else if (userSettings.layout === "4col") {
+            containerClasses.push("grid", "grid-cols-2", "sm:grid-cols-3", "md:grid-cols-4", "gap-2");
+        } else if (userSettings.layout === "single" || (userSettings.layout === "double" && window.innerWidth < 1024)) {
+            containerClasses.push("grid", "grid-cols-1", "gap-4");
+        } else { // compact layout
+            containerClasses.push("bg-white", "rounded-xl", "shadow-sm", "border");
+        }
+        container.className = containerClasses.join(" ");
+
+        container.innerHTML = "";
+        if (!sentences) return;
+
+        sentences.forEach((sentence, index) => {
+            const isSelected = selectedSentences.has(index);
+            const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
+            const isStarred = starredCards.has(sentenceId);
+            const starIcon = isStarred ? 'star' : 'star_border';
+            const sentenceItem = document.createElement("div");
+
+            if (isLearningSelectMode) {
+                sentenceItem.classList.add('cursor-pointer');
+                sentenceItem.onclick = (e) => {
+                    if (e.target.closest('button, input, .pinyin-word')) return;
+                    toggleSentenceSelection(index, !isSelected);
+                    renderSentences();
+                };
+            }
+
+            const originalPinyin = sentence["拼音"];
+            const pinyinDisplayHtml = createClickablePhoneticHtml(originalPinyin);
+            const annotatedHakka = annotateHakkaText(sentence["客語"], originalPinyin, userSettings.pinyinAnnotation);
+
+            if (userSettings.layout === 'compact') {
+                sentenceItem.className += " flex items-center gap-3 p-3 border-b last:border-b-0";
+                sentenceItem.innerHTML = `
+                <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded flex-shrink-0" 
+                       ${isSelected ? "checked" : ""} 
+                       onchange="toggleSentenceSelection(${index}, this.checked)">
+                <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-500 hover:text-gray-800 p-1.5 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0">
+                    <span class="material-icons text-lg">volume_up</span>
+                </button>
+                <span class="text-sm text-gray-500 font-mono flex-shrink-0">${index + 1}</span>
+                <div class="flex-1 min-w-0 flex items-baseline gap-4">
+                    <span class="hakka-text text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</span>
+                    <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplayHtml}</span>
+                    <span class="chinese-text text-gray-800 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</span>
+                </div>
+                <button onclick="toggleStar(${index})" class="learning-star-btn ml-2" title="標示星號">
+                    <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
+                </button>
+            `;
+            } else {
+                const cardPadding = (userSettings.layout === '3col' || userSettings.layout === '4col') ? 'p-4' : 'p-4';
+                sentenceItem.className += ` sentence-card bg-white rounded-xl shadow-sm ${cardPadding}`;
+                sentenceItem.innerHTML = `
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
+                               ${isSelected ? "checked" : ""} 
+                               onchange="toggleSentenceSelection(${index}, this.checked)">
+                        <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-800 hover:bg-gray-100 p-1.5 rounded transition-colors">
+                            <span class="material-icons text-lg">volume_up</span>
+                        </button>
+                        <span class="text-sm text-gray-500 font-mono">${index + 1}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="toggleStar(${index})" class="learning-star-btn" title="標示星號">
+                            <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="hakka-text text-blue-800 line-spacing-tight" 
+                         style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</div>
+                    <div class="pinyin-text text-gray-600 line-spacing-tight" 
+                         style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplayHtml}</div>
+                    <div class="chinese-text text-gray-800 line-spacing-tight" 
+                         style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</div>
+                </div>
+            `;
+            }
+            container.appendChild(sentenceItem);
+        });
     }
-    container.className = containerClasses.join(" ");
-
-    container.innerHTML = "";
-    if (!sentences) return;
-
-    sentences.forEach((sentence, index) => {
-        const isSelected = selectedSentences.has(index);
-        const sentenceId = sentence["ID"] || `${sentence["分類"]}_${sentence["華語"]}`;
-        const isStarred = starredCards.has(sentenceId);
-        const starIcon = isStarred ? 'star' : 'star_border';
-        const sentenceItem = document.createElement("div");
-
-        if (isLearningSelectMode) {
-            sentenceItem.classList.add('cursor-pointer');
-            sentenceItem.onclick = (e) => {
-                if (e.target.closest('button, input, .pinyin-word')) return; // 避免點擊拼音時觸發整行選取
-                toggleSentenceSelection(index, !isSelected);
-                renderSentences();
-            };
-        }
-
-        // --- 【修改】使用新邏輯 ---
-        const originalPinyin = sentence["拼音"];
-        const pinyinDisplayHtml = createClickablePhoneticHtml(originalPinyin);
-        const annotatedHakka = annotateHakkaText(sentence["客語"], originalPinyin, userSettings.pinyinAnnotation);
-        // --- 修改結束 ---
-
-
-        if (userSettings.layout === 'compact') {
-            sentenceItem.className += " flex items-center gap-3 p-3 border-b last:border-b-0";
-            sentenceItem.innerHTML = `
-            <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded flex-shrink-0" 
-                   ${isSelected ? "checked" : ""} 
-                   onchange="toggleSentenceSelection(${index}, this.checked)">
-            <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-500 hover:text-gray-800 p-1.5 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0">
-                <span class="material-icons text-lg">volume_up</span>
-            </button>
-            <span class="text-sm text-gray-500 font-mono flex-shrink-0">${index + 1}</span>
-            <div class="flex-1 min-w-0 flex items-baseline gap-4">
-                <span class="hakka-text text-blue-800 flex-shrink-0" style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</span>
-                <span class="pinyin-text text-gray-600 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplayHtml}</span>
-                <span class="chinese-text text-gray-800 truncate" style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</span>
-            </div>
-            <button onclick="toggleStar(${index})" class="learning-star-btn ml-2" title="標示星號">
-                <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
-            </button>
-        `;
-        } else {
-            sentenceItem.className += " sentence-card bg-white rounded-xl shadow-sm p-6";
-            sentenceItem.innerHTML = `
-            <div class="flex items-start justify-between mb-4">
-                <div class="flex items-center gap-3">
-                    <input type="checkbox" class="sentence-checkbox w-4 h-4 text-blue-600 rounded" 
-                           ${isSelected ? "checked" : ""} 
-                           onchange="toggleSentenceSelection(${index}, this.checked)">
-                    <button onclick="playAudio('${sentence["音檔"]}', this.querySelector('.material-icons'))" class="text-gray-800 hover:bg-gray-100 p-1.5 rounded transition-colors">
-                        <span class="material-icons text-lg">volume_up</span>
-                    </button>
-                    <span class="text-sm text-gray-500 font-mono">${index + 1}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="toggleStar(${index})" class="learning-star-btn" title="標示星號">
-                        <span class="material-icons ${isStarred ? 'text-yellow-400' : 'text-gray-400'}">${starIcon}</span>
-                    </button>
-                </div>
-            </div>
-            <div class="space-y-3">
-                <div class="hakka-text text-blue-800 line-spacing-tight" 
-                     style="font-size: ${userSettings.fontSize}px">${annotatedHakka}</div>
-                <div class="pinyin-text text-gray-600 line-spacing-tight" 
-                     style="font-size: ${Math.floor(userSettings.fontSize * 0.8)}px">${pinyinDisplayHtml}</div>
-                <div class="chinese-text text-gray-800 line-spacing-tight" 
-                     style="font-size: ${Math.floor(userSettings.fontSize * 0.9)}px">${sentence["華語"]}</div>
-            </div>
-        `;
-        }
-        container.appendChild(sentenceItem);
-    });
 
     const toggleAnnotationBtn = document.getElementById("togglePinyinAnnotation");
     if (toggleAnnotationBtn) {
@@ -2158,8 +2283,6 @@ function renderSentences() {
 
     updateSelectAllButtonState();
 }
-
-
 
 function setupLearningControls() {
     const hideStates = { hakka: "show", pinyin: "show", chinese: "show" };
@@ -2235,6 +2358,22 @@ function setupLearningControls() {
                 const isHidden = menu.classList.contains('hidden');
                 closeAllDropdowns();
                 if (isHidden) {
+                    menu.style.visibility = 'hidden';
+                    menu.classList.remove('hidden');
+                    const menuRect = menu.getBoundingClientRect();
+                    menu.style.visibility = '';
+                    menu.classList.add('hidden');
+
+                    const btnRect = toggleBtn.getBoundingClientRect();
+                    
+                    menu.classList.remove('left-0', 'right-0');
+
+                    if ((btnRect.right - menuRect.width) < 0) {
+                        menu.classList.add('left-0');
+                    } else {
+                        menu.classList.add('right-0');
+                    }
+                    
                     menu.classList.remove('hidden');
                 }
             };
@@ -2281,6 +2420,10 @@ function setupLearningControls() {
                 case "double": layoutIcon.textContent = "view_column"; break;
                 case "single": layoutIcon.textContent = "view_agenda"; break;
                 case "compact": layoutIcon.textContent = "view_list"; break;
+                case "3col": layoutIcon.textContent = "view_module"; break;
+                case "4col": layoutIcon.textContent = "grid_view"; break;
+                case "table": layoutIcon.textContent = "table_view"; break;
+                default: layoutIcon.textContent = "view_agenda"; break;
            }
         }
         
@@ -2321,7 +2464,7 @@ function setupLearningControls() {
             if (userSettings.layout !== layout) {
                 userSettings.layout = layout;
                 saveUserSettings();
-                showLearningView(); // Re-render the entire view for layout changes
+                showLearningView();
             }
             closeAllDropdowns();
         };
@@ -2341,7 +2484,6 @@ function setupLearningControls() {
         };
     });
     
-    // --- Existing unchanged logic for star and display ---
     document.getElementById("starSelected").onclick = () => {
         categories[currentCategory].forEach(sentence => {
             if (!sentence) return;
@@ -2390,6 +2532,7 @@ function setupLearningControls() {
 
     updateLearningControlsUI();
 }
+
 
 // 切換句子選取
 function toggleSentenceSelection(index, checked) {
@@ -2452,6 +2595,7 @@ function adjustFontSize(change, mode = "learning") {
 
 
 // 閃卡模式
+// 閃卡模式
 function showFlashcardView() {
     const contentArea = document.getElementById("contentArea");
     const sentences = getSelectedSentences();
@@ -2462,14 +2606,20 @@ function showFlashcardView() {
     }
 
     contentArea.innerHTML = `
-    <div class="max-w-5xl mx-auto pt-8">
+    <div class="max-w-5xl mx-auto pt-4">
         <div id="flashcardContainer" class="bg-white rounded-xl shadow-lg p-8 mb-4 relative overflow-hidden">
             <div class="absolute top-4 left-4 z-10">
                 <div class="flex items-center gap-1">
-                     <label for="flashcardAutoPlayAudio" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-200 cursor-pointer" title="自動播音">
+                     <label for="flashcardAutoPlayAudio" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-200 cursor-pointer setting-btn" title="自動播音">
                         <input type="checkbox" id="flashcardAutoPlayAudio" class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-gray-300">
                         <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
                     </label>
+                    <button id="toggleFlashcardAnnotation" class="setting-btn" title="標音設定 (U)">
+                        <span class="material-icons">text_rotation_none</span>
+                    </button>
+                    <button id="toggleFlashcardPhoneticSystem" class="setting-btn" title="切換拼音/注音 (Y)">
+                        <span class="material-icons">translate</span>
+                    </button>
                 </div>
             </div>
 
@@ -2478,13 +2628,6 @@ function showFlashcardView() {
             </div>
 
             <div class="absolute top-4 right-4 flex items-center gap-1 z-10">
-                 <button onclick="adjustFontSize(-1, 'flashcard')" class="setting-btn" title="縮小字體">
-                    <span class="material-icons">text_decrease</span>
-                </button>
-                <button onclick="adjustFontSize(1, 'flashcard')" class="setting-btn" title="放大字體">
-                    <span class="material-icons">text_increase</span>
-                </button>
-                <div class="w-px h-4 bg-gray-300 mx-1"></div>
                 <button id="starCard" class="control-btn !p-2" title="設為星號 (S)">
                     <span id="starIcon" class="material-icons text-3xl text-gray-400">star_border</span>
                 </button>
@@ -2495,19 +2638,12 @@ function showFlashcardView() {
                     <div id="filterCardsPopup" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
                         </div>
                 </div>
-                <div class="relative">
-                     <button id="flashcardAnnotationBtn" class="control-btn !p-2" title="標音設定">
-                        <span class="material-icons">text_rotation_none</span>
-                    </button>
-                    <div id="flashcardAnnotationPopup" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg border z-10 py-1">
-                        <button id="toggleFlashcardAnnotation" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700 control-button">
-                            <span class="material-icons text-base mr-2">vertical_align_top</span>
-                            <span>拼音標字上</span>
-                        </button>
-                    </div>
-                </div>
-                <button id="toggleFlashcardPhoneticSystem" class="control-btn !p-2" title="切換拼音/注音">
-                    <span class="material-icons">translate</span>
+                <div class="w-px h-4 bg-gray-300 mx-1"></div>
+                <button onclick="adjustFontSize(-1, 'flashcard')" class="setting-btn" title="縮小字體 (-)">
+                    <span class="material-icons">text_decrease</span>
+                </button>
+                <button onclick="adjustFontSize(1, 'flashcard')" class="setting-btn" title="加大字體 (+)">
+                    <span class="material-icons">text_increase</span>
                 </button>
             </div>
 
@@ -2658,8 +2794,6 @@ function setupFlashcardControls() {
     const autoPlayPopup = document.getElementById("autoPlayPopup");
     const filterButton = document.getElementById("filterCardsBtn");
     const filterPopup = document.getElementById("filterCardsPopup");
-    const flashcardAnnotationBtn = document.getElementById("flashcardAnnotationBtn");
-    const flashcardAnnotationPopup = document.getElementById("flashcardAnnotationPopup");
 
     const repeatButton = document.getElementById("repeatBtn");
     const goToFirstButton = document.getElementById("goToFirstCard");
@@ -2698,21 +2832,43 @@ function setupFlashcardControls() {
         };
     }
 
-    // --- 新增開始 ---
-    const togglePhoneticBtn = document.getElementById("toggleFlashcardPhoneticSystem");
-    if (togglePhoneticBtn) {
-        togglePhoneticBtn.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
-        togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
-
-        togglePhoneticBtn.onclick = () => {
-            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+    const annotationButton = document.getElementById("toggleFlashcardAnnotation");
+    if (annotationButton) {
+        const updateAnnotationButtonState = () => {
+            const icon = annotationButton.querySelector('.material-icons');
+            if (userSettings.pinyinAnnotation) {
+                annotationButton.classList.add('active');
+                icon.textContent = 'text_rotate_up';
+                annotationButton.title = "標音在字上 (U)";
+            } else {
+                annotationButton.classList.remove('active');
+                icon.textContent = 'text_rotation_none';
+                annotationButton.title = "拼音獨立一行 (U)";
+            }
+        };
+        updateAnnotationButtonState();
+        annotationButton.onclick = () => {
+            userSettings.pinyinAnnotation = !userSettings.pinyinAnnotation;
             saveUserSettings();
-            togglePhoneticBtn.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
-            togglePhoneticBtn.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音' : '切換為拼音';
-            updateFlashcard(); // 重新渲染卡片
+            updateFlashcard();
+            updateAnnotationButtonState();
         };
     }
-    // --- 新增結束 ---
+
+    const phoneticButton = document.getElementById("toggleFlashcardPhoneticSystem");
+    if (phoneticButton) {
+        const updatePhoneticButtonState = () => {
+            phoneticButton.classList.toggle('active', userSettings.phoneticSystem === 'zhuyin');
+            phoneticButton.title = userSettings.phoneticSystem === 'pinyin' ? '切換為注音 (Y)' : '切換為拼音 (Y)';
+        };
+        updatePhoneticButtonState();
+        phoneticButton.onclick = () => {
+            userSettings.phoneticSystem = userSettings.phoneticSystem === 'pinyin' ? 'zhuyin' : 'pinyin';
+            saveUserSettings();
+            updateFlashcard();
+            updatePhoneticButtonState();
+        };
+    }
 
     const popups = [{
             btn: autoPlayButton,
@@ -2721,10 +2877,6 @@ function setupFlashcardControls() {
         {
             btn: filterButton,
             menu: filterPopup
-        },
-        {
-            btn: flashcardAnnotationBtn,
-            menu: flashcardAnnotationPopup
         }
     ];
 
@@ -2789,7 +2941,7 @@ function setupFlashcardControls() {
             clearStarsBtn.onclick = () => {
                 if (starredCards.size > 0) {
                     starredCards.clear();
-                    saveStarredCards(); // 新增：儲存變更
+                    saveStarredCards();
                     if (flashcardPracticeMode === 'starred') {
                         flashcardPracticeMode = 'all';
                     }
@@ -2875,7 +3027,6 @@ function setupFlashcardControls() {
     }
 
     if (repeatButton) {
-        // 根據讀取的設定，初始化按鈕外觀
         if (isAutoplayLooping) {
             repeatButton.classList.add("active");
             repeatButton.title = "取消循環";
@@ -2886,7 +3037,6 @@ function setupFlashcardControls() {
 
         repeatButton.onclick = () => {
             isAutoplayLooping = !isAutoplayLooping;
-            // 將新設定儲存起來
             userSettings.flashcardLoop = isAutoplayLooping;
             saveUserSettings();
 
@@ -2971,7 +3121,7 @@ function setupFlashcardControls() {
         } else {
             starredCards.add(sentenceId);
         }
-        saveStarredCards(); // 新增：儲存變更
+        saveStarredCards();
         updateFlashcard();
         updateFilterPopup();
     };
@@ -3030,19 +3180,31 @@ function setupFlashcardControls() {
                 event.preventDefault();
                 if (starButton) starButton.click();
                 break;
+            case '+':
+            case '=':
+                event.preventDefault();
+                adjustFontSize(1, 'flashcard');
+                break;
+            case '-':
+                event.preventDefault();
+                adjustFontSize(-1, 'flashcard');
+                break;
+            case 'u':
+                event.preventDefault();
+                if (document.getElementById('toggleFlashcardAnnotation')) {
+                    document.getElementById('toggleFlashcardAnnotation').click();
+                }
+                break;
+            case 'y':
+                event.preventDefault();
+                if (document.getElementById('toggleFlashcardPhoneticSystem')) {
+                    document.getElementById('toggleFlashcardPhoneticSystem').click();
+                }
+                break;
         }
     };
     document.addEventListener('keydown', flashcardKeyHandler);
-    const toggleFlashcardAnnotationBtn = document.getElementById("toggleFlashcardAnnotation");
-    if (toggleFlashcardAnnotationBtn) {
-        toggleFlashcardAnnotationBtn.onclick = () => {
-            userSettings.pinyinAnnotation = !userSettings.pinyinAnnotation;
-            saveUserSettings();
-            updateFlashcard();
-            if (flashcardAnnotationPopup) flashcardAnnotationPopup.classList.add('hidden');
-        };
-    }
-
+    
     updateFilterPopup();
 }
 
@@ -3249,9 +3411,16 @@ function setupMatchingGame() {
 
     ;
     ["matchingType", "matchingPairs", "matchingCondition"].forEach((id) => {
-        document.getElementById(id).onchange = () => {
-            if (!matchingGameState.isPlaying) {
-                generateMatchingData();
+        const selectElement = document.getElementById(id);
+        if (selectElement) {
+            selectElement.onchange = () => {
+                // *** 新增：立即更新 URL ***
+                updateUrlWithGameSettings('matching');
+                
+                // 維持原有邏輯：如果遊戲尚未開始，則重新生成題目
+                if (!matchingGameState.isPlaying) {
+                    generateMatchingData();
+                }
             }
         }
     });
@@ -3277,7 +3446,6 @@ function setupMatchingGame() {
 
     generateMatchingData();
 }
-
 
 function stopMatchingGame() {
     if (matchingGameState.timerInterval) {
@@ -3574,6 +3742,8 @@ function checkMatch() {
 }
 
 function startMatchingGame() {
+	updateUrlWithGameSettings('matching');
+
     const condition = document.getElementById("matchingCondition").value
     const button = document.getElementById("startMatching")
     const optionsContainer = document.getElementById("matchingOptions");
@@ -3873,7 +4043,6 @@ function showQuizGame() {
 }
 
 
-// 請替換此函數
 function setupQuizGame() {
     const isMobile = window.innerWidth < 768;
     if (!userSettings.quizLayout || !['horizontal', 'vertical', 'flow'].includes(userSettings.quizLayout)) {
@@ -3897,6 +4066,16 @@ function setupQuizGame() {
     }
 
     document.getElementById("startQuiz").onclick = startQuizGame;
+
+    // *** 新增：為設定選項綁定 onchange 事件 ***
+    ["quizType", "quizOptions", "quizCondition"].forEach((id) => {
+        const selectElement = document.getElementById(id);
+        if (selectElement) {
+            selectElement.onchange = () => {
+                updateUrlWithGameSettings('quiz');
+            }
+        }
+    });
 
     const layoutToggleButton = document.getElementById("quizLayoutToggle");
     const layoutIcon = layoutToggleButton.querySelector('.material-icons');
@@ -3934,7 +4113,6 @@ function setupQuizGame() {
         }
     }
 
-    // --- 新增開始 ---
     const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
     if (togglePhoneticBtn) {
         togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
@@ -3952,10 +4130,11 @@ function setupQuizGame() {
             }
         };
     }
-    // --- 新增結束 ---
 }
 
 function startQuizGame() {
+	updateUrlWithGameSettings('quiz');
+
     const sentences = getSelectedSentences()
     const condition = document.getElementById("quizCondition").value
     const button = document.getElementById("startQuiz")
@@ -4376,6 +4555,16 @@ function setupSortingGame() {
 
     document.getElementById("startSorting").onclick = startSortingGame;
 
+    // *** 新增：為設定選項綁定 onchange 事件 ***
+    ["sortingType", "sortingCondition"].forEach((id) => {
+        const selectElement = document.getElementById(id);
+        if (selectElement) {
+            selectElement.onchange = () => {
+                updateUrlWithGameSettings('sorting');
+            }
+        }
+    });
+
 	const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
 	if (togglePhoneticBtn) {
 		togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
@@ -4419,6 +4608,8 @@ function stopSortingGame() {
 }
 
 function startSortingGame() {
+	updateUrlWithGameSettings('sorting'); 
+
     const sentences = getSelectedSentences()
     const condition = document.getElementById("sortingCondition").value
     const button = document.getElementById("startSorting")
@@ -4784,6 +4975,8 @@ function checkSortingAnswer() {
  * 儲存遊戲結果到 Local Storage
  * @param {object} resultData - 包含遊戲結果的物件
  */
+// script.js
+
 function saveGameResult(resultData) {
     if (!currentUser || currentUser.id === 'guest') {
         console.log("訪客模式，不儲存遊戲記錄。");
@@ -5255,32 +5448,34 @@ function setupEventListeners() {
     document.getElementById("cancelEdit").onclick = () => {
         document.getElementById("userModal").classList.add("hidden");
     }
-    document.getElementById("clearData").onclick = () => {
-        document.getElementById("userDropdown").classList.add("hidden");
-        document.getElementById("clearModal").classList.remove("hidden");
-    }
-    document.getElementById("confirmClear").onclick = () => {
-        const password = document.getElementById("clearPassword").value;
-        if (password === config.CLEAR_DATA_PASSWORD) {
-            const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`;
-            const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
-            const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`;
-            const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
-            localStorage.removeItem(settingsKey);
-            localStorage.removeItem(starredKey);
-            localStorage.removeItem(selectedKey);
-            localStorage.removeItem(collectedKey);
-            starredCards.clear();
-            selectedCategories.clear();
-            selectedSentences.clear();
-            collectedCategories.clear();
-            document.getElementById("clearModal").classList.add("hidden");
-            document.getElementById("clearPassword").value = "";
-            showResult("✅", "清除完成", "所有學習記錄已清除");
-        } else {
-            showResult("❌", "密碼錯誤", "請輸入正確的密碼");
-        }
-    }
+
+	document.getElementById("confirmClear").onclick = () => {
+		const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`;
+		const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
+		const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`;
+		const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
+		// 👇 新增這一行，也要清除遊戲紀錄 👇
+		const historyKey = `${config.STORAGE_PREFIX}gameHistory_${currentUser.id}`;
+
+		localStorage.removeItem(settingsKey);
+		localStorage.removeItem(starredKey);
+		localStorage.removeItem(selectedKey);
+		localStorage.removeItem(collectedKey);
+		// 👇 新增這一行 👇
+		localStorage.removeItem(historyKey);
+
+		starredCards.clear();
+		selectedCategories.clear();
+		selectedSentences.clear();
+		collectedCategories.clear();
+		document.getElementById("clearModal").classList.add("hidden");
+
+		showResult("✅", "清除完成", "所有學習記錄已清除");
+		// 如果使用者正在歷史紀錄頁面，清除後需要重新渲染
+		if (!document.getElementById("learningHistory").classList.contains("hidden")) {
+			renderLearningHistory();
+		}
+	}
     document.getElementById("cancelClear").onclick = () => {
         document.getElementById("clearModal").classList.add("hidden");
         document.getElementById("clearPassword").value = "";
@@ -5297,6 +5492,30 @@ function setupEventListeners() {
         document.getElementById("userDropdown").classList.add("hidden");
         showResult("👋", "已登出", "已切換為訪客模式");
     }
+	document.getElementById("viewHistory").onclick = () => {
+		document.getElementById("userDropdown").classList.add("hidden");
+		showLearningHistory();
+	};
+
+	document.getElementById("viewHistoryDetail").onclick = () => {
+		document.getElementById("userDropdownDetail").classList.add("hidden");
+		showLearningHistory();
+	};
+
+	document.getElementById("goHomeFromHistory").onclick = () => {
+		document.getElementById("learningHistory").classList.add("hidden");
+		document.getElementById("mainMenu").classList.remove("hidden");
+		// 確保返回首頁時，重新渲染頁籤和列表
+		renderCatalogTabs();
+		renderCategoryList();
+	};
+
+	document.getElementById("clearHistoryBtn").onclick = () => {
+		// 直接使用清除所有資料的 modal，但可以客製化標題
+		document.getElementById("clearModalTitle").textContent = "清除學習紀錄";
+		document.getElementById("clearModal").classList.remove("hidden");
+	};
+
     const userButtonDetail = document.getElementById("userButtonDetail");
     const userDropdownDetail = document.getElementById("userDropdownDetail");
     if (userButtonDetail && userDropdownDetail) {
@@ -5315,10 +5534,6 @@ function setupEventListeners() {
             document.getElementById("editId").value = currentUser.id;
             document.getElementById("editAvatar").value = currentUser.avatar;
             document.getElementById("userModal").classList.remove("hidden");
-        }
-        document.getElementById("clearDataDetail").onclick = () => {
-            userDropdownDetail.classList.add("hidden");
-            document.getElementById("clearModal").classList.remove("hidden");
         }
         document.getElementById("logoutDetail").onclick = () => {
             currentUser = {
@@ -5371,6 +5586,7 @@ document.getElementById("goHome").onclick = () => {
         history.pushState({}, '', window.location.pathname);
     }
     document.getElementById("categoryDetail").classList.add("hidden");
+	document.getElementById("learningHistory").classList.add("hidden"); 
     document.getElementById("mainMenu").classList.remove("hidden");
     
     renderCatalogTabs();
@@ -5519,6 +5735,237 @@ function convertPinyinToZhuyin(pinyinString) {
 
     return result;
 }
+
+/**
+ * 根據 URL 參數設定遊戲選項並自動開始遊戲
+ * @param {string} mode - 遊戲模式 ('matching', 'quiz', 'sorting')
+ * @param {object} params - 從 URL 讀取的參數物件
+ */
+function applyAndStartGameFromParams(mode, params) {
+    // 輔助函數：檢查某個值是否為 select 元素中的有效選項
+    const isValidOption = (selectEl, value) => {
+        if (!selectEl || !value) return true; // 如果沒有傳入元素或值，視為有效(不需檢查)
+        return [...selectEl.options].some(opt => opt.value === value);
+    };
+
+    let startButton, allParamsValid = true;
+    let selectors = {};
+
+    switch (mode) {
+        case 'matching':
+            selectors = {
+                lang: document.getElementById('matchingType'),
+                pairs: document.getElementById('matchingPairs'),
+                condition: document.getElementById('matchingCondition')
+            };
+            startButton = document.getElementById('startMatching');
+            break;
+        case 'quiz':
+            selectors = {
+                lang: document.getElementById('quizType'),
+                options: document.getElementById('quizOptions'),
+                condition: document.getElementById('quizCondition')
+            };
+            startButton = document.getElementById('startQuiz');
+            break;
+        case 'sorting':
+            selectors = {
+                lang: document.getElementById('sortingType'),
+                condition: document.getElementById('sortingCondition')
+            };
+            startButton = document.getElementById('startSorting');
+            break;
+        default:
+            return;
+    }
+
+    // 逐一驗證並設定參數
+    for (const key in params) {
+        if (params[key] && selectors[key]) {
+            if (isValidOption(selectors[key], params[key])) {
+                selectors[key].value = params[key];
+            } else {
+                console.error(`參數 ${key}=${params[key]} 在 ${mode} 模式中無效。`);
+                allParamsValid = false;
+            }
+        }
+    }
+
+    // 如果所有傳入的參數都有效，則自動開始遊戲
+    if (allParamsValid && startButton) {
+        // 使用 setTimeout 確保 UI 渲染完成後再點擊
+        setTimeout(() => startButton.click(), 100);
+    }
+}
+
+/**
+ * 當手動開始遊戲時，將當前的遊戲設定更新到 URL 上
+ * @param {string} mode - 遊戲模式 ('matching', 'quiz', 'sorting')
+ */
+function updateUrlWithGameSettings(mode) {
+    if (!history.pushState) return;
+
+    const params = new URLSearchParams(window.location.search);
+    let settings = {};
+
+    switch (mode) {
+        case 'matching':
+            settings = {
+                lang: document.getElementById('matchingType').value,
+                pairs: document.getElementById('matchingPairs').value,
+                condition: document.getElementById('matchingCondition').value
+            };
+            break;
+        case 'quiz':
+            settings = {
+                lang: document.getElementById('quizType').value,
+                options: document.getElementById('quizOptions').value,
+                condition: document.getElementById('quizCondition').value
+            };
+            break;
+        case 'sorting':
+            settings = {
+                lang: document.getElementById('sortingType').value,
+                condition: document.getElementById('sortingCondition').value
+            };
+            break;
+        default:
+            return;
+    }
+    
+    // 設定參數到 URL
+    for (const key in settings) {
+        if (settings[key]) {
+            params.set(key, settings[key]);
+        }
+    }
+
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    // 使用 replaceState 避免用戶按上一頁時，只改變了參數
+    history.replaceState(history.state, '', newUrl);
+}
+
+
+
+setupEventListeners 
+/**
+ * 顯示學習紀錄頁面
+ */
+function showLearningHistory() {
+    if (currentUser.id === 'guest') {
+        showResult("👤", "訪客模式", "登入後即可開始記錄學習歷程。");
+        return;
+    }
+    document.getElementById("mainMenu").classList.add("hidden");
+    document.getElementById("categoryDetail").classList.add("hidden");
+    document.getElementById("learningHistory").classList.remove("hidden");
+    renderLearningHistory();
+    window.scrollTo(0, 0);
+}
+
+/**
+ * 渲染學習紀錄內容
+ */
+function renderLearningHistory() {
+    const contentArea = document.getElementById("historyContent");
+    const historyKey = `${config.STORAGE_PREFIX}gameHistory_${currentUser.id}`;
+    let history = [];
+    try {
+        const storedHistory = localStorage.getItem(historyKey);
+        if (storedHistory) {
+            history = JSON.parse(storedHistory);
+        }
+    } catch (e) {
+        console.error("讀取遊戲歷史記錄失敗:", e);
+    }
+
+    if (history.length === 0) {
+        contentArea.innerHTML = `<div class="text-center py-20 text-gray-500">
+            <span class="material-icons text-6xl text-gray-300">history</span>
+            <p class="mt-4 text-lg">目前沒有任何學習紀錄</p>
+        </div>`;
+        document.getElementById("clearHistoryBtn").classList.add("hidden");
+        return;
+    }
+    
+    document.getElementById("clearHistoryBtn").classList.remove("hidden");
+
+    const gameInfo = {
+        matching: { icon: 'extension', name: '配對', color: 'orange' },
+        quiz: { icon: 'quiz', name: '測驗', color: 'red' },
+        sorting: { icon: 'sort', name: '排序', color: 'indigo' }
+    };
+    
+    const langMap = {
+        'hakka-chinese': '客↔華', 'pinyin-chinese': '拼↔華', 'hakka-pinyin': '客↔拼',
+        'audio-hakka': '音↔客', 'audio-pinyin': '音↔拼', 'audio-chinese': '音↔華',
+        'chinese-hakka': '華→客', 'chinese-pinyin': '華→拼', 'pinyin-hakka': '拼→客'
+    };
+    
+    const formatCondition = (cond) => {
+        if (!cond) return '';
+        if (cond.startsWith('time')) return `${cond.replace('time', '')}秒`;
+        if (cond.startsWith('correct')) return `答對${cond.replace('correct', '')}題`;
+        if (cond.startsWith('round')) return `${cond.replace('round', '')}關`;
+        if (cond === 'unlimited') return '無限';
+        return cond;
+    };
+
+    const headerHtml = `
+        <div class="history-list-header">
+            <div class="col-icon" title="遊戲類型"><span class="material-icons">category</span></div>
+            <div class="col-topic">主題單元</div>
+            <div class="col-settings">遊戲設定</div>
+            <div class="col-stats">成績紀錄</div>
+            <div class="col-date">時間</div>
+        </div>
+    `;
+
+    const rowsHtml = history.map(item => {
+        const info = gameInfo[item.gameType] || { icon: 'videogame_asset', name: '遊戲', color: 'gray' };
+        const date = new Date(item.timestamp);
+        const formattedDate = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        
+        const settings = item.settings || {};
+        const topics = settings.categories ? (settings.categories.length > 1 ? `${settings.categories.length}個主題` : settings.categories[0]) : 'N/A';
+        
+        const settingsParts = [
+            langMap[settings.type] || settings.type,
+            settings.pairs ? `${settings.pairs}組` : null,
+            settings.options ? `${settings.options}項` : null,
+            formatCondition(settings.condition)
+        ].filter(Boolean).join(', ');
+
+        let statsHtml = '';
+        if(item.score !== undefined) statsHtml += `<span class="stat-icon-group" title="分數"><span class="material-icons">scoreboard</span>${item.score}</span>`;
+        if(item.correct !== undefined) statsHtml += `<span class="stat-icon-group" title="答對"><span class="material-icons text-green-600">check_circle</span>${item.correct}</span>`;
+        if(item.incorrect !== undefined) statsHtml += `<span class="stat-icon-group" title="答錯"><span class="material-icons text-red-500">cancel</span>${item.incorrect}</span>`;
+        if(item.duration !== undefined) statsHtml += `<span class="stat-icon-group" title="耗時"><span class="material-icons">timer</span>${item.duration}s</span>`;
+        if(item.steps !== undefined) statsHtml += `<span class="stat-icon-group" title="步數"><span class="material-icons">footprint</span>${item.steps}</span>`;
+
+        return `
+            <div class="history-list-row ${item.gameType}">
+                <div class="col-icon" title="${info.name}"><span class="material-icons">${info.icon}</span></div>
+                <div class="col-topic" title="${settings.categories?.join(', ')}">${topics}</div>
+                <div class="col-settings">${settingsParts}</div>
+                <div class="col-stats">${statsHtml}</div>
+                <div class="col-date">${formattedDate}</div>
+            </div>`;
+    }).join('');
+
+    contentArea.innerHTML = `<div class="history-list-container">${headerHtml}${rowsHtml}</div>`;
+}
+
+/**
+ * (輔助函數) 格式化時間 (秒 -> 分:秒)
+ */
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+
 // =================================================================
 const arr_pz = ["ainn","","iang","","iong","","iung","","uang","","inn","","eeu","","een","","eem","","eed","","eeb","","enn","","onn","","ang","","iag","","ied","","ien","","ong","","ung","","iid","","iim","","iin","","iab","","iam","","iau","","iog","","ieb","","iem","","ieu","","iug","","iun","","uad","","uai","","uan","","ued","","uen","","iui","","ioi","","iud","","ion","","iib","","ab","","ad","","ag","","ai","","am","","an","","au","","ed","","en","","eu","","ee","","oo","","er","","id","","in","","iu","","od","","og","","oi","","ud","","ug","","un","","em","","ii","","on","","ui","","eb","","io","","ia","","ib","","ie","","im","","ua","","bb","","a","","e","","i","","o","","u","","ng","","rh","","r","","zh","","ch","","sh","","b","","p","","m","","f","","d","","t","","n","","l","","g","","k","","h","","j","","q","","x","","z","","c","","s","","v",""];
 
