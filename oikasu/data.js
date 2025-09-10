@@ -80,11 +80,11 @@ const myData = `
 10 問生肖	佢肖牛。	guiˋ sioˆ ngiuˋ.	他屬牛。	oikasu-k1-067.mp3
 10 問生肖	啊佢肖麼个？	a guiˋ sioˆ bbooˊ-gaiˆ?	而他屬什麼？	oikasu-k1-068.mp3
 10 問生肖	佢肖兔。	guiˋ sioˆ tuˆ.	他屬兔。	oikasu-k1-069.mp3
-11 問年級	請問你讀幾多年？	ciangˆ-munˆ henˋ tu giˆdooˇ neenˋ?	請問你讀幾年級？	oikasu-k1-070.mp3
+11 問年級	請問你讀幾多年？	ciangˆ-munˆ henˋ tu giˆ-dooˇ neenˋ?	請問你讀幾年級？	oikasu-k1-070.mp3
 11 問年級	𠊎讀三年。	ngaiˋ tu samˇ neenˋ.	我讀三年級。	oikasu-k1-071.mp3
-11 問年級	請問你弟讀幾多年？	ciangˆ-munˆ henˋ teˇ tu giˆdooˇ neenˋ?	請問你弟弟讀幾年級？	oikasu-k1-072.mp3
+11 問年級	請問你弟讀幾多年？	ciangˆ-munˆ henˋ teˇ tu giˆ-dooˇ neenˋ?	請問你弟弟讀幾年級？	oikasu-k1-072.mp3
 11 問年級	𠊎弟讀一年。	ngaiˋ teˇ tu rhidˊ neenˋ.	我弟弟讀一年級。	oikasu-k1-073.mp3
-11 問年級	請問佢讀幾多年？	ciangˆ-munˆ guiˋ tu giˆdooˇ neenˋ?	請問他讀幾年級？	oikasu-k1-074.mp3
+11 問年級	請問佢讀幾多年？	ciangˆ-munˆ guiˋ tu giˆ-dooˇ neenˋ?	請問他讀幾年級？	oikasu-k1-074.mp3
 11 問年級	佢讀二年。	guiˋ tu ngi neenˋ.	他讀二年級。	oikasu-k1-075.mp3
 12 問身份	佢係哪儕？	guiˋ he ni-saˋ?	他是誰？	oikasu-k1-076.mp3
 12 問身份	佢係學校長。	guiˋ he hoo-hau-zhongˆ.	他是校長。	oikasu-k1-077.mp3
@@ -99,13 +99,13 @@ const myData = `
 13 問星期	韶日拜二。	shioˋ-ngidˊ baiˆ-ngi.	明天星期二。	oikasu-k1-086.mp3
 13 問星期	昨日拜幾？	caˇ-ngidˊ baiˆ guiˆ?	昨天星期幾？	oikasu-k1-087.mp3
 13 問星期	昨日禮拜。	caˇ-ngidˊ leˆ-baiˆ.	昨天星期日。	oikasu-k1-088.mp3
-14 問日期	今日幾多號？	ginˇ-ngidˊ giˆdooˇ hoo?	今天幾號？	oikasu-k1-089.mp3
+14 問日期	今日幾多號？	ginˇ-ngidˊ giˆ-dooˇ hoo?	今天幾號？	oikasu-k1-089.mp3
 14 問日期	今日十六號。	ginˇ-ngidˊ shibˋ liuˊ hoo.	今天十六號。	oikasu-k1-090.mp3
-14 問日期	韶日幾多號？	shioˋ-ngidˊ giˆdooˇ hoo?	明天幾號？	oikasu-k1-091.mp3
+14 問日期	韶日幾多號？	shioˋ-ngidˊ giˆ-dooˇ hoo?	明天幾號？	oikasu-k1-091.mp3
 14 問日期	韶日十七號。	shioˋ-ngidˊ shibˋ cidˊ hoo.	明天十七號。	oikasu-k1-092.mp3
-14 問日期	昨日幾多號？	caˇ-ngidˊ giˆdooˇ hoo?	昨天幾號？	oikasu-k1-093.mp3
+14 問日期	昨日幾多號？	caˇ-ngidˊ giˆ-dooˇ hoo?	昨天幾號？	oikasu-k1-093.mp3
 14 問日期	昨日十五號。	caˇ-ngidˊ shibˋ-mˆ hoo.	昨天十五號。	oikasu-k1-094.mp3
-15 問幾點	這滿幾多點？	liˊ-manˆ giˆdooˇ deemˆ?	現在幾點？	oikasu-k1-095.mp3
+15 問幾點	這滿幾多點？	liˊ-manˆ giˆ-dooˇ deemˆ?	現在幾點？	oikasu-k1-095.mp3
 15 問幾點	這滿八點。	liˊ-manˆ beedˊ deemˆ.	現在八點。	oikasu-k1-096.mp3
 15 問幾點	這滿八點二十分。	liˊ-manˆ beedˊ deemˆ ngi shibˋ funˇ.	現在八點二十分。	oikasu-k1-097.mp3
 15 問幾點	這滿九點半。	liˊ-manˆ giuˆ deemˆ banˆ.	現在九點半。	oikasu-k1-098.mp3
@@ -222,7 +222,7 @@ const myData = `
 30 溝通確認	𠊎个意思毋係恁。	ngaiˋ e rhiˆ-suˆ mˇ-he anˊ.	我的意思不是這樣。	oikasu-k1-209.mp3
 31 就寢	好睡啊。	hooˆ fe aˆ.	該睡覺了。	oikasu-k1-210.mp3
 31 就寢	𠊎嘛真想討睡。	ngaiˋ maˇ zhinˇ siong-tooˆ fe.	我也很想睡覺。	oikasu-k1-211.mp3
-31 就寢	你攏幾多點睡？	henˋ lungˆ giˆdooˇ deemˆ fe?	你都幾點睡覺？	oikasu-k1-212.mp3
+31 就寢	你攏幾多點睡？	henˋ lungˆ giˆ-dooˇ deemˆ fe?	你都幾點睡覺？	oikasu-k1-212.mp3
 31 就寢	𠊎攏九點半睡。	ngaiˋ lungˆ giuˆ deemˆ banˆ fe.	我都九點半睡覺。	oikasu-k1-213.mp3
 31 就寢	睡進前毋好講傷多事。	fe zinˆ-cienˋ m-hooˆ gongˆ shiong dooˇ su.	睡覺之前不要說太多話。	oikasu-k1-214.mp3
 31 就寢	睡進前毋好啉傷多茶。	fe zinˆ-cienˋ m-hooˆ limˇ shiong dooˇ caˋ.	睡覺之前不要喝太多茶。	oikasu-k1-215.mp3

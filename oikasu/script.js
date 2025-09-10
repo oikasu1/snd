@@ -3,15 +3,14 @@
 // =================================================================
 const config = {
     // Local Storage 的獨特前綴，避免與其他應用程式衝突
-    STORAGE_PREFIX: "hakkaLearningApp_v4_",
+    STORAGE_PREFIX: "hakkaLearningApp_v5_",
 
 
     // 【新增】GOOGLE 表單設定
     GOOGLE_FORM_CONFIG: {
         formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSeAHb2ovqcJsQnOhuEqVjk_9ORt9mcfGvqvNpwBA7FgOCXTzw/formResponse", 
-        
-        nameField: "entry.390906906",      // 姓名 (文字)
-        idField: "entry.766582104",        // 班號/ID (文字)
+        nameField: "entry.390906906",      // 姓名
+        idField: "entry.766582104",        // 班號/ID
         gameTypeField: "entry.1584239140",   // 遊戲類型 (文字: matching, quiz, sorting)
         scoreField: "entry.774071075",      // 分數 (數字)
         durationField: "entry.125296714",   // 遊戲時間 (秒) (數字)
@@ -22,33 +21,42 @@ const config = {
         settingsField: "entry.1928836665"    // 遊戲設定 (文字, JSON 格式)
     },
 
-    // 慶祝動畫中隨機顯示的表情符號
+    // 慶祝動畫的表情符號
     CELEBRATION_EMOJIS: ["🌈", "🌟", "🎊", "🎉", "✨", "💖", "😍", "🥰"],
 
-    // 新使用者的預設設定
+    // 預設設定
     DEFAULT_USER_SETTINGS: {
         fontSize: 20,
-        flashcardFontSize: 24,
-        lineSpacing: "loose",
-        layout: "double",
+        flashcardFontSize: 28,
+        layout: "double",  // double、single、精簡compact、3col、4col、table
         viewMode: "card",
         matchingLayout: '1col',
-        quizLayout: 'horizontal', // 將在初次載入時根據螢幕寬度動態調整
+		matchingColumns: 2,
+        quizLayout: 'horizontal',
         flashcardAutoPlayAudio: true,
-        matchingColumns: 2, // 配對遊戲在電腦版的預設欄數
+		quizAutoPlayAudio: true,
+		playPinyinOnClick: true,
         pinyinAnnotation: true,
-        phoneticSystem: 'pinyin',
-		playPinyinOnClick: true
+        phoneticSystem: 'pinyin'
     },
 
-    // 不同模式下的字體大小級距
+    // 不同模式字體大小級距
     FONT_SIZES: {
-        learning: [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40],
-        flashcard: [24, 28, 32, 36, 40, 44, 48, 52, 56, 60]
+        learning: [20, 22, 24, 26, 28, 30, 32],
+        flashcard: [28, 32, 36, 40, 44, 48, 52, 56, 60]
     },
 
-    // 音檔存放的基礎路徑
-    AUDIO_BASE_PATH: "https://oikasu1.github.io/snd/oikasu/",
+    // 學習紀錄最大保存筆數
+    MAX_HISTORY_RECORDS: 100,
+
+    // 音檔路徑設定
+    AUDIO_PATHS: {
+        // key 是副檔名 (不含點)，value 是對應的路徑
+        "oikasu": "https://oikasu2.github.io/snd/oikasu/",
+        "kasu100": "https://oikasu1.github.io/snd/oikasu100/",
+        // 'mp3' 作為預設或後備路徑
+        "mp3": "https://oikasu1.github.io/snd/oikasu/"
+    },
 };
 // =================================================================
 
@@ -102,7 +110,70 @@ let isLearningSelectMode = false;
 let lastVisitedTab = "";
 let collectedCategories = new Set();
 
-
+// 表情符號對應表
+const myEmoji = `
+天氣	☀️
+問好	👋
+相遇	🤝
+道別	👋
+行禮	🙇
+感謝	🙏
+等候	⏳
+問姓名	❓
+問年紀	🎂
+問生肖	🐭
+問年級	📚
+問身份	🧑‍💼
+問星期	📅
+問日期	🗓️
+問幾點	⏰
+趕時間	🏃
+遲到	⏱️
+問處所	📍
+問去向	➡️
+距離	📏
+問路	🗺️
+座位	🪑
+問意願	🤔
+問擁有	💰
+問方式	❓
+問原因	❓
+事實確認	✅
+認知確認	🧠
+能力確認	💪
+溝通確認	🗣️
+就寢	😴
+洗衣服	🧺
+用餐	🍽️
+味道	👃
+感冒	🤧
+視力檢查	👓
+去廁所	🚽
+剪頭髮	💇
+看電影	🎬
+音樂	🎶
+打球	🏀
+猜拳	✊
+散步	🚶
+拍照	📸
+付錢	💳
+換錢	💱
+買車票	🎫
+買門票	🎟️
+加汽油	⛽
+遺失	😟
+找東西	👀
+語言能力	🗣️
+語言翻譯	🌐
+數學加減	➕
+數學數量	🔢
+大小	↔️
+點名	🙋
+排隊	🚶
+手動作	🖐️
+腳動作	🦶
+畢業	🎓
+`;
 
 /**
  * 解析 URL 中的 no 參數字串 (例如 "1-3,8") 為數字陣列 [1, 2, 3, 8]
@@ -416,8 +487,6 @@ function init() {
     renderCategoryList();
     setupEventListeners();
     updateUserDisplay();
-
-    document.getElementById("learnSelected").addEventListener("click", startLearning);
 }
 
 // 解析分類群組資料
@@ -454,7 +523,7 @@ function parseCatalog() {
         }
     });
 
-    // 【新增】動態建立「收藏」頁籤
+    // 動態建立「收藏」頁籤
     const hasStarred = starredCards.size > 0;
     const hasCollected = collectedCategories.size > 0;
 
@@ -480,14 +549,14 @@ function parseCatalog() {
     }
 }
 
-// 使用新的函數來處理頁籤溢出
+// 處理頁籤溢出
 function renderCatalogTabs() {
     const tabsContainer = document.getElementById("catalogTabs");
     const moreTabsContainer = document.getElementById("moreTabsContainer");
     const moreTabsDropdown = document.getElementById("moreTabsDropdown");
     const container = document.getElementById("catalogTabsContainer");
 
-    // 【新增的防護】如果容器是隱藏的(寬度為0)，則不執行後續程式碼
+    // 如果容器是隱藏的(寬度為0)，則不執行後續程式碼
     if (!tabsContainer || !container || container.offsetWidth === 0) {
         return;
     }
@@ -517,7 +586,7 @@ function renderCatalogTabs() {
         return button;
     });
 
-    // 使用 requestAnimationFrame 確保元素已渲染以進行寬度計算
+    // 確保元素已渲染以進行寬度計算
     requestAnimationFrame(() => {
         const viewToggleBtn = document.getElementById("viewToggle");
         // 計算可用空間 (容器寬度 - 切換檢視按鈕寬度 - 一些間距)
@@ -581,7 +650,6 @@ function createCategoryCardElement(categoryName, cardCount) {
 
     const isStarredCategory = categoryName === "星號";
 
-    // *** 修改點：根據是否為多選模式，決定點擊行為 ***
     if (isMultiSelectMode) {
         categoryItem.onclick = () => toggleCategorySelection(categoryName);
     } else {
@@ -749,11 +817,16 @@ function updateSelectionControlsState() {
 }
 
 
+
 // 處理頁籤選擇事件
 function selectCatalogTab(tabName) {
     currentCatalogTab = tabName;
     renderCatalogTabs();
     renderCategoryList();
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
 }
 
 
@@ -795,7 +868,7 @@ function loadUserData() {
         currentUser = JSON.parse(userData)
     }
 
-    // 【新增】載入收藏的分類
+    // 載入收藏的分類
     const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
     const collectedData = localStorage.getItem(collectedKey);
     if (collectedData) {
@@ -814,14 +887,13 @@ function saveUserData() {
     localStorage.setItem(`${config.STORAGE_PREFIX}user`, JSON.stringify(currentUser))
 }
 
-// 請替換此函數
+
 function loadUserSettings() {
     const settingsKey = `${config.STORAGE_PREFIX}settings_${currentUser.id}`
     const settings = localStorage.getItem(settingsKey)
     if (settings) {
         userSettings = JSON.parse(settings)
     } else {
-        // 從 config 載入預設設定 (使用深拷貝以避免修改原始設定)
         userSettings = JSON.parse(JSON.stringify(config.DEFAULT_USER_SETTINGS));
     }
 
@@ -837,6 +909,11 @@ function loadUserSettings() {
         userSettings.flashcardAutoPlayAudio = true;
     }
 
+    // 為測驗模式的自動播放音效設定預設值
+    if (userSettings.quizAutoPlayAudio === undefined) {
+        userSettings.quizAutoPlayAudio = true;
+    }
+
     if (userSettings.flashcardLoop === undefined) {
         userSettings.flashcardLoop = false;
     }
@@ -845,11 +922,9 @@ function loadUserSettings() {
         userSettings.pinyinAnnotation = false;
     }
 
-    // --- 新增開始 ---
     if (userSettings.phoneticSystem === undefined) {
         userSettings.phoneticSystem = 'pinyin';
     }
-    // --- 新增結束 ---
 
     currentViewMode = userSettings.viewMode || "card"
 
@@ -860,7 +935,7 @@ function loadUserSettings() {
         selectedCategories = new Set(JSON.parse(selectedData))
     }
 
-    // --- 新增：載入星號紀錄 ---
+    // 載入星號紀錄 ---
     const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
     const starredData = localStorage.getItem(starredKey);
     if (starredData) {
@@ -883,30 +958,70 @@ function saveUserSettings() {
 
 
 function updateUserDisplay() {
-    // 首頁用戶顯示
-    document.getElementById("userName").textContent = currentUser.name
-    document.getElementById("userAvatar").textContent = currentUser.avatar
-    document.getElementById("dropdownName").textContent = currentUser.name
-    document.getElementById("dropdownId").textContent = `#${currentUser.id}`
-    document.getElementById("dropdownAvatar").textContent = currentUser.avatar
+    // 更新使用者名稱、頭像等基本資訊
+    document.getElementById("userName").textContent = currentUser.name;
+    document.getElementById("userAvatar").textContent = currentUser.avatar;
+    document.getElementById("dropdownName").textContent = currentUser.name;
+    document.getElementById("dropdownId").textContent = `#${currentUser.id}`;
+    document.getElementById("dropdownAvatar").textContent = currentUser.avatar;
 
-    // 詳情頁用戶顯示
-    const userNameDetail = document.getElementById("userNameDetail")
-    const userAvatarDetail = document.getElementById("userAvatarDetail")
-    const dropdownNameDetail = document.getElementById("dropdownNameDetail")
-    const dropdownIdDetail = document.getElementById("dropdownIdDetail")
-    const dropdownAvatarDetail = document.getElementById("dropdownAvatarDetail")
+    const userNameDetail = document.getElementById("userNameDetail");
+    const userAvatarDetail = document.getElementById("userAvatarDetail");
+    const dropdownNameDetail = document.getElementById("dropdownNameDetail");
+    const dropdownIdDetail = document.getElementById("dropdownIdDetail");
+    const dropdownAvatarDetail = document.getElementById("dropdownAvatarDetail");
 
-    if (userNameDetail) userNameDetail.textContent = currentUser.name
-    if (userAvatarDetail) userAvatarDetail.textContent = currentUser.avatar
-    if (dropdownNameDetail) dropdownNameDetail.textContent = currentUser.name
-    if (dropdownIdDetail) dropdownIdDetail.textContent = `#${currentUser.id}`
-    if (dropdownAvatarDetail) dropdownAvatarDetail.textContent = currentUser.avatar
+    if (userNameDetail) userNameDetail.textContent = currentUser.name;
+    if (userAvatarDetail) userAvatarDetail.textContent = currentUser.avatar;
+    if (dropdownNameDetail) dropdownNameDetail.textContent = currentUser.name;
+    if (dropdownIdDetail) dropdownIdDetail.textContent = `#${currentUser.id}`;
+    if (dropdownAvatarDetail) dropdownAvatarDetail.textContent = currentUser.avatar;
+    
+    // --- 根據登入狀態更新按鈕 ---
+    const editProfileBtn = document.getElementById("editProfile");
+    const viewHistoryBtn = document.getElementById("viewHistory");
+    const logoutBtn = document.getElementById("logout");
+    
+    const editProfileDetailBtn = document.getElementById("editProfileDetail");
+    const viewHistoryDetailBtn = document.getElementById("viewHistoryDetail");
+    const logoutDetailBtn = document.getElementById("logoutDetail");
+
+    const isGuest = currentUser.id === 'guest';
+
+    // 處理主選單的下拉選單
+    if (isGuest) {
+        logoutBtn.textContent = "登入";
+        editProfileBtn.classList.add("text-gray-400", "cursor-not-allowed");
+        editProfileBtn.disabled = true;
+        viewHistoryBtn.classList.add("text-gray-400", "cursor-not-allowed");
+        viewHistoryBtn.disabled = true;
+    } else {
+        logoutBtn.textContent = "登出";
+        editProfileBtn.classList.remove("text-gray-400", "cursor-not-allowed");
+        editProfileBtn.disabled = false;
+        viewHistoryBtn.classList.remove("text-gray-400", "cursor-not-allowed");
+        viewHistoryBtn.disabled = false;
+    }
+    
+    // 處理詳情頁的下拉選單
+    if (logoutDetailBtn) {
+        if (isGuest) {
+            logoutDetailBtn.textContent = "登入";
+            editProfileDetailBtn.classList.add("text-gray-400", "cursor-not-allowed");
+            editProfileDetailBtn.disabled = true;
+            viewHistoryDetailBtn.classList.add("text-gray-400", "cursor-not-allowed");
+            viewHistoryDetailBtn.disabled = true;
+        } else {
+            logoutDetailBtn.textContent = "登出";
+            editProfileDetailBtn.classList.remove("text-gray-400", "cursor-not-allowed");
+            editProfileDetailBtn.disabled = false;
+            viewHistoryDetailBtn.classList.remove("text-gray-400", "cursor-not-allowed");
+            viewHistoryDetailBtn.disabled = false;
+        }
+    }
 }
 
 // 搜尋功能
-// script.js
-
 function handleSearchInput(e) {
     // 【修改】將查詢中的一個或多個 '-' 替換為空格
     const query = e.target.value.toLowerCase().replace(/-+/g, ' ');
@@ -1105,70 +1220,7 @@ function selectSearchResult(type, data) {
 
 
 
-// 表情符號對應表
-const myEmoji = `
-天氣	☀️
-問好	👋
-相遇	🤝
-道別	👋
-行禮	🙇
-感謝	🙏
-等候	⏳
-問姓名	❓
-問年紀	🎂
-問生肖	🐭
-問年級	📚
-問身份	🧑‍💼
-問星期	📅
-問日期	🗓️
-問幾點	⏰
-趕時間	🏃
-遲到	⏱️
-問處所	📍
-問去向	➡️
-距離	📏
-問路	🗺️
-座位	🪑
-問意願	🤔
-問擁有	💰
-問方式	❓
-問原因	❓
-事實確認	✅
-認知確認	🧠
-能力確認	💪
-溝通確認	🗣️
-就寢	😴
-洗衣服	🧺
-用餐	🍽️
-味道	👃
-感冒	🤧
-視力檢查	👓
-去廁所	🚽
-剪頭髮	💇
-看電影	🎬
-音樂	🎶
-打球	🏀
-猜拳	✊
-散步	🚶
-拍照	📸
-付錢	💳
-換錢	💱
-買車票	🎫
-買門票	🎟️
-加汽油	⛽
-遺失	😟
-找東西	👀
-語言能力	🗣️
-語言翻譯	🌐
-數學加減	➕
-數學數量	🔢
-大小	↔️
-點名	🙋
-排隊	🚶
-手動作	🖐️
-腳動作	🦶
-畢業	🎓
-`;
+
 
 const emojiMap = myEmoji.trim().split('\n').reduce((acc, line) => {
     const parts = line.trim().split(/\s+/);
@@ -1236,14 +1288,14 @@ function removeFromCollection() {
 
     disableMultiSelectMode();
 
-    // 【新增】檢查「收藏」頁籤在移除後是否應被刪除
+    // 檢查「收藏」頁籤在移除後是否應被刪除
     const isCollectionNowEmpty = collectedCategories.size === 0 && starredCards.size === 0;
 
-    // 【修改】重新解析目錄，這會移除空的「收藏」頁籤
+    // 重新解析目錄，這會移除空的「收藏」頁籤
     parseCatalog();
 
     if (isCollectionNowEmpty && currentCatalogTab === '收藏') {
-        // 【新增】如果收藏已空且當前就在該頁籤，則跳轉到預設頁籤
+        // 如果收藏已空且當前就在該頁籤，則跳轉到預設頁籤
         const defaultTabName = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
 
         if (defaultTabName) {
@@ -1254,7 +1306,7 @@ function removeFromCollection() {
             renderCatalogTabs();
         }
     } else {
-        // 【修改】如果收藏未空，或使用者不在收藏頁籤，則正常刷新當前畫面即可
+        // 如果收藏未空，或使用者不在收藏頁籤，則正常刷新當前畫面即可
         renderCategoryList();
         renderCatalogTabs();
     }
@@ -1315,7 +1367,7 @@ function startLearning() {
   
   const tempCategoryName = `${selectedCount}主題`;
   
-  // 【修改處】使用更嚴謹的方式來清除舊的暫存分類
+  // 使用更嚴謹的方式來清除舊的暫存分類
   Object.keys(categories).forEach(key => {
     // 確保只刪除由數字開頭的暫存主題，例如 "4主題", "3/4主題"
     if (key.endsWith("主題") && !isNaN(parseInt(key, 10))) {
@@ -1419,7 +1471,6 @@ function showStarredCategory() {
 
 
 // 切換檢視模式
-
 function setViewMode(mode) {
     currentViewMode = mode
     userSettings.viewMode = currentViewMode
@@ -1429,7 +1480,7 @@ function setViewMode(mode) {
     const viewToggle = document.getElementById("viewToggle")
     const icon = viewToggle.querySelector(".material-icons")
 
-    // 【核心變更】圖示顯示的是你將要切換到的模式
+    // 【圖示顯示的是你將要切換到的模式
     if (mode === "card") {
         icon.textContent = "view_list"; // 在卡片模式下，顯示 "列表" 圖示
         viewToggle.title = "切換為清單檢視";
@@ -1443,7 +1494,6 @@ function setViewMode(mode) {
 
 
 // 顯示分類詳情
-// 請替換此函數
 function showCategoryDetail(category) {
   currentCategory = category
 
@@ -1471,7 +1521,7 @@ function showCategoryDetail(category) {
 
   const categoryTitleContainer = document.getElementById("categoryTitleContainer");
   
-  // 【修改】放寬判斷條件，只要以「主題」結尾就渲染互動式標題
+  // 放寬判斷條件，只要以「主題」結尾就渲染互動式標題
   if (category.endsWith("主題")) {
       renderInteractiveTitle(category);
   } else {
@@ -1494,7 +1544,7 @@ function renderInteractiveTitle(initialCategoryName) {
     const container = document.getElementById("categoryTitleContainer");
     if (!container) return;
 
-    // 【新增】解析初始的主題總數
+    // 解析初始的主題總數
     const initialCount = parseInt(initialCategoryName, 10);
 
     let dropdownItemsHtml = Array.from(selectedCategories).sort().map(catName => `
@@ -1581,7 +1631,7 @@ function updateCombinedSentencesAndRender() {
         }
     });
 
-    // 【修改】讀取初始總數，並產生新的標題格式
+    // 讀取初始總數，並產生新的標題格式
     const dropdownBtn = document.getElementById("categoryDropdownBtn");
     const initialCount = dropdownBtn.dataset.initialCount;
     const newCount = selectedCategories.size;
@@ -1773,14 +1823,14 @@ function annotateHakkaText(hakkaText, pinyinText, isAnnotated) {
 
 /**
  * 播放音檔，並可選擇性地更新按鈕圖示。
- * @param {string} filename - 要播放的音檔名稱。
+ * 新版本會根據音檔的副檔名，從 config.AUDIO_PATHS 中動態選擇對應的路徑。
+ * @param {string} filename - 要播放的音檔名稱 (例如 "oikasu-k1-001.mp3" 或 "word.oikasu")。
  * @param {HTMLElement} [iconElement=null] - (可選) 要更新的 Material Icons 元素。
  * @returns {Promise<void>} - 一個在音檔播放完畢時解析的 Promise。
  */
 function playAudio(filename, iconElement = null) {
-    // 停止任何正在播放的音檔。這對於防止音檔重疊至關重要。
+    // 停止任何正在播放的音檔，防止重疊
     if (currentAudio) {
-        // 移除舊音檔的事件監聽器，避免舊的 Promise 意外地被解析
         currentAudio.onended = null;
         currentAudio.onpause = null;
         currentAudio.onerror = null;
@@ -1798,8 +1848,16 @@ function playAudio(filename, iconElement = null) {
             return;
         }
 
-        const audio = new Audio(`${config.AUDIO_BASE_PATH}${filename}`);
-        currentAudio = audio; // 將當前音檔指定到全域變數
+        // --- 動態決定音檔路徑 ---
+        const parts = filename.split('.');
+        // 取得最後一部分作為副檔名，如果沒有副檔名則預設為 'mp3'
+        const extension = parts.length > 1 ? parts.pop().toLowerCase() : 'mp3';
+        // 從 config 中尋找對應的路徑，如果找不到，則使用 mp3 的路徑作為後備
+        const basePath = config.AUDIO_PATHS[extension] || config.AUDIO_PATHS['mp3'];
+        const audioUrl = `${basePath}${filename}`;
+
+        const audio = new Audio(audioUrl);
+        currentAudio = audio;
 
         if (iconElement) {
             currentPlayingIcon = iconElement;
@@ -1808,12 +1866,10 @@ function playAudio(filename, iconElement = null) {
         }
 
         const cleanupAndResolve = () => {
-            // 確保只清理與此音檔相關的圖示
             if (iconElement && currentPlayingIcon === iconElement) {
                 iconElement.textContent = originalIconContent;
                 currentPlayingIcon = null;
             }
-            // 清理事件監聽器以避免記憶體洩漏
             audio.onended = null;
             audio.onerror = null;
             resolve();
@@ -1821,13 +1877,13 @@ function playAudio(filename, iconElement = null) {
 
         audio.onended = cleanupAndResolve;
         audio.onerror = () => {
-            console.log("音檔播放失敗");
-            cleanupAndResolve(); // 即使失敗也解析，以防自動播放循環中斷
+            console.error(`音檔播放失敗: ${audioUrl}`);
+            cleanupAndResolve();
         };
 
         audio.play().catch(e => {
-            console.log("音檔播放命令失敗:", e);
-            cleanupAndResolve(); // 同樣解析以防循環中斷
+            console.error(`音檔播放命令失敗:`, e);
+            cleanupAndResolve();
         });
     });
 }
@@ -1850,20 +1906,32 @@ function playCurrentAudio() {
 
 // 顯示慶祝特效
 function showCelebration(element) {
-    element.classList.add("celebration")
-    setTimeout(() => element.classList.remove("celebration"), 800)
+    element.classList.add("celebration");
+    setTimeout(() => element.classList.remove("celebration"), 800);
+
+    // 安全邊界距離，避免太靠近邊緣
+    const margin = 100;
 
     // 隨機表情符號特效
-    const emoji = config.CELEBRATION_EMOJIS[Math.floor(Math.random() * config.CELEBRATION_EMOJIS.length)]
-    const emojiElement = document.createElement("div")
-    emojiElement.className = "emoji-celebration"
-    emojiElement.textContent = emoji
-    emojiElement.style.left = Math.random() * window.innerWidth + "px"
-    emojiElement.style.top = Math.random() * window.innerHeight + "px"
-    document.body.appendChild(emojiElement)
+    const emoji = config.CELEBRATION_EMOJIS[
+        Math.floor(Math.random() * config.CELEBRATION_EMOJIS.length)
+    ];
+    const emojiElement = document.createElement("div");
+    emojiElement.className = "emoji-celebration";
+    emojiElement.textContent = emoji;
 
-    setTimeout(() => emojiElement.remove(), 2000)
+    // 限制隨機位置在 margin 內
+    const left = Math.random() * (window.innerWidth - margin * 2) + margin;
+    const top = Math.random() * (window.innerHeight - margin * 2) + margin;
+
+    emojiElement.style.left = `${left}px`;
+    emojiElement.style.top = `${top}px`;
+
+    document.body.appendChild(emojiElement);
+
+    setTimeout(() => emojiElement.remove(), 2000);
 }
+
 
 
 // 學習模式
@@ -2109,7 +2177,6 @@ function renderSentences() {
     if (!container) return;
     const sentences = categories[currentCategory];
 
-    // --- 修改開始 ---
     // 1. 先建立一個基礎的 class 陣列
     let containerClasses = [];
     if (isLearningSelectMode) {
@@ -2119,7 +2186,6 @@ function renderSentences() {
         // 確保 pinyin-annotated class 能在任何版面模式下都被加入
         containerClasses.push("pinyin-annotated");
     }
-    // --- 修改結束 ---
 
 
     if (userSettings.layout === 'table') {
@@ -2555,10 +2621,10 @@ function updateSelectAllButtonState() {
     const selectedCount = selectedSentences.size;
 
     if (selectedCount === totalCount && totalCount > 0) {
-        icon.textContent = 'check_box'; // 圖示：已全選，可點擊取消
+        icon.textContent = 'check_box'; 
         selectAllButton.title = '取消全選';
     } else {
-        icon.textContent = 'select_all'; // 圖示：未全選，可點擊全選
+        icon.textContent = 'select_all'; 
         selectAllButton.title = '全選';
     }
 }
@@ -2594,7 +2660,6 @@ function adjustFontSize(change, mode = "learning") {
 }
 
 
-// 閃卡模式
 // 閃卡模式
 function showFlashcardView() {
     const contentArea = document.getElementById("contentArea");
@@ -2728,20 +2793,18 @@ function updateFlashcard() {
     const pinyinTextEl = document.getElementById("pinyinText");
     const chineseTextEl = document.getElementById("chineseText");
 
-    // --- 修改開始 ---
     let pinyinDisplay = sentence["拼音"];
     if (userSettings.phoneticSystem === 'zhuyin') {
         pinyinDisplay = convertPinyinToZhuyin(pinyinDisplay);
     }
     const annotatedHakka = annotateHakkaText(sentence["客語"], pinyinDisplay, userSettings.pinyinAnnotation);
-    // --- 修改結束 ---
 
     hakkaTextEl.innerHTML = annotatedHakka;
     pinyinTextEl.textContent = pinyinDisplay;
     chineseTextEl.textContent = sentence["華語"];
     document.getElementById("cardCounter").textContent = `${currentCardIndex + 1} / ${flashcardSentences.length}`;
 
-    // 【新增】根據標音狀態，切換容器的 class
+    // 根據標音狀態，切換容器的 class
     document.getElementById('flashcardContainer').classList.toggle('pinyin-annotated', userSettings.pinyinAnnotation);
 
     // 根據模糊狀態來切換 class
@@ -2770,7 +2833,7 @@ function updateFlashcard() {
     document.getElementById("prevCard").disabled = isAtFirst;
     document.getElementById("nextCard").disabled = isAtLast;
 
-    // 新增：更新卡片內部導航按鈕的禁用狀態
+    // 更新卡片內部導航按鈕的禁用狀態
     document.getElementById("goToFirstCard").disabled = isAtFirst;
     document.getElementById("goToLastCard").disabled = isAtLast;
 
@@ -3264,7 +3327,7 @@ function getSelectedSentences() {
     return Array.from(selectedSentences).map((index) => allSentences[index])
 }
 
-// 請替換此函數
+
 function showMatchingGame() {
     const contentArea = document.getElementById("contentArea");
     const sentences = getSelectedSentences();
@@ -3283,12 +3346,12 @@ function showMatchingGame() {
 
                 <div class="mode-toolbar flex items-center justify-between flex-wrap gap-x-4 gap-y-3 p-4 md:p-5 border-b border-gray-200">
                     <div class="flex items-center flex-wrap gap-2">
-                        <button id="startMatching" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
-                            開始配對
+                        
+                        <button id="stopMatching" class="hidden bg-red-500 hover:bg-red-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors" title="停止遊戲">
+                            <span class="material-icons !text-xl">close</span>
                         </button>
 
                         <div id="matchingOptions" class="flex items-center flex-wrap gap-2">
-                             <div class="w-px h-5 bg-gray-300 mx-1 hidden sm:block"></div>
                              <select id="matchingType" class="bg-gray-100 border-gray-300 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="hakka-chinese">客語 ↔ 華語</option>
                                 <option value="pinyin-chinese" selected>拼音 ↔ 華語</option>
@@ -3358,8 +3421,12 @@ function showMatchingGame() {
                     <div id="leftColumnContainer" class="grid grid-cols-1 gap-3"></div>
                     <div id="rightColumnContainer" class="grid grid-cols-1 gap-3"></div>
                 </div>
-                <div id="matchingStartNotice" class="text-center py-20 text-gray-500">
-                    <p>請點擊按鈕開始遊戲</p>
+                
+                <div id="matchingStartNotice" class="text-center py-20 text-gray-500 min-h-[300px] flex flex-col justify-center items-center">
+                    <button id="startMatchingGameBtn" class="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-lg font-semibold transition-colors text-xl flex items-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+                        <span class="material-icons">play_circle</span>
+                        <span>開始配對</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -3381,24 +3448,26 @@ function setupMatchingGame() {
         timeLeft: 0,
         timerInterval: null,
         gameData: [],
-        // 【修改】根據螢幕寬度設定預設欄數，手機版為1，電腦版為2
+        // 根據螢幕寬度設定預設欄數，手機版為1，電腦版為2
         columnsPerSide: isMobile ? 1 : (userSettings.matchingColumns || 2),
     }
 
     const layoutToggleButton = document.getElementById("matchingLayoutToggle");
     if (layoutToggleButton) {
-        // 【修改】統一圖示邏輯
+        // 統一圖示邏輯
         const icon = layoutToggleButton.querySelector(".material-icons");
         icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'view_agenda';
     }
-
-    document.getElementById("startMatching").onclick = startMatchingGame;
+    
+    // 將事件監聽器綁定到新的按鈕上
+    document.getElementById("startMatchingGameBtn").onclick = startMatchingGame;
+    document.getElementById("stopMatching").onclick = stopMatchingGame; // 新增停止按鈕的監聽
 
     layoutToggleButton.onclick = () => {
         matchingGameState.columnsPerSide = matchingGameState.columnsPerSide === 1 ? 2 : 1;
 
         const icon = layoutToggleButton.querySelector(".material-icons");
-        // 【修改】統一圖示邏輯
+        // 統一圖示邏輯
         icon.textContent = matchingGameState.columnsPerSide === 1 ? 'view_column' : 'view_agenda';
 
         userSettings.matchingColumns = matchingGameState.columnsPerSide;
@@ -3414,7 +3483,7 @@ function setupMatchingGame() {
         const selectElement = document.getElementById(id);
         if (selectElement) {
             selectElement.onchange = () => {
-                // *** 新增：立即更新 URL ***
+
                 updateUrlWithGameSettings('matching');
                 
                 // 維持原有邏輯：如果遊戲尚未開始，則重新生成題目
@@ -3425,7 +3494,7 @@ function setupMatchingGame() {
         }
     });
 
-    // --- 新增開始 ---
+
     const togglePhoneticBtn = document.getElementById("togglePhoneticSystem");
     if (togglePhoneticBtn) {
         togglePhoneticBtn.classList.toggle('bg-blue-100', userSettings.phoneticSystem === 'zhuyin');
@@ -3451,11 +3520,11 @@ function stopMatchingGame() {
     if (matchingGameState.timerInterval) {
         clearInterval(matchingGameState.timerInterval);
     }
-    endMatchingGame("遊戲已中止");
+    endMatchingGame("遊戲已中止", null, false);
 }
 
 
-// 請替換此函數
+
 function generateMatchingData() {
     const sentences = getSelectedSentences()
     const type = document.getElementById("matchingType").value
@@ -3470,7 +3539,7 @@ function generateMatchingData() {
     const leftItems = []
     const rightItems = []
 
-    // --- 新增：定義一個幫助函數 ---
+    // --- 定義一個幫助函數 ---
     const getPhonetic = (text) => {
         if (userSettings.phoneticSystem === 'zhuyin') {
             return convertPinyinToZhuyin(text);
@@ -3616,7 +3685,6 @@ function createMatchingItem(item, side) {
         // 如果項目類型是 'audio'，顯示喇叭圖示
         element.innerHTML = `<span class="material-icons text-4xl text-orange-600">volume_up</span>`;
 
-        // 【修改點】修改 onclick 事件處理
         element.onclick = () => {
             // 在點擊時，找到這個元素內部的圖示
             const iconElement = element.querySelector('.material-icons');
@@ -3677,7 +3745,7 @@ function checkMatch() {
         matchingGameState.score += 100
         document.getElementById("matchingScore").textContent = matchingGameState.score
 
-        // 新增：檢查是否要播放音效
+        // 檢查是否要播放音效
         if (document.getElementById('matchingPlaySound').checked) {
             // 從遊戲資料中找到完整的句子物件
             const matchedSentence = matchingGameState.gameData.sentences.find((s, index) => index === first.item.id);
@@ -3742,10 +3810,11 @@ function checkMatch() {
 }
 
 function startMatchingGame() {
+    toggleGameUI(true);
 	updateUrlWithGameSettings('matching');
 
     const condition = document.getElementById("matchingCondition").value
-    const button = document.getElementById("startMatching")
+    const stopButton = document.getElementById("stopMatching"); // 取得停止按鈕
     const optionsContainer = document.getElementById("matchingOptions");
 
     if (matchingGameState.timerInterval) {
@@ -3761,10 +3830,8 @@ function startMatchingGame() {
     // 遊戲開始時，移除禁用 class
     document.getElementById("matchingArea").classList.remove("game-area-disabled");
 
-    button.innerHTML = `<span class="material-icons">close</span>`;
-    button.title = "停止遊戲";
-    button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-    button.onclick = stopMatchingGame;
+    // 顯示停止按鈕
+    stopButton.classList.remove("hidden");
 
     optionsContainer.querySelectorAll('select').forEach(el => {
         el.classList.add('opacity-50', 'pointer-events-none');
@@ -3779,6 +3846,7 @@ function startMatchingGame() {
     document.getElementById("matchingSteps").textContent = "0"
     document.getElementById("matchingRound").textContent = "1"
 
+    // 顯示遊戲區，隱藏開始提示區
     document.getElementById("matchingArea").classList.remove("hidden");
     document.getElementById("matchingStartNotice").classList.add("hidden");
 
@@ -3801,6 +3869,127 @@ function startMatchingGame() {
     }
 
     generateMatchingData()
+}
+
+function startQuizGame() {
+    toggleGameUI(true);
+	updateUrlWithGameSettings('quiz');
+
+    const sentences = getSelectedSentences()
+    const condition = document.getElementById("quizCondition").value
+    const stopButton = document.getElementById("stopQuiz");
+    const optionsContainer = document.getElementById("quizOptionsContainer");
+
+    quizGameState.isPlaying = true
+    quizGameState.correct = 0
+    quizGameState.incorrect = 0
+    quizGameState.total = 0
+    quizGameState.currentIndex = 0
+    quizGameState.questions = [...sentences].sort(() => Math.random() - 0.5)
+
+    // 遊戲開始時，移除禁用 class
+    document.getElementById("quizArea").classList.remove("game-area-disabled");
+
+    // 顯示停止按鈕
+    stopButton.classList.remove("hidden");
+
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.add('opacity-50', 'pointer-events-none');
+        el.disabled = true;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.add('hidden');
+    }
+
+    document.getElementById("quizCorrect").textContent = "0"
+    document.getElementById("quizIncorrect").textContent = "0"
+
+    // 顯示遊戲區，隱藏開始提示區
+    document.getElementById("quizArea").classList.remove("hidden");
+    document.getElementById("quizStartNotice").classList.add("hidden");
+
+    if (condition.startsWith("time")) {
+        const timeLimit = Number.parseInt(condition.replace("time", ""))
+        quizGameState.timeLeft = timeLimit
+        startQuizTimer()
+    } else {
+        const timerElement = document.getElementById("quizTimer");
+        quizGameState.startTime = Date.now();
+
+        timerElement.textContent = "00:00";
+
+        quizGameState.timerInterval = setInterval(() => {
+            const elapsedSeconds = Math.floor((Date.now() - quizGameState.startTime) / 1000);
+            const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+            const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+            timerElement.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    }
+
+    generateQuizQuestion()
+}
+
+
+
+function startSortingGame() {
+    toggleGameUI(true);
+	updateUrlWithGameSettings('sorting'); 
+
+    const sentences = getSelectedSentences()
+    const condition = document.getElementById("sortingCondition").value
+    const stopButton = document.getElementById("stopSorting");
+    const optionsContainer = document.getElementById("sortingOptions");
+
+    sortingGameState.isPlaying = true
+    sortingGameState.correct = 0
+    sortingGameState.incorrect = 0
+    sortingGameState.score = 0
+    sortingGameState.total = 0;
+    sortingGameState.sentences = sentences
+    sortingGameState.usedSentences = []
+    sortingGameState.availableSentences = [...sentences].sort(() => Math.random() - 0.5)
+
+    // 遊戲開始時，移除禁用 class
+    document.getElementById("sortingArea").classList.remove("game-area-disabled");
+
+    // 顯示停止按鈕
+    stopButton.classList.remove("hidden");
+
+    optionsContainer.querySelectorAll('select').forEach(el => {
+        el.classList.add('opacity-50', 'pointer-events-none');
+        el.disabled = true;
+    });
+    if (window.innerWidth < 768) {
+        optionsContainer.classList.add('hidden');
+    }
+
+    document.getElementById("sortingScore").textContent = "0"
+    document.getElementById("sortingCorrect").textContent = "0"
+    document.getElementById("sortingIncorrect").textContent = "0"
+
+    // 顯示遊戲區，隱藏開始提示區
+    document.getElementById("sortingArea").classList.remove("hidden");
+    document.getElementById("sortingStartNotice").classList.add("hidden");
+
+    if (condition.startsWith("time")) {
+        const timeLimit = Number.parseInt(condition.replace("time", ""))
+        sortingGameState.timeLeft = timeLimit
+        startSortingTimer()
+    } else {
+        const timerElement = document.getElementById("sortingTimer");
+        sortingGameState.startTime = Date.now();
+
+        timerElement.textContent = "00:00";
+
+        sortingGameState.timerInterval = setInterval(() => {
+            const elapsedSeconds = Math.floor((Date.now() - sortingGameState.startTime) / 1000);
+            const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+            const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+            timerElement.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    }
+
+    generateSortingQuestion()
 }
 
 function restartMatchingGame() {
@@ -3963,13 +4152,12 @@ function showQuizGame() {
 
                 <div class="mode-toolbar flex items-center justify-between flex-wrap gap-x-4 gap-y-3 p-4 md:p-5 border-b border-gray-200">
                      <div class="flex items-center flex-wrap gap-2">
-                        <button id="startQuiz" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
-                            開始測驗
+                        
+                        <button id="stopQuiz" class="hidden bg-red-500 hover:bg-red-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors" title="停止遊戲">
+                            <span class="material-icons !text-xl">close</span>
                         </button>
 
-
                         <div id="quizOptionsContainer" class="flex items-center flex-wrap gap-2">
-
                             <select id="quizType" class="bg-gray-100 border-gray-300 focus:ring-red-500 focus:border-red-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="hakka-chinese">客語 → 華語</option>
                                 <option value="chinese-hakka">華語 → 客語</option>
@@ -4003,7 +4191,7 @@ function showQuizGame() {
                     <div class="flex items-center gap-x-3 gap-y-2 flex-wrap justify-end">
                         <div class="flex items-center gap-1">
                             <label for="autoPlayAudio" class="flex items-center gap-1 p-1.5 rounded-md hover:bg-gray-100 cursor-pointer" title="自動播放題目音效">
-                                <input type="checkbox" id="autoPlayAudio" class="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-gray-300">
+                                <input type="checkbox" id="autoPlayAudio" class="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-gray-300" ${userSettings.quizAutoPlayAudio ? 'checked' : ''}>
                                 <span class="material-icons text-gray-600 !text-xl align-middle">volume_up</span>
                             </label>
                             <button id="quizLayoutToggle" class="p-2 rounded-md hover:bg-gray-100 transition-colors" title="切換排版">
@@ -4033,8 +4221,11 @@ function showQuizGame() {
 
                 <div id="quizArea" class="p-4 md:p-8 hidden min-h-[300px]"></div>
 
-                <div id="quizStartNotice" class="text-center py-20 text-gray-500">
-                    <p>請點擊按鈕開始遊戲</p>
+                <div id="quizStartNotice" class="text-center py-20 text-gray-500 min-h-[300px] flex flex-col justify-center items-center">
+                    <button id="startQuizGameBtn" class="bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-lg font-semibold transition-colors text-xl flex items-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+                        <span class="material-icons">play_circle</span>
+                        <span>開始測驗</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -4065,9 +4256,19 @@ function setupQuizGame() {
         isAnswered: false,
     }
 
-    document.getElementById("startQuiz").onclick = startQuizGame;
+    document.getElementById("startQuizGameBtn").onclick = startQuizGame;
+    document.getElementById("stopQuiz").onclick = stopQuizGame;
 
-    // *** 新增：為設定選項綁定 onchange 事件 ***
+    // 監聽自動播放音效核取方塊的變化
+    const autoPlayAudioCheckbox = document.getElementById("autoPlayAudio");
+    if (autoPlayAudioCheckbox) {
+        autoPlayAudioCheckbox.onchange = () => {
+            // 當使用者點擊時，更新設定並儲存
+            userSettings.quizAutoPlayAudio = autoPlayAudioCheckbox.checked;
+            saveUserSettings();
+        };
+    }
+
     ["quizType", "quizOptions", "quizCondition"].forEach((id) => {
         const selectElement = document.getElementById(id);
         if (selectElement) {
@@ -4132,63 +4333,6 @@ function setupQuizGame() {
     }
 }
 
-function startQuizGame() {
-	updateUrlWithGameSettings('quiz');
-
-    const sentences = getSelectedSentences()
-    const condition = document.getElementById("quizCondition").value
-    const button = document.getElementById("startQuiz")
-    const optionsContainer = document.getElementById("quizOptionsContainer");
-
-    quizGameState.isPlaying = true
-    quizGameState.correct = 0
-    quizGameState.incorrect = 0
-    quizGameState.total = 0
-    quizGameState.currentIndex = 0
-    quizGameState.questions = [...sentences].sort(() => Math.random() - 0.5)
-
-    // 遊戲開始時，移除禁用 class
-    document.getElementById("quizArea").classList.remove("game-area-disabled");
-
-    button.innerHTML = `<span class="material-icons">close</span>`;
-    button.title = "停止遊戲";
-    button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-    button.onclick = stopQuizGame;
-
-    optionsContainer.querySelectorAll('select').forEach(el => {
-        el.classList.add('opacity-50', 'pointer-events-none');
-        el.disabled = true;
-    });
-    if (window.innerWidth < 768) {
-        optionsContainer.classList.add('hidden');
-    }
-
-    document.getElementById("quizCorrect").textContent = "0"
-    document.getElementById("quizIncorrect").textContent = "0"
-
-    document.getElementById("quizArea").classList.remove("hidden");
-    document.getElementById("quizStartNotice").classList.add("hidden");
-
-    if (condition.startsWith("time")) {
-        const timeLimit = Number.parseInt(condition.replace("time", ""))
-        quizGameState.timeLeft = timeLimit
-        startQuizTimer()
-    } else {
-        const timerElement = document.getElementById("quizTimer");
-        quizGameState.startTime = Date.now();
-
-        timerElement.textContent = "00:00";
-
-        quizGameState.timerInterval = setInterval(() => {
-            const elapsedSeconds = Math.floor((Date.now() - quizGameState.startTime) / 1000);
-            const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
-            const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
-            timerElement.textContent = `${minutes}:${seconds}`;
-        }, 1000);
-    }
-
-    generateQuizQuestion()
-}
 
 
 
@@ -4196,7 +4340,7 @@ function stopQuizGame() {
     if (quizGameState.timerInterval) {
         clearInterval(quizGameState.timerInterval);
     }
-    endQuizGame("遊戲已中止");
+    endQuizGame("遊戲已中止", false);
 }
 
 function restartQuizGame() {
@@ -4227,7 +4371,7 @@ function startQuizTimer() {
 }
 
 
-// 請替換此函數
+
 function generateQuizQuestion() {
     if (quizGameState.currentIndex >= quizGameState.questions.length) {
         quizGameState.questions = [...quizGameState.questions].sort(() => Math.random() - 0.5)
@@ -4238,7 +4382,7 @@ function generateQuizQuestion() {
     const type = document.getElementById("quizType").value
     const optionCount = Number.parseInt(document.getElementById("quizOptions").value)
 
-    // --- 新增：定義一個幫助函數 ---
+    // --- 定義一個幫助函數 ---
     const getPhonetic = (text) => {
         if (userSettings.phoneticSystem === 'zhuyin') {
             return convertPinyinToZhuyin(text);
@@ -4258,19 +4402,19 @@ function generateQuizQuestion() {
             correctAnswer = currentSentence["客語"]
             break
         case "pinyin-chinese":
-            question = getPhonetic(currentSentence["拼音"]); // 修改
+            question = getPhonetic(currentSentence["拼音"]);
             correctAnswer = currentSentence["華語"]
             break
         case "chinese-pinyin":
             question = currentSentence["華語"]
-            correctAnswer = getPhonetic(currentSentence["拼音"]); // 修改
+            correctAnswer = getPhonetic(currentSentence["拼音"]);
             break
         case "hakka-pinyin":
             question = currentSentence["客語"]
-            correctAnswer = getPhonetic(currentSentence["拼音"]); // 修改
+            correctAnswer = getPhonetic(currentSentence["拼音"]);
             break
         case "pinyin-hakka":
-            question = getPhonetic(currentSentence["拼音"]); // 修改
+            question = getPhonetic(currentSentence["拼音"]);
             correctAnswer = currentSentence["客語"]
             break
     }
@@ -4289,7 +4433,7 @@ function generateQuizQuestion() {
                     return s["客語"]
                 case "hakka-pinyin":
                 case "chinese-pinyin":
-                    return getPhonetic(s["拼音"]); // 修改
+                    return getPhonetic(s["拼音"]);
                 default:
                     return s["華語"]
             }
@@ -4398,7 +4542,7 @@ function selectQuizOption(selectedAnswer, element) {
     document.querySelectorAll(".quiz-option").forEach((option) => {
         option.classList.add("quiz-answered");
 
-        // 【修改】使用更穩健的方式來獲取選項的純文字內容，以進行比對
+        // 使用更穩健的方式來獲取選項的純文字內容，以進行比對
         let rawOptionText = option.textContent.trim();
         if (rawOptionText.match(/^[A-H]\.\s/)) { // 處理 "A. " 或 "B. " 這種前綴
             rawOptionText = rawOptionText.substring(3).trim();
@@ -4462,13 +4606,12 @@ function showSortingGame() {
 
                 <div class="mode-toolbar flex items-center justify-between flex-wrap gap-x-4 gap-y-3 p-4 md:p-5 border-b border-gray-200">
                     <div class="flex items-center flex-wrap gap-2">
-                        <button id="startSorting" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base flex-shrink-0">
-                            開始排序
+                        
+                        <button id="stopSorting" class="hidden bg-red-500 hover:bg-red-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors" title="停止遊戲">
+                            <span class="material-icons !text-xl">close</span>
                         </button>
 
-
                         <div id="sortingOptions" class="flex items-center flex-wrap gap-2">
-
                             <select id="sortingType" class="bg-gray-100 border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm rounded-md p-1.5 transition-colors">
                                 <option value="hakka-pinyin">客語 ↔ 拼音</option>
                                 <option value="chinese-pinyin">華語 ↔ 拼音</option>
@@ -4524,8 +4667,11 @@ function showSortingGame() {
                     </div>
                 </div>
                 <div id="sortingArea" class="p-4 md:p-8 hidden min-h-[300px]"></div>
-                <div id="sortingStartNotice" class="text-center py-20 text-gray-500">
-                    <p>請點擊按鈕開始遊戲</p>
+                <div id="sortingStartNotice" class="text-center py-20 text-gray-500 min-h-[300px] flex flex-col justify-center items-center">
+                     <button id="startSortingGameBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-lg font-semibold transition-colors text-xl flex items-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+                        <span class="material-icons">play_circle</span>
+                        <span>開始排序</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -4538,11 +4684,10 @@ function setupSortingGame() {
         isPlaying: false,
         currentSentence: null,
         questionText: "",
-        // --- 新增：使用物件陣列來儲存單字資訊 ---
+        // --- 使用物件陣列來儲存單字資訊 ---
         originalWordObjects: [], // 儲存正確順序的單字物件
         shuffledWordObjects: [], // 儲存打亂順序的單字物件
         userOrderObjects: [],    // 儲存使用者排序的單字物件
-        // --- 以下為既有屬性 ---
         correct: 0,
         incorrect: 0,
         score: 0,
@@ -4553,9 +4698,9 @@ function setupSortingGame() {
         total: 0
     }
 
-    document.getElementById("startSorting").onclick = startSortingGame;
+    document.getElementById("startSortingGameBtn").onclick = startSortingGame;
+    document.getElementById("stopSorting").onclick = stopSortingGame;
 
-    // *** 新增：為設定選項綁定 onchange 事件 ***
     ["sortingType", "sortingCondition"].forEach((id) => {
         const selectElement = document.getElementById(id);
         if (selectElement) {
@@ -4604,69 +4749,10 @@ function stopSortingGame() {
     if (sortingGameState.timerInterval) {
         clearInterval(sortingGameState.timerInterval);
     }
-    endSortingGame("遊戲已中止");
+    endSortingGame("遊戲已中止", false);
 }
 
-function startSortingGame() {
-	updateUrlWithGameSettings('sorting'); 
 
-    const sentences = getSelectedSentences()
-    const condition = document.getElementById("sortingCondition").value
-    const button = document.getElementById("startSorting")
-    const optionsContainer = document.getElementById("sortingOptions");
-
-    sortingGameState.isPlaying = true
-    sortingGameState.correct = 0
-    sortingGameState.incorrect = 0
-    sortingGameState.score = 0
-    sortingGameState.total = 0;
-    sortingGameState.sentences = sentences
-    sortingGameState.usedSentences = []
-    sortingGameState.availableSentences = [...sentences].sort(() => Math.random() - 0.5)
-
-    // 遊戲開始時，移除禁用 class
-    document.getElementById("sortingArea").classList.remove("game-area-disabled");
-
-    button.innerHTML = `<span class="material-icons">close</span>`;
-    button.title = "停止遊戲";
-    button.className = "bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 flex items-center justify-center rounded-full font-semibold transition-colors";
-    button.onclick = stopSortingGame
-
-    optionsContainer.querySelectorAll('select').forEach(el => {
-        el.classList.add('opacity-50', 'pointer-events-none');
-        el.disabled = true;
-    });
-    if (window.innerWidth < 768) {
-        optionsContainer.classList.add('hidden');
-    }
-
-    document.getElementById("sortingScore").textContent = "0"
-    document.getElementById("sortingCorrect").textContent = "0"
-    document.getElementById("sortingIncorrect").textContent = "0"
-
-    document.getElementById("sortingArea").classList.remove("hidden");
-    document.getElementById("sortingStartNotice").classList.add("hidden");
-
-    if (condition.startsWith("time")) {
-        const timeLimit = Number.parseInt(condition.replace("time", ""))
-        sortingGameState.timeLeft = timeLimit
-        startSortingTimer()
-    } else {
-        const timerElement = document.getElementById("sortingTimer");
-        sortingGameState.startTime = Date.now();
-
-        timerElement.textContent = "00:00";
-
-        sortingGameState.timerInterval = setInterval(() => {
-            const elapsedSeconds = Math.floor((Date.now() - sortingGameState.startTime) / 1000);
-            const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
-            const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
-            timerElement.textContent = `${minutes}:${seconds}`;
-        }, 1000);
-    }
-
-    generateSortingQuestion()
-}
 
 
 function restartSortingGame() {
@@ -4758,9 +4844,11 @@ function generateSortingQuestion(isNewQuestion = true) {
 
     let fixedObjects = [];
     let shuffleObjects = wordObjects;
+    sortingGameState.fixedCount = 0;
 
     if (wordObjects.length > 6) {
         const fixedCount = wordObjects.length - 6;
+        sortingGameState.fixedCount = fixedCount; 
         fixedObjects = wordObjects.slice(0, fixedCount);
         shuffleObjects = wordObjects.slice(fixedCount);
     }
@@ -4798,13 +4886,26 @@ function renderSortingQuestion() {
             <div class="bg-gray-100 rounded-lg p-4 mb-6 min-h-16">
                 <div id="sortingTarget" class="flex gap-2 flex-wrap justify-center min-h-12">
                     ${sortingGameState.userOrderObjects
-                      .map((wordObj, index) => `
-                            <div class="sorting-word bg-indigo-500 text-white px-4 py-2 rounded-lg cursor-pointer" 
-                                 style="font-size: ${userSettings.fontSize}px"
-                                 onclick="removeFromTarget(${index})">
-                                ${wordObj.display}
-                            </div>
-                        `).join("")}
+                      .map((wordObj, index) => {
+                          if (index < sortingGameState.fixedCount) {
+                              // 固定項目的樣式、不可點擊
+                              return `
+                                <div class="sorting-word bg-green-600 text-white px-4 py-2 rounded-lg cursor-default" 
+                                     style="font-size: ${userSettings.fontSize}px">
+                                    ${wordObj.display}
+                                </div>
+                              `;
+                          } else {
+                              // 使用者放置的項目樣式、可點擊
+                              return `
+                                <div class="sorting-word bg-indigo-500 text-white px-4 py-2 rounded-lg cursor-pointer" 
+                                     style="font-size: ${userSettings.fontSize}px"
+                                     onclick="removeFromTarget(${index})">
+                                    ${wordObj.display}
+                                </div>
+                              `;
+                          }
+                      }).join("")}
                     ${sortingGameState.userOrderObjects.length === 0 ? '<div class="invisible-placeholder px-4 py-2">　</div>' : ""}
                 </div>
             </div>
@@ -4856,7 +4957,7 @@ function addToTarget(shuffledIndex) {
 
         // 只要答案不是華語，且該選項物件有對應的拼音，就播放
         if (answerType !== 'chinese' && wordObject.pinyin) {
-            // 使用 kasu 播放單一音節
+            // 使用 PinyinAudio.kasu 播放單一音節
             window.PinyinAudio.kasu(null, wordObject.pinyin);
         }
     }
@@ -4905,7 +5006,6 @@ function checkSortingAnswer() {
             wordEl.onclick = null;
         });
 
-        // --- START: 已加入的修改 ---
         const wordBankContainer = document.getElementById('sortingWordBankContainer');
         const sentence = sortingGameState.currentSentence;
         const type = document.getElementById("sortingType").value;
@@ -4930,7 +5030,6 @@ function checkSortingAnswer() {
                 </div>
             `;
         }
-        // --- END: 已加入的修改 ---
 
         const condition = document.getElementById("sortingCondition").value;
         if (condition.startsWith("correct")) {
@@ -4975,8 +5074,6 @@ function checkSortingAnswer() {
  * 儲存遊戲結果到 Local Storage
  * @param {object} resultData - 包含遊戲結果的物件
  */
-// script.js
-
 function saveGameResult(resultData) {
     if (!currentUser || currentUser.id === 'guest') {
         console.log("訪客模式，不儲存遊戲記錄。");
@@ -4994,15 +5091,16 @@ function saveGameResult(resultData) {
         history = [];
     }
 
-    // 新增時間戳記
+    // 新增時間戳記 & 提交狀態
     resultData.timestamp = new Date().toISOString();
+    resultData.submitted = false; 
 
     // 將新記錄加到最前面
     history.unshift(resultData);
 
-    // 保持最多 50 筆記錄
-    if (history.length > 50) {
-        history = history.slice(0, 50);
+    // 保持最多紀錄筆數 (使用 config 設定)
+    if (history.length > config.MAX_HISTORY_RECORDS) {
+        history = history.slice(0, config.MAX_HISTORY_RECORDS);
     }
 
     localStorage.setItem(historyKey, JSON.stringify(history));
@@ -5055,9 +5153,11 @@ async function submitToGoogleForm(gameResult) {
     }
 }
 
-function endMatchingGame(message, finalTime = null) {
+function endMatchingGame(message, finalTime = null, save = true) {
+    toggleGameUI(false);
     matchingGameState.isPlaying = false;
-    const button = document.getElementById("startMatching");
+    const startButton = document.getElementById("startMatchingGameBtn"); // 改為指向中央的開始按鈕
+    const stopButton = document.getElementById("stopMatching"); // 指向停止按鈕
     const optionsContainer = document.getElementById("matchingOptions");
 
     // 遊戲結束時，新增禁用 class
@@ -5067,37 +5167,47 @@ function endMatchingGame(message, finalTime = null) {
         clearInterval(matchingGameState.timerInterval);
     }
     
-    // --- 新增：記錄遊戲成果 ---
-    const condition = document.getElementById("matchingCondition").value;
-    let duration = 0;
-    if (condition.startsWith("time")) {
-        const timeLimit = parseInt(condition.replace("time", ""), 10);
-        duration = timeLimit - matchingGameState.timeLeft;
-    } else if (matchingGameState.startTime) {
-        duration = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
+    let gameResult = null;
+    
+    if (save) {
+        const condition = document.getElementById("matchingCondition").value;
+        let duration = 0;
+        if (condition.startsWith("time")) {
+            const timeLimit = parseInt(condition.replace("time", ""), 10);
+            duration = timeLimit - matchingGameState.timeLeft;
+        } else if (matchingGameState.startTime) {
+            duration = Math.floor((Date.now() - matchingGameState.startTime) / 1000);
+        }
+
+        gameResult = {
+            gameType: 'matching',
+            score: matchingGameState.score,
+            steps: matchingGameState.steps,
+            duration: finalTime !== null ? finalTime : duration,
+            settings: {
+                categories: Array.from(selectedCategories),
+                type: document.getElementById("matchingType").value,
+                pairs: document.getElementById("matchingPairs").value,
+                condition: condition
+            }
+        };
+        saveGameResult(gameResult);
     }
 
-    const gameResult = {
-        gameType: 'matching',
-        score: matchingGameState.score,
-        steps: matchingGameState.steps,
-        duration: finalTime !== null ? finalTime : duration,
-        settings: {
-            categories: Array.from(selectedCategories),
-            type: document.getElementById("matchingType").value,
-            pairs: document.getElementById("matchingPairs").value,
-            condition: condition
-        }
-    };
-    saveGameResult(gameResult);
-    // --- 記錄結束 ---
 
+    // 隱藏停止按鈕
+    if (stopButton) {
+        stopButton.classList.add("hidden");
+    }
 
-    if (button) {
-        button.innerHTML = "重新開始";
-        button.title = "重新開始";
-        button.className = "bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition-colors text-base";
-        button.onclick = restartMatchingGame;
+    // 顯示開始提示區，並將按鈕文字改為 "重新開始"
+    if (startButton) {
+        startButton.innerHTML = `
+            <span class="material-icons">replay</span>
+            <span>重新開始</span>
+        `;
+        document.getElementById("matchingStartNotice").classList.remove("hidden");
+        document.getElementById("matchingArea").classList.add("hidden"); // 隱藏遊戲區
     }
 
     optionsContainer.querySelectorAll('select').forEach(el => {
@@ -5118,7 +5228,6 @@ function endMatchingGame(message, finalTime = null) {
         timerBar.style.width = "100%";
     }
 
-    // 【修改】傳遞 gameResult 到 showResult
     showResult(
         "🎉",
         "配對完成",
@@ -5127,9 +5236,13 @@ function endMatchingGame(message, finalTime = null) {
     );
 }
 
-function endQuizGame(message) {
+
+
+function endQuizGame(message, save = true) {
+    toggleGameUI(false);
     quizGameState.isPlaying = false;
-    const button = document.getElementById("startQuiz");
+    const startButton = document.getElementById("startQuizGameBtn");
+    const stopButton = document.getElementById("stopQuiz");
     const optionsContainer = document.getElementById("quizOptionsContainer");
 
     // 遊戲結束時，新增禁用 class
@@ -5139,40 +5252,49 @@ function endQuizGame(message) {
         clearInterval(quizGameState.timerInterval);
     }
 
-    // --- 新增：記錄遊戲成果 ---
-    const condition = document.getElementById("quizCondition").value;
-    let duration = 0;
-    if (condition.startsWith("time")) {
-        const timeLimit = parseInt(condition.replace("time", ""), 10);
-        duration = timeLimit - quizGameState.timeLeft;
-    } else if (quizGameState.startTime) {
-        duration = Math.floor((Date.now() - quizGameState.startTime) / 1000);
-    }
+    let gameResult = null;
     const accuracy = quizGameState.total > 0 ? Math.round((quizGameState.correct / quizGameState.total) * 100) : 0;
     
-    const gameResult = {
-        gameType: 'quiz',
-        score: quizGameState.correct, // 以答對題數為分數
-        correct: quizGameState.correct,
-        incorrect: quizGameState.incorrect,
-        accuracy: accuracy,
-        duration: duration,
-        settings: {
-            categories: Array.from(selectedCategories),
-            type: document.getElementById("quizType").value,
-            options: document.getElementById("quizOptions").value,
-            condition: condition,
+    if (save) {
+        const condition = document.getElementById("quizCondition").value;
+        let duration = 0;
+        if (condition.startsWith("time")) {
+            const timeLimit = parseInt(condition.replace("time", ""), 10);
+            duration = timeLimit - quizGameState.timeLeft;
+        } else if (quizGameState.startTime) {
+            duration = Math.floor((Date.now() - quizGameState.startTime) / 1000);
         }
-    };
-    saveGameResult(gameResult);
-    // --- 記錄結束 ---
+        
+        gameResult = {
+            gameType: 'quiz',
+            score: quizGameState.correct, // 以答對題數為分數
+            correct: quizGameState.correct,
+            incorrect: quizGameState.incorrect,
+            accuracy: accuracy,
+            duration: duration,
+            settings: {
+                categories: Array.from(selectedCategories),
+                type: document.getElementById("quizType").value,
+                options: document.getElementById("quizOptions").value,
+                condition: condition,
+            }
+        };
+        saveGameResult(gameResult);
+    }
 
+    // 隱藏停止按鈕
+    if (stopButton) {
+        stopButton.classList.add("hidden");
+    }
 
-    if (button) {
-        button.innerHTML = "重新開始";
-        button.title = "重新開始";
-        button.className = "bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
-        button.onclick = restartQuizGame;
+    // 顯示開始提示區，並將按鈕文字改為 "重新開始"
+    if (startButton) {
+        startButton.innerHTML = `
+            <span class="material-icons">replay</span>
+            <span>重新開始</span>
+        `;
+        document.getElementById("quizStartNotice").classList.remove("hidden");
+        document.getElementById("quizArea").classList.add("hidden"); // 隱藏遊戲區
     }
     
     optionsContainer.querySelectorAll('select').forEach(el => {
@@ -5183,7 +5305,6 @@ function endQuizGame(message) {
         optionsContainer.classList.remove('hidden');
     }
 
-    // 【修改】傳遞 gameResult 到 showResult
     showResult(
         "🎯",
         "測驗結束",
@@ -5196,10 +5317,11 @@ function endQuizGame(message) {
     );
 }
 
-// 替換 endSortingGame()
-function endSortingGame(message) {
+function endSortingGame(message, save = true) {
+    toggleGameUI(false);
     sortingGameState.isPlaying = false;
-    const button = document.getElementById("startSorting");
+    const startButton = document.getElementById("startSortingGameBtn");
+    const stopButton = document.getElementById("stopSorting");
     const optionsContainer = document.getElementById("sortingOptions");
 
     // 遊戲結束時，新增禁用 class
@@ -5209,40 +5331,49 @@ function endSortingGame(message) {
         clearInterval(sortingGameState.timerInterval);
     }
     
-    // --- 新增：記錄遊戲成果 ---
-    const condition = document.getElementById("sortingCondition").value;
-    let duration = 0;
-    if (condition.startsWith("time")) {
-        const timeLimit = parseInt(condition.replace("time", ""), 10);
-        duration = timeLimit - sortingGameState.timeLeft;
-    } else if (sortingGameState.startTime) {
-        duration = Math.floor((Date.now() - sortingGameState.startTime) / 1000);
-    }
+    let gameResult = null;
     const totalQuestions = sortingGameState.correct + sortingGameState.incorrect;
     const accuracy = totalQuestions > 0 ? Math.round((sortingGameState.correct / totalQuestions) * 100) : 0;
     
-    const gameResult = {
-        gameType: 'sorting',
-        score: sortingGameState.score,
-        correct: sortingGameState.correct,
-        incorrect: sortingGameState.incorrect,
-        accuracy: accuracy,
-        duration: duration,
-        settings: {
-            categories: Array.from(selectedCategories),
-            type: document.getElementById("sortingType").value,
-            condition: condition,
+    if (save) {
+        const condition = document.getElementById("sortingCondition").value;
+        let duration = 0;
+        if (condition.startsWith("time")) {
+            const timeLimit = parseInt(condition.replace("time", ""), 10);
+            duration = timeLimit - sortingGameState.timeLeft;
+        } else if (sortingGameState.startTime) {
+            duration = Math.floor((Date.now() - sortingGameState.startTime) / 1000);
         }
-    };
-    saveGameResult(gameResult);
-    // --- 記錄結束 ---
+        
+        gameResult = {
+            gameType: 'sorting',
+            score: sortingGameState.score,
+            correct: sortingGameState.correct,
+            incorrect: sortingGameState.incorrect,
+            accuracy: accuracy,
+            duration: duration,
+            settings: {
+                categories: Array.from(selectedCategories),
+                type: document.getElementById("sortingType").value,
+                condition: condition,
+            }
+        };
+        saveGameResult(gameResult);
+    }
 
+    // 隱藏停止按鈕
+    if (stopButton) {
+        stopButton.classList.add("hidden");
+    }
 
-    if (button) {
-        button.innerHTML = "重新開始";
-        button.title = "重新開始";
-        button.className = "bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-base";
-        button.onclick = restartSortingGame;
+    // 顯示開始提示區，並將按鈕文字改為 "重新開始"
+    if (startButton) {
+        startButton.innerHTML = `
+            <span class="material-icons">replay</span>
+            <span>重新開始</span>
+        `;
+        document.getElementById("sortingStartNotice").classList.remove("hidden");
+        document.getElementById("sortingArea").classList.add("hidden");
     }
 
     optionsContainer.querySelectorAll('select').forEach(el => {
@@ -5253,7 +5384,6 @@ function endSortingGame(message) {
         optionsContainer.classList.remove('hidden');
     }
 
-    // 【修改】傳遞 gameResult 到 showResult
     showResult(
         "🎯",
         "排序結束",
@@ -5274,7 +5404,7 @@ function showResult(icon, title, message, gameResult = null) {
 
     const submitButton = document.getElementById("submitResult");
     
-    // 【新增】處理成績提交按鈕的邏輯
+    // 處理成績提交按鈕的邏輯
     if (gameResult && currentUser.id !== 'guest') {
         submitButton.classList.remove("hidden");
         submitButton.disabled = false;
@@ -5424,13 +5554,15 @@ function setupEventListeners() {
             document.getElementById("userDropdown").classList.add("hidden");
         }
     })
-    document.getElementById("editProfile").onclick = () => {
-        document.getElementById("userDropdown").classList.add("hidden");
-        document.getElementById("editName").value = currentUser.name;
-        document.getElementById("editId").value = currentUser.id;
-        document.getElementById("editAvatar").value = currentUser.avatar;
-        document.getElementById("userModal").classList.remove("hidden");
-    }
+	document.getElementById("editProfile").onclick = () => {
+		if (currentUser.id === 'guest') return;
+
+		document.getElementById("userDropdown").classList.add("hidden");
+		document.getElementById("editName").value = currentUser.name;
+		document.getElementById("editId").value = currentUser.id;
+		document.getElementById("editAvatar").value = currentUser.avatar;
+		document.getElementById("userModal").classList.remove("hidden");
+	}
     document.getElementById("saveProfile").onclick = () => {
         const newName = document.getElementById("editName").value.trim();
         const newId = document.getElementById("editId").value.trim();
@@ -5454,14 +5586,12 @@ function setupEventListeners() {
 		const starredKey = `${config.STORAGE_PREFIX}starred_${currentUser.id}`;
 		const selectedKey = `${config.STORAGE_PREFIX}selected_${currentUser.id}`;
 		const collectedKey = `${config.STORAGE_PREFIX}collected_${currentUser.id}`;
-		// 👇 新增這一行，也要清除遊戲紀錄 👇
 		const historyKey = `${config.STORAGE_PREFIX}gameHistory_${currentUser.id}`;
 
 		localStorage.removeItem(settingsKey);
 		localStorage.removeItem(starredKey);
 		localStorage.removeItem(selectedKey);
 		localStorage.removeItem(collectedKey);
-		// 👇 新增這一行 👇
 		localStorage.removeItem(historyKey);
 
 		starredCards.clear();
@@ -5480,18 +5610,25 @@ function setupEventListeners() {
         document.getElementById("clearModal").classList.add("hidden");
         document.getElementById("clearPassword").value = "";
     }
-    document.getElementById("logout").onclick = () => {
-        currentUser = {
-            id: "guest",
-            name: "訪客",
-            avatar: "U"
-        };
-        saveUserData();
-        updateUserDisplay();
-        loadUserSettings();
-        document.getElementById("userDropdown").classList.add("hidden");
-        showResult("👋", "已登出", "已切換為訪客模式");
-    }
+	document.getElementById("logout").onclick = () => {
+		document.getElementById("userDropdown").classList.add("hidden");
+
+		if (currentUser.id === 'guest') {
+			// 訪客狀態下，此按鈕為「登入」
+			// 清空輸入框並顯示登入視窗
+			document.getElementById("editName").value = "";
+			document.getElementById("editId").value = "";
+			document.getElementById("editAvatar").value = "";
+			document.getElementById("userModal").classList.remove("hidden");
+		} else {
+			// 登入狀態下，此按鈕為「登出」
+			currentUser = { id: "guest", name: "訪客", avatar: "U" };
+			saveUserData();
+			updateUserDisplay();
+			loadUserSettings(); // 重新載入訪客的設定
+			showResult("👋", "已登出", "已切換為訪客模式");
+		}
+	}
 	document.getElementById("viewHistory").onclick = () => {
 		document.getElementById("userDropdown").classList.add("hidden");
 		showLearningHistory();
@@ -5528,25 +5665,33 @@ function setupEventListeners() {
                 userDropdownDetail.classList.add("hidden");
             }
         })
-        document.getElementById("editProfileDetail").onclick = () => {
-            userDropdownDetail.classList.add("hidden");
-            document.getElementById("editName").value = currentUser.name;
-            document.getElementById("editId").value = currentUser.id;
-            document.getElementById("editAvatar").value = currentUser.avatar;
-            document.getElementById("userModal").classList.remove("hidden");
-        }
-        document.getElementById("logoutDetail").onclick = () => {
-            currentUser = {
-                id: "guest",
-                name: "訪客",
-                avatar: "U"
-            };
-            saveUserData();
-            updateUserDisplay();
-            loadUserSettings();
-            userDropdownDetail.classList.add("hidden");
-            showResult("👋", "已登出", "已切換為訪客模式");
-        }
+		document.getElementById("editProfileDetail").onclick = () => {
+			if (currentUser.id === 'guest') return;
+
+			userDropdownDetail.classList.add("hidden");
+			document.getElementById("editName").value = currentUser.name;
+			document.getElementById("editId").value = currentUser.id;
+			document.getElementById("editAvatar").value = currentUser.avatar;
+			document.getElementById("userModal").classList.remove("hidden");
+		}
+	document.getElementById("logoutDetail").onclick = () => {
+		userDropdownDetail.classList.add("hidden");
+
+		if (currentUser.id === 'guest') {
+			// 訪客狀態下，此按鈕為「登入」
+			document.getElementById("editName").value = "";
+			document.getElementById("editId").value = "";
+			document.getElementById("editAvatar").value = "";
+			document.getElementById("userModal").classList.remove("hidden");
+		} else {
+			// 登入狀態下，此按鈕為「登出」
+			currentUser = { id: "guest", name: "訪客", avatar: "U" };
+			saveUserData();
+			updateUserDisplay();
+			loadUserSettings();
+			showResult("👋", "已登出", "已切換為訪客模式");
+		}
+	}
     }
     document.getElementById("menuToggle").onclick = (e) => {
         e.stopPropagation();
@@ -5558,7 +5703,7 @@ function setupEventListeners() {
         }
     })
 
-// 請替換此函數
+
 document.getElementById("goHome").onclick = () => {
     stopAllTimers();
     
@@ -5567,7 +5712,6 @@ document.getElementById("goHome").onclick = () => {
 	isLearningSelectMode = false
     
     Object.keys(categories).forEach((key) => {
-      // 【修改】判斷條件變更
       if ((key.endsWith("主題") && !isNaN(parseInt(key))) || key === "星號") {
         delete categories[key];
       }
@@ -5653,6 +5797,7 @@ document.getElementById("goHome").onclick = () => {
     }
     document.getElementById("addToCollectionBtn").onclick = addToCollection;
     document.getElementById("removeFromCollectionBtn").onclick = removeFromCollection;
+	document.getElementById("learnSelected").addEventListener("click", startLearning);
     setStickyTopPosition();
     window.addEventListener('resize', setStickyTopPosition);
 }
@@ -5686,6 +5831,28 @@ function stopAllTimers() {
         flashcardKeyHandler = null
     }
 }
+
+/**
+ * 啟用或禁用遊戲模式下的主要導覽介面
+ * @param {boolean} disable - true 為禁用, false 為啟用
+ */
+function toggleGameUI(disable) {
+    const elementsToToggle = [
+        document.getElementById("menuToggle"),
+        document.getElementById("goHome"),
+        document.getElementById("userButtonDetail"),
+        document.getElementById("categoryDropdownBtn")
+    ];
+
+    elementsToToggle.forEach(el => {
+        if (el) {
+            el.disabled = disable;
+            el.classList.toggle('opacity-50', disable);
+            el.classList.toggle('pointer-events-none', disable);
+        }
+    });
+}
+
 // =================================================================
 // 新增：拼音注音轉換工具 (Phonetic Conversion Utility)
 // =================================================================
@@ -5845,9 +6012,6 @@ function updateUrlWithGameSettings(mode) {
     history.replaceState(history.state, '', newUrl);
 }
 
-
-
-setupEventListeners 
 /**
  * 顯示學習紀錄頁面
  */
@@ -5905,7 +6069,7 @@ function renderLearningHistory() {
     const formatCondition = (cond) => {
         if (!cond) return '';
         if (cond.startsWith('time')) return `${cond.replace('time', '')}秒`;
-        if (cond.startsWith('correct')) return `答對${cond.replace('correct', '')}題`;
+        if (cond.startsWith('correct')) return `${cond.replace('correct', '')}題`;
         if (cond.startsWith('round')) return `${cond.replace('round', '')}關`;
         if (cond === 'unlimited') return '無限';
         return cond;
@@ -5918,16 +6082,31 @@ function renderLearningHistory() {
             <div class="col-settings">遊戲設定</div>
             <div class="col-stats">成績紀錄</div>
             <div class="col-date">時間</div>
+            <div class="col-action">操作</div>
         </div>
     `;
 
-    const rowsHtml = history.map(item => {
+    const rowsHtml = history.map((item, index) => {
         const info = gameInfo[item.gameType] || { icon: 'videogame_asset', name: '遊戲', color: 'gray' };
         const date = new Date(item.timestamp);
         const formattedDate = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
         
         const settings = item.settings || {};
-        const topics = settings.categories ? (settings.categories.length > 1 ? `${settings.categories.length}個主題` : settings.categories[0]) : 'N/A';
+        
+        let topicsDisplay = 'N/A';
+        if (settings.categories && settings.categories.length > 0) {
+            if (settings.categories.length === 1) {
+                topicsDisplay = settings.categories[0];
+            } else {
+                const categoryIndexes = settings.categories
+                    .map(name => orderedCategories.indexOf(name) + 1)
+                    .filter(index => index > 0)
+                    .sort((a, b) => a - b);
+                
+                const compressedString = compressNumberArray(categoryIndexes);
+                topicsDisplay = `${settings.categories.length}主題(${compressedString})`;
+            }
+        }
         
         const settingsParts = [
             langMap[settings.type] || settings.type,
@@ -5940,20 +6119,86 @@ function renderLearningHistory() {
         if(item.score !== undefined) statsHtml += `<span class="stat-icon-group" title="分數"><span class="material-icons">scoreboard</span>${item.score}</span>`;
         if(item.correct !== undefined) statsHtml += `<span class="stat-icon-group" title="答對"><span class="material-icons text-green-600">check_circle</span>${item.correct}</span>`;
         if(item.incorrect !== undefined) statsHtml += `<span class="stat-icon-group" title="答錯"><span class="material-icons text-red-500">cancel</span>${item.incorrect}</span>`;
+        if(item.accuracy !== undefined) statsHtml += `<span class="stat-icon-group" title="正確率"><span class="material-icons text-blue-500">percent</span>${item.accuracy}</span>`;
         if(item.duration !== undefined) statsHtml += `<span class="stat-icon-group" title="耗時"><span class="material-icons">timer</span>${item.duration}s</span>`;
         if(item.steps !== undefined) statsHtml += `<span class="stat-icon-group" title="步數"><span class="material-icons">footprint</span>${item.steps}</span>`;
+
+        const isSubmitted = item.submitted === true;
+        const buttonHtml = `
+            <button 
+                class="history-submit-btn ${isSubmitted ? 'submitted' : ''}" 
+                onclick="handleHistorySubmit(${index}, this)"
+                ${isSubmitted ? 'disabled' : ''}>
+                ${isSubmitted ? '已送出' : '送出'}
+            </button>
+        `;
 
         return `
             <div class="history-list-row ${item.gameType}">
                 <div class="col-icon" title="${info.name}"><span class="material-icons">${info.icon}</span></div>
-                <div class="col-topic" title="${settings.categories?.join(', ')}">${topics}</div>
+                <div class="col-topic" title="${settings.categories?.join(', ')}">${topicsDisplay}</div>
                 <div class="col-settings">${settingsParts}</div>
                 <div class="col-stats">${statsHtml}</div>
                 <div class="col-date">${formattedDate}</div>
+                <div class="col-action">${buttonHtml}</div>
             </div>`;
     }).join('');
 
     contentArea.innerHTML = `<div class="history-list-container">${headerHtml}${rowsHtml}</div>`;
+}
+
+
+/**
+ * 處理從歷史紀錄頁面提交單筆成績的事件
+ * @param {number} itemIndex - 該筆紀錄在 history 陣列中的索引
+ * @param {HTMLElement} buttonElement - 被點擊的按鈕元素
+ */
+async function handleHistorySubmit(itemIndex, buttonElement) {
+    const historyKey = `${config.STORAGE_PREFIX}gameHistory_${currentUser.id}`;
+    let history = [];
+    try {
+        const storedHistory = localStorage.getItem(historyKey);
+        if (storedHistory) {
+            history = JSON.parse(storedHistory);
+        }
+    } catch (e) {
+        console.error("讀取遊戲歷史記錄失敗:", e);
+        showResult("❌", "錯誤", "讀取歷史紀錄失敗，無法提交。");
+        return;
+    }
+
+    const gameResult = history[itemIndex];
+    if (!gameResult) {
+        showResult("❌", "錯誤", "找不到對應的遊戲紀錄。");
+        return;
+    }
+
+    // 1. 更新 UI 為「處理中」
+    buttonElement.disabled = true;
+    buttonElement.textContent = '處理中...';
+    buttonElement.classList.add('processing');
+
+    // 2. 提交至 Google 表單
+    const success = await submitToGoogleForm(gameResult);
+
+    if (success) {
+        // 3. 成功後，更新 UI 為「已送出」
+        buttonElement.textContent = '已送出';
+        buttonElement.classList.remove('processing');
+        buttonElement.classList.add('submitted');
+        
+        // 4. 更新 Local Storage 中的紀錄
+        gameResult.submitted = true;
+        history[itemIndex] = gameResult;
+        localStorage.setItem(historyKey, JSON.stringify(history));
+
+    } else {
+        // 5. 處理失敗情況
+        buttonElement.disabled = false;
+        buttonElement.textContent = '重新送出';
+        buttonElement.classList.remove('processing');
+        showResult("⚠️", "提交失敗", "無法將成績送出，請檢查網路連線後再試一次。");
+    }
 }
 
 /**
