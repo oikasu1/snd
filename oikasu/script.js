@@ -2,8 +2,8 @@
 // 全域設定 (Global Configuration)
 // =================================================================
 const config = {
-    // Local Storage 的獨特前綴，避免與其他應用程式衝突
-    STORAGE_PREFIX: "hakkaLearningApp_v5_",
+    // Local Storage 的獨特前綴，避免衝突
+    STORAGE_PREFIX: "hakkaLearningApp_v6_",
 
 
     // 【新增】GOOGLE 表單設定
@@ -24,6 +24,18 @@ const config = {
     // 慶祝動畫的表情符號
     CELEBRATION_EMOJIS: ["🌈", "🌟", "🎊", "🎉", "✨", "💖", "😍", "🥰"],
 
+
+    // 彩色紙片慶祝特效的顏色列表
+    CONFETTI_COLORS: ["#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3", "#03a9f4", "#00bcd4", "#009688", "#4CAF50", "#8BC34A", "#CDDC39", "#FFEB3B", "#FFC107", "#FF9800", "#FF5722"],
+
+
+    // 連續答對觸發門檻
+    STREAK_THRESHOLDS: {
+        matching: 6, // 配對遊戲連續答對 6 組
+        quiz: 5,     // 測驗遊戲連續答對 5 題
+        sorting: 3   // 排序遊戲連續答對 3 題
+    },
+	
     // 預設設定
     DEFAULT_USER_SETTINGS: {
         fontSize: 20,
@@ -53,7 +65,7 @@ const config = {
     AUDIO_PATHS: {
         // key 是副檔名 (不含點)，value 是對應的路徑
         "oikasu": "https://oikasu2.github.io/snd/oikasu/",
-        "kasu100": "https://oikasu1.github.io/snd/oikasu100/",
+        "k100": "https://oikasu1.github.io/kasu100/",
         // 'mp3' 作為預設或後備路徑
         "mp3": "https://oikasu1.github.io/snd/oikasu/"
     },
@@ -68,7 +80,7 @@ let orderedCategories = [];
 let currentUser = {
     id: "guest",
     name: "訪客",
-    avatar: "U"
+    avatar: "K"
 }
 let currentCategory = ""
 let currentViewMode = "card"
@@ -109,6 +121,18 @@ let isMultiSelectMode = false;
 let isLearningSelectMode = false;
 let lastVisitedTab = "";
 let collectedCategories = new Set();
+
+const avatarEmojis = [
+    "😀", "😁", "😆", "🤣", "😊", "🥰", "🤩", "🤗", "🫣", "😶‍🌫️", 
+    "😴", "🤠", "🥳", "😭", "👺", "👻", "😺", "😼", "💯", "💃", 
+    "🕺", "🐵", "🐶", "🐺", "🦊", "🦁", "🐯", "🫎", "🦄", "🐘", 
+    "🐰", "🐻", "🦥", "🐣", "🐦", "🐸", "🐲", "🐳", "🦖", "🦎", 
+    "🐊", "🐡", "🪸", "🐛", "🐞", "🌱", "🌵", "🍄", "🌶️", "🍆", 
+    "🍍", "🍉", "🥝", "🥯", "🍔", "🍿", "🍩", "🎂", "🧁", "🍭", 
+    "🧋", "🧸", "🪅", "✨", "⚽", "⚾", "🏀", "🏐", "🏸", "🧑‍🎤", 
+    "🧑‍🚀", "🏇", "🌍", "🧭", "🎠", "🎡", "🏍️", "🚗", "🚨", "🚦", 
+    "🪂", "🚁", "🛸", "👑", "🪗", "🎸", "🎹", "🎻", "📸"
+];
 
 // 表情符號對應表
 const myEmoji = `
@@ -173,6 +197,40 @@ const myEmoji = `
 手動作	🖐️
 腳動作	🦶
 畢業	🎓
+星期	📅
+時間	⏰
+比較	⚖️
+活動	🎯
+禮貌	🙏
+算數	➕
+認知	🧠
+身份	🪪
+關心	💖
+顏色	🎨
+鼓勵	💪
+問好	👋
+禮貌	🙏
+姓名	📝
+年紀	🎂
+年級	🎒
+身份	🪪
+擁有	📦
+星期	📅
+時間	⏰
+交通	🚌
+住處	🏠
+去向	➡️
+排隊	🚶
+動作	🤸
+學習	📖
+活動	🎯
+比較	⚖️
+算數	➕
+顏色	🎨
+認知	🧠
+關心	💖
+健康	🩺
+感覺	😊
 `;
 
 /**
@@ -444,8 +502,8 @@ function updateMultiSelectControlsUI() {
         }
 
         controlsContainer.innerHTML = `
-            <button onclick="disableMultiSelectMode()" class="p-1 rounded-full hover:bg-gray-200 transition-colors text-gray-600" title="關閉多選模式">
-                <span class="material-icons text-base">close</span>
+            <button onclick="disableMultiSelectMode()" class="p-1 rounded-full hover:bg-gray-200 transition-colors text-gray-600" title="關閉多選模式">			
+                <span>❌</span>
             </button>
             <input type="checkbox" id="currentTabSelectAll" class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" 
                    title="${isChecked ? '取消全選' : '全選本頁'}">
@@ -466,15 +524,39 @@ function updateMultiSelectControlsUI() {
 
 // 初始化
 function init() {
-    loadUserData(); 
+    loadUserData();
     parseData();
-    parseCatalog(); 
+    parseCatalog(); // Catalog is now available
 
-    const defaultTabName = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
+    const tabKeys = Object.keys(catalog);
+    let defaultTabName = tabKeys.find(tab => tab !== '收藏') || (tabKeys.length > 0 ? tabKeys[0] : "");
 
     loadUserSettings();
 
-    currentCatalogTab = defaultTabName;
+    // --- Start of new logic for parsing URL parameter ---
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+
+    // 檢查 URL 中是否有 'type' 參數，如果有，則優先處理遊戲模式，忽略 'tab'
+    if (!params.has('type')) {
+        if (tabParam) {
+            const tabIndex = parseInt(tabParam, 10);
+            // 檢查 tabIndex 是否為有效數字且在可用頁籤的範圍內
+            if (!isNaN(tabIndex) && tabIndex > 0 && tabIndex <= tabKeys.length) {
+                // 根據 URL 中的 1-based 索引設定當前頁籤
+                currentCatalogTab = tabKeys[tabIndex - 1];
+            } else {
+                console.warn(`URL 'tab' parameter "${tabParam}" is invalid. Falling back to default.`);
+                currentCatalogTab = defaultTabName;
+            }
+        } else {
+            currentCatalogTab = defaultTabName;
+        }
+    } else {
+         currentCatalogTab = defaultTabName;
+    }
+    // --- End of new logic ---
+
 
     const paramsHandled = handleUrlParameters();
     if (paramsHandled) {
@@ -821,6 +903,23 @@ function updateSelectionControlsState() {
 // 處理頁籤選擇事件
 function selectCatalogTab(tabName) {
     currentCatalogTab = tabName;
+
+    // --- Start of new logic for updating URL ---
+    if (history.pushState) {
+        const tabKeys = Object.keys(catalog);
+        const tabIndex = tabKeys.indexOf(tabName) + 1; // 將 0-based 索引轉為 1-based
+
+        if (tabIndex > 0) {
+            const newUrl = `${window.location.pathname}?tab=${tabIndex}`;
+            
+            // 僅在 URL 發生變化時才更新，避免產生重複的歷史紀錄
+            if (window.location.search !== `?tab=${tabIndex}`) {
+                 history.pushState({ tab: tabIndex }, '', newUrl);
+            }
+        }
+    }
+    // --- End of new logic ---
+
     renderCatalogTabs();
     renderCategoryList();
     window.scrollTo({
@@ -828,7 +927,6 @@ function selectCatalogTab(tabName) {
         behavior: 'smooth'
     });
 }
-
 
 // 解析資料
 function parseData() {
@@ -958,24 +1056,50 @@ function saveUserSettings() {
 
 
 function updateUserDisplay() {
-    // 更新使用者名稱、頭像等基本資訊
-    document.getElementById("userName").textContent = currentUser.name;
-    document.getElementById("userAvatar").textContent = currentUser.avatar;
-    document.getElementById("dropdownName").textContent = currentUser.name;
-    document.getElementById("dropdownId").textContent = `#${currentUser.id}`;
-    document.getElementById("dropdownAvatar").textContent = currentUser.avatar;
+    // 獲取所有需要更新的頭像和名稱元素
+    const avatarElements = [
+        document.getElementById("userAvatar"),
+        document.getElementById("dropdownAvatar"),
+        document.getElementById("userAvatarDetail"),
+        document.getElementById("dropdownAvatarDetail")
+    ].filter(el => el); // 過濾掉不存在的元素
 
-    const userNameDetail = document.getElementById("userNameDetail");
-    const userAvatarDetail = document.getElementById("userAvatarDetail");
-    const dropdownNameDetail = document.getElementById("dropdownNameDetail");
-    const dropdownIdDetail = document.getElementById("dropdownIdDetail");
-    const dropdownAvatarDetail = document.getElementById("dropdownAvatarDetail");
+    const nameElements = [
+        document.getElementById("userName"),
+        document.getElementById("dropdownName"),
+        document.getElementById("userNameDetail"),
+        document.getElementById("dropdownNameDetail")
+    ].filter(el => el);
 
-    if (userNameDetail) userNameDetail.textContent = currentUser.name;
-    if (userAvatarDetail) userAvatarDetail.textContent = currentUser.avatar;
-    if (dropdownNameDetail) dropdownNameDetail.textContent = currentUser.name;
-    if (dropdownIdDetail) dropdownIdDetail.textContent = `#${currentUser.id}`;
-    if (dropdownAvatarDetail) dropdownAvatarDetail.textContent = currentUser.avatar;
+    const idElements = [
+        document.getElementById("dropdownId"),
+        document.getElementById("dropdownIdDetail")
+    ].filter(el => el);
+
+    // 更新姓名和ID
+    nameElements.forEach(el => el.textContent = currentUser.name);
+    idElements.forEach(el => el.textContent = `#${currentUser.id}`);
+
+    // 檢查頭像是否為 Emoji
+    const isEmoji = avatarEmojis.includes(currentUser.avatar);
+
+    // 根據是否為 Emoji 來動態調整樣式
+    avatarElements.forEach(el => {
+        el.textContent = currentUser.avatar;
+        if (isEmoji) {
+            // 如果是 Emoji，移除背景色和文字顏色，並放大字體
+            el.classList.remove('bg-blue-500', 'text-white', 'font-bold');
+            if (el.id === 'userAvatar' || el.id === 'userAvatarDetail') {
+                 el.style.fontSize = '1.75rem'; // ~28px
+            } else { // dropdownAvatar
+                 el.style.fontSize = '2.25rem'; // ~36px
+            }
+        } else {
+            // 如果不是 Emoji (預設情況)，確保背景和文字顏色存在
+            el.classList.add('bg-blue-500', 'text-white', 'font-bold');
+            el.style.fontSize = ''; // 清除行內樣式，恢復 CSS 預設
+        }
+    });
     
     // --- 根據登入狀態更新按鈕 ---
     const editProfileBtn = document.getElementById("editProfile");
@@ -989,18 +1113,20 @@ function updateUserDisplay() {
     const isGuest = currentUser.id === 'guest';
 
     // 處理主選單的下拉選單
-    if (isGuest) {
-        logoutBtn.textContent = "登入";
-        editProfileBtn.classList.add("text-gray-400", "cursor-not-allowed");
-        editProfileBtn.disabled = true;
-        viewHistoryBtn.classList.add("text-gray-400", "cursor-not-allowed");
-        viewHistoryBtn.disabled = true;
-    } else {
-        logoutBtn.textContent = "登出";
-        editProfileBtn.classList.remove("text-gray-400", "cursor-not-allowed");
-        editProfileBtn.disabled = false;
-        viewHistoryBtn.classList.remove("text-gray-400", "cursor-not-allowed");
-        viewHistoryBtn.disabled = false;
+    if (logoutBtn) {
+        if (isGuest) {
+            logoutBtn.textContent = "登入";
+            editProfileBtn.classList.add("text-gray-400", "cursor-not-allowed");
+            editProfileBtn.disabled = true;
+            viewHistoryBtn.classList.add("text-gray-400", "cursor-not-allowed");
+            viewHistoryBtn.disabled = true;
+        } else {
+            logoutBtn.textContent = "登出";
+            editProfileBtn.classList.remove("text-gray-400", "cursor-not-allowed");
+            editProfileBtn.disabled = false;
+            viewHistoryBtn.classList.remove("text-gray-400", "cursor-not-allowed");
+            viewHistoryBtn.disabled = false;
+        }
     }
     
     // 處理詳情頁的下拉選單
@@ -1023,7 +1149,7 @@ function updateUserDisplay() {
 
 // 搜尋功能
 function handleSearchInput(e) {
-    // 【修改】將查詢中的一個或多個 '-' 替換為空格
+    // 將查詢中的一個或多個 '-' 替換為空格
     const query = e.target.value.toLowerCase().replace(/-+/g, ' ');
     const searchResults = document.getElementById("searchResults");
     const clearSearchBtn = document.getElementById("clearSearch");
@@ -1073,8 +1199,14 @@ function handleSearchInput(e) {
         const foundResults = [];
         Object.entries(categories).forEach(([category, sentences]) => {
             sentences.forEach((sentence, index) => {
-                // 【修改】將資料庫文本中的一個或多個 '-' 替換為空格
-                let searchText = `${sentence["客語"]} ${sentence["拼音"]} ${sentence["華語"]}`.toLowerCase().replace(/-+/g, ' ');
+                // --- Start of Modification ---
+                // 1. 在搜尋前，先移除客語欄位中的特殊造字
+                const cleanHakkaText = sentence["客語"].replace(/[\uE166-\uE24B]/g, '');
+
+                // 2. 使用清理過的客語文字來建立要搜尋的字串
+                let searchText = `${cleanHakkaText} ${sentence["拼音"]} ${sentence["華語"]}`.toLowerCase().replace(/-+/g, ' ');
+                // --- End of Modification ---
+
                 if (isToneInsensitive) {
                     searchText = searchText.replace(/[ˊˇˋˆ]/g, ''); // 移除資料中的聲調
                 }
@@ -1082,7 +1214,7 @@ function handleSearchInput(e) {
                 if (searchRegex.test(searchText)) {
                     foundResults.push({
                         type: "sentence",
-                        title: sentence["客語"],
+                        title: sentence["客語"], // 顯示結果時，仍顯示原始的客語文字
                         chinese: sentence["華語"],
                         category: category,
                         data: {
@@ -1234,7 +1366,7 @@ function getCategoryEmoji(categoryName) {
     if (categoryName === "星號") {
         return '🌟';
     }
-    const cleanName = categoryName.replace(/[0-9\s]+/g, '');
+    const cleanName = categoryName.replace(/[0-9\s-]+/g, '');
     return emojiMap[cleanName] || '📚';
 }
 
@@ -1768,7 +1900,19 @@ function annotateHakkaText(hakkaText, pinyinText, isAnnotated) {
 
     const processedPinyin = pinyinText.replace(/([,.?!;:。！？，、：；()（）])/g, ' $1 ');
     const pinyinSegments = processedPinyin.split(/[\s-]+/).filter(p => p.trim() !== "");
-    const hakkaChars = Array.from(hakkaText);
+    
+    // --- MODIFICATION START ---
+    let hakkaSegments;
+    // 整合您提供的邏輯：如果客語字串沒有空格且包含特殊注音字元，則為其加上空格再分割。
+    if (hakkaText.split(/\s+/).length === 1 && /[\uE166-\uE24B]/.test(hakkaText)) {
+        let processedText = hakkaText.replace(/([\uE166-\uE24B]+)(?=\S|$)/g, "$1 ").trim();
+        hakkaSegments = processedText.split(/\s+/);
+    } else {
+        // 其他情況則維持原樣，按單一字元分割，以處理普通漢字。
+        hakkaSegments = Array.from(hakkaText);
+    }
+    // --- MODIFICATION END ---
+
     const punctuationMap = {
         ".": "。",
         ",": "，",
@@ -1783,7 +1927,10 @@ function annotateHakkaText(hakkaText, pinyinText, isAnnotated) {
     let resultHtml = '';
     let pinyinIndex = 0;
 
-    hakkaChars.forEach(char => {
+    // --- MODIFICATION START ---
+    // 將 forEach 的迭代對象從 hakkaChars 改為新的 hakkaSegments
+    hakkaSegments.forEach(char => {
+    // --- MODIFICATION END ---
         const currentPinyin = pinyinSegments[pinyinIndex];
         let pinyinForDisplay = currentPinyin;
 
@@ -1823,8 +1970,8 @@ function annotateHakkaText(hakkaText, pinyinText, isAnnotated) {
 
 /**
  * 播放音檔，並可選擇性地更新按鈕圖示。
- * 新版本會根據音檔的副檔名，從 config.AUDIO_PATHS 中動態選擇對應的路徑。
- * @param {string} filename - 要播放的音檔名稱 (例如 "oikasu-k1-001.mp3" 或 "word.oikasu")。
+ * 此版本會根據原始副檔名查找路徑，但一律播放 .mp3 檔案。
+ * @param {string} filename - 要播放的音檔名稱 (例如 "oikasu-k1-001.mp3" 或 "k016.k100")。
  * @param {HTMLElement} [iconElement=null] - (可選) 要更新的 Material Icons 元素。
  * @returns {Promise<void>} - 一個在音檔播放完畢時解析的 Promise。
  */
@@ -1850,11 +1997,19 @@ function playAudio(filename, iconElement = null) {
 
         // --- 動態決定音檔路徑 ---
         const parts = filename.split('.');
-        // 取得最後一部分作為副檔名，如果沒有副檔名則預設為 'mp3'
-        const extension = parts.length > 1 ? parts.pop().toLowerCase() : 'mp3';
-        // 從 config 中尋找對應的路徑，如果找不到，則使用 mp3 的路徑作為後備
-        const basePath = config.AUDIO_PATHS[extension] || config.AUDIO_PATHS['mp3'];
-        const audioUrl = `${basePath}${filename}`;
+        const hasExtension = parts.length > 1;
+        
+        // 取得原始副檔名用於查找路徑，如果沒有則預設為 'mp3'
+        const originalExtension = hasExtension ? parts[parts.length - 1].toLowerCase() : 'mp3';
+        
+        // 從 config 中尋找對應的路徑，如果找不到，則使用 'mp3' 的路徑作為後備
+        const basePath = config.AUDIO_PATHS[originalExtension] || config.AUDIO_PATHS['mp3'];
+        
+        // 取得不含副檔名的檔名主體
+        const filenameBody = hasExtension ? parts.slice(0, -1).join('.') : filename;
+        
+        // 組成最終要播放的 .mp3 檔案路徑
+        const audioUrl = `${basePath}${filenameBody}.mp3`;
 
         const audio = new Audio(audioUrl);
         currentAudio = audio;
@@ -1957,7 +2112,7 @@ function showLearningView() {
                     </button>
                     <div id="learningSelectActions" class="hidden items-center gap-4">
                         <button id="disableLearningSelect" title="關閉選取模式" class="control-button active">
-                            <span class="material-icons !text-lg">close</span>
+                            <span>❌</span>
                             <span class="hidden md:inline text-sm">關閉</span>
                         </button>
                         <button id="learningSelectAll" title="全選/取消全選" class="control-button">
@@ -1984,6 +2139,29 @@ function showLearningView() {
                 </div>
 
                 <div id="learningModeStandardControls" class="flex flex-wrap items-center gap-x-6 gap-y-2">
+
+                    <div class="flex items-center gap-4 border-l border-gray-300 pl-6">
+                         <div class="relative">
+                            <button id="displayMenuToggle" class="control-button" title="顯示設定">
+                                <span class="material-icons !text-lg">visibility</span>
+                                <span class="hidden md:inline text-sm">顯示</span>
+                            </button>
+                            <div id="displayMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
+                                <button id="hideHakka" title="客語" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
+                                    <span>客語</span>
+                                </button>
+                                <button id="hidePinyin" title="拼音" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
+                                    <span>拼音</span>
+                                </button>
+                                <button id="hideChinese" title="華語" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
+                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
+                                    <span>華語</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="flex items-center gap-4 border-l border-gray-300 pl-6">
                         <div class="relative">
@@ -2042,29 +2220,7 @@ function showLearningView() {
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-4 border-l border-gray-300 pl-6">
-                         <div class="relative">
-                            <button id="displayMenuToggle" class="control-button" title="顯示設定">
-                                <span class="material-icons !text-lg">visibility</span>
-                                <span class="hidden md:inline text-sm">顯示</span>
-                            </button>
-                            <div id="displayMenu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-10 py-1">
-                                <button id="hideHakka" title="客語" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
-                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
-                                    <span>客語</span>
-                                </button>
-                                <button id="hidePinyin" title="拼音" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
-                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
-                                    <span>拼音</span>
-                                </button>
-                                <button id="hideChinese" title="華語" class="w-full text-left px-3 py-2 flex items-center hover:bg-gray-100 text-sm text-gray-700">
-                                    <span class="material-icons text-base mr-3 w-5 text-center">visibility</span>
-                                    <span>華語</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
+                   
                     <div class="flex items-center gap-4 border-l border-gray-300 pl-6">
                         <div class="relative">
                             <button id="layoutMenuToggle" class="control-button" title="切換版面">
@@ -3380,8 +3536,8 @@ function showMatchingGame() {
                                 <option value="round8">8關</option>
                                 <option value="unlimited">無限</option>
                             </select>
-                            <div id="matchingTimer" class="text-lg font-mono text-gray-700 min-w-[5rem] text-center">00:00</div>
                         </div>
+                        <div id="matchingTimer" class="text-lg font-mono text-gray-700 min-w-[5rem] text-center">00:00</div>
                     </div>
 
                     <div class="flex items-center gap-x-3 gap-y-2 flex-wrap justify-end">
@@ -3445,6 +3601,7 @@ function setupMatchingGame() {
         totalRounds: 1,
         score: 0,
         steps: 0,
+        streak: 0, // 【新增】連續答對計數器
         timeLeft: 0,
         timerInterval: null,
         gameData: [],
@@ -3515,6 +3672,8 @@ function setupMatchingGame() {
 
     generateMatchingData();
 }
+
+
 
 function stopMatchingGame() {
     if (matchingGameState.timerInterval) {
@@ -3735,6 +3894,7 @@ function selectMatchingItem(element, item) {
     }
 }
 
+
 function checkMatch() {
     const [first, second] = matchingGameState.selectedItems
     matchingGameState.steps++
@@ -3744,6 +3904,13 @@ function checkMatch() {
         // 配對成功
         matchingGameState.score += 100
         document.getElementById("matchingScore").textContent = matchingGameState.score
+
+        // 【新增】處理連續答對邏輯
+        matchingGameState.streak++;
+        if (matchingGameState.streak > 0 && matchingGameState.streak === config.STREAK_THRESHOLDS.matching) {
+            triggerStreakCelebration();
+            matchingGameState.streak = 0; // 觸發後重置
+        }
 
         // 檢查是否要播放音效
         if (document.getElementById('matchingPlaySound').checked) {
@@ -3787,6 +3954,9 @@ function checkMatch() {
         // 配對錯誤
         matchingGameState.score = Math.max(0, matchingGameState.score - 50)
         document.getElementById("matchingScore").textContent = matchingGameState.score
+
+        // 【新增】答錯時重置連續答對計數器
+        matchingGameState.streak = 0;
 
         first.element.classList.remove("matching-selected")
         second.element.classList.remove("matching-selected")
@@ -4234,6 +4404,7 @@ function showQuizGame() {
 }
 
 
+
 function setupQuizGame() {
     const isMobile = window.innerWidth < 768;
     if (!userSettings.quizLayout || !['horizontal', 'vertical', 'flow'].includes(userSettings.quizLayout)) {
@@ -4248,6 +4419,7 @@ function setupQuizGame() {
         options: [],
         correct: 0,
         incorrect: 0,
+        streak: 0, // 【新增】連續答對計數器
         total: 0,
         timeLeft: 0,
         timerInterval: null,
@@ -4333,6 +4505,65 @@ function setupQuizGame() {
     }
 }
 
+function selectQuizOption(selectedAnswer, element) {
+    if (quizGameState.isAnswered) return;
+
+    quizGameState.isAnswered = true;
+    quizGameState.total++;
+
+    const isCorrect = selectedAnswer.trim() === quizGameState.correctAnswer.trim();
+
+    document.querySelectorAll(".quiz-option").forEach((option) => {
+        option.classList.add("quiz-answered");
+
+        // 使用更穩健的方式來獲取選項的純文字內容，以進行比對
+        let rawOptionText = option.textContent.trim();
+        if (rawOptionText.match(/^[A-H]\.\s/)) { // 處理 "A. " 或 "B. " 這種前綴
+            rawOptionText = rawOptionText.substring(3).trim();
+        }
+
+        if (rawOptionText === quizGameState.correctAnswer) {
+            option.classList.add("quiz-correct");
+            // 當使用者答對時，在正確的選項上觸發慶祝特效
+            if (isCorrect) {
+                showCelebration(option);
+            }
+        } else if (option === element && !isCorrect) {
+            option.classList.add("quiz-incorrect");
+        }
+    });
+
+    if (isCorrect) {
+        quizGameState.correct++;
+        document.getElementById("quizCorrect").textContent = quizGameState.correct;
+        
+        // 【新增】處理連續答對邏輯
+        quizGameState.streak++;
+        if (quizGameState.streak > 0 && quizGameState.streak === config.STREAK_THRESHOLDS.quiz) {
+            triggerStreakCelebration();
+            quizGameState.streak = 0; // 觸發後重置
+        }
+    } else {
+        quizGameState.incorrect++;
+        document.getElementById("quizIncorrect").textContent = quizGameState.incorrect;
+        // 【新增】答錯時重置連續答對計數器
+        quizGameState.streak = 0;
+    }
+
+    const condition = document.getElementById("quizCondition").value;
+    if (condition.startsWith("correct")) {
+        const target = Number.parseInt(condition.replace("correct", ""));
+        if (quizGameState.correct >= target) {
+            setTimeout(() => endQuizGame(`恭喜達成目標！\n答對 ${target} 題`), 1500);
+            return;
+        }
+    }
+
+    setTimeout(() => {
+        quizGameState.currentIndex++;
+        generateQuizQuestion();
+    }, 1500);
+}
 
 
 
@@ -4501,14 +4732,19 @@ function renderQuizQuestion() {
     }
 
     quizArea.innerHTML = `
-    <div class="text-center mb-8">
-        <div class="flex items-center justify-center gap-4 mb-6">
-            <button onclick="playAudio('${quizGameState.questions[quizGameState.currentIndex]["音檔"]}', this.querySelector('.material-icons'))" 
-                    class="text-gray-800 hover:bg-gray-100 p-2 rounded transition-colors">
-                <span class="material-icons">volume_up</span>
-            </button>
-            <div id="quizQuestion" class="text-2xl text-red-800 cursor-pointer" style="font-size: ${userSettings.fontSize + 4}px">
-                <span class="question-number">${questionNumber}. </span><span class="question-text">${quizGameState.currentQuestion}</span>
+    <div class="mb-8">
+        <div class="flex items-center justify-center text-center mb-6">
+            <div class="flex flex-col md:flex-row items-center gap-y-2 md:gap-x-4">
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <button onclick="playAudio('${quizGameState.questions[quizGameState.currentIndex]["音檔"]}', this.querySelector('.material-icons'))" 
+                            class="text-gray-800 hover:bg-gray-100 p-2 rounded transition-colors">
+                        <span class="material-icons">volume_up</span>
+                    </button>
+                    <span class="question-number text-2xl text-red-800" style="font-size: ${userSettings.fontSize + 4}px">${questionNumber}.</span>
+                </div>
+                <div id="quizQuestion" class="text-2xl text-red-800 cursor-pointer w-full" style="font-size: ${userSettings.fontSize + 4}px">
+                    <span class="question-text">${quizGameState.currentQuestion}</span>
+                </div>
             </div>
         </div>
     </div>
@@ -4531,56 +4767,6 @@ function renderQuizQuestion() {
     }
 }
 
-function selectQuizOption(selectedAnswer, element) {
-    if (quizGameState.isAnswered) return;
-
-    quizGameState.isAnswered = true;
-    quizGameState.total++;
-
-    const isCorrect = selectedAnswer.trim() === quizGameState.correctAnswer.trim();
-
-    document.querySelectorAll(".quiz-option").forEach((option) => {
-        option.classList.add("quiz-answered");
-
-        // 使用更穩健的方式來獲取選項的純文字內容，以進行比對
-        let rawOptionText = option.textContent.trim();
-        if (rawOptionText.match(/^[A-H]\.\s/)) { // 處理 "A. " 或 "B. " 這種前綴
-            rawOptionText = rawOptionText.substring(3).trim();
-        }
-
-        if (rawOptionText === quizGameState.correctAnswer) {
-            option.classList.add("quiz-correct");
-            // 當使用者答對時，在正確的選項上觸發慶祝特效
-            if (isCorrect) {
-                showCelebration(option);
-            }
-        } else if (option === element && !isCorrect) {
-            option.classList.add("quiz-incorrect");
-        }
-    });
-
-    if (isCorrect) {
-        quizGameState.correct++;
-        document.getElementById("quizCorrect").textContent = quizGameState.correct;
-    } else {
-        quizGameState.incorrect++;
-        document.getElementById("quizIncorrect").textContent = quizGameState.incorrect;
-    }
-
-    const condition = document.getElementById("quizCondition").value;
-    if (condition.startsWith("correct")) {
-        const target = Number.parseInt(condition.replace("correct", ""));
-        if (quizGameState.correct >= target) {
-            setTimeout(() => endQuizGame(`恭喜達成目標！\n答對 ${target} 題`), 1500);
-            return;
-        }
-    }
-
-    setTimeout(() => {
-        quizGameState.currentIndex++;
-        generateQuizQuestion();
-    }, 1500);
-}
 
 
 
@@ -4690,6 +4876,7 @@ function setupSortingGame() {
         userOrderObjects: [],    // 儲存使用者排序的單字物件
         correct: 0,
         incorrect: 0,
+        streak: 0, // 【新增】連續答對計數器
         score: 0,
         timeLeft: 0,
         timerInterval: null,
@@ -4742,6 +4929,105 @@ function setupSortingGame() {
                 renderSortingQuestion();
             }
         };
+    }
+}
+
+function checkSortingAnswer() {
+    if (sortingGameState.userOrderObjects.length !== sortingGameState.originalWordObjects.length) {
+        showResult("⚠️", "提醒", "請完成排列");
+        return;
+    }
+
+    // 透過比較每個物件的唯一 ID 來檢查順序是否正確
+    const isCorrect = sortingGameState.userOrderObjects.every((obj, index) => obj.id === sortingGameState.originalWordObjects[index].id);
+
+    if (isCorrect) {
+        sortingGameState.correct++;
+        sortingGameState.score += 100;
+        document.getElementById("sortingCorrect").textContent = sortingGameState.correct;
+        document.getElementById("sortingScore").textContent = sortingGameState.score;
+
+        // 【新增】處理連續答對邏輯
+        sortingGameState.streak++;
+        if (sortingGameState.streak > 0 && sortingGameState.streak === config.STREAK_THRESHOLDS.sorting) {
+            triggerStreakCelebration();
+            sortingGameState.streak = 0; // 觸發後重置
+        }
+
+        const targetDiv = document.getElementById("sortingTarget");
+        showCelebration(targetDiv);
+        document.querySelector('#sortingArea button[onclick="checkSortingAnswer()"]').disabled = true;
+
+        targetDiv.querySelectorAll('.sorting-word').forEach(wordEl => {
+            wordEl.classList.remove('bg-indigo-500', 'cursor-pointer');
+            wordEl.classList.add('bg-green-600', 'cursor-default');
+            wordEl.onclick = null;
+        });
+
+        const wordBankContainer = document.getElementById('sortingWordBankContainer');
+        const sentence = sortingGameState.currentSentence;
+        const type = document.getElementById("sortingType").value;
+        let revealedText = '';
+        
+        // 輔助函數，用於處理拼音/注音轉換
+        const getPhonetic = (text) => userSettings.phoneticSystem === 'zhuyin' ? convertPinyinToZhuyin(text) : text;
+
+        if (type.includes('hakka') && type.includes('pinyin')) {
+            revealedText = sentence['華語'];
+        } else if (type.includes('chinese') && type.includes('pinyin')) {
+            revealedText = sentence['客語'];
+        } else if (type.includes('chinese') && type.includes('hakka')) {
+            // 當第三語言是拼音時，也需要根據用戶設定轉換為注音
+            revealedText = getPhonetic(sentence['拼音']);
+        }
+
+        if (revealedText && wordBankContainer) {
+            wordBankContainer.innerHTML = `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center transition-all duration-300 w-full animate-pulse">
+                    <p class="text-green-900 mt-1" style="font-size: ${userSettings.fontSize + 2}px">${revealedText}</p>
+                </div>
+            `;
+        }
+
+        const condition = document.getElementById("sortingCondition").value;
+        if (condition.startsWith("correct")) {
+            const target = Number.parseInt(condition.replace("correct", ""));
+            if (sortingGameState.correct >= target) {
+                setTimeout(() => endSortingGame(`恭喜完成目標！\n答對 ${target} 題`), 2000);
+                return;
+            }
+        }
+        setTimeout(() => generateSortingQuestion(), 2000);
+
+    } else {
+        sortingGameState.incorrect++;
+        sortingGameState.score = Math.max(0, sortingGameState.score - 20);
+        document.getElementById("sortingIncorrect").textContent = sortingGameState.incorrect;
+        document.getElementById("sortingScore").textContent = sortingGameState.score;
+        
+        // 【新增】答錯時重置連續答對計數器
+        sortingGameState.streak = 0;
+        
+        const playSoundCheckbox = document.getElementById('sortingPlaySound');
+        if (playSoundCheckbox && playSoundCheckbox.checked) {
+            playAudio(sortingGameState.currentSentence["音檔"]);
+        }
+        
+        // 找出答錯的部分並將它們移回選項區
+        let correctCount = 0;
+        for (let i = 0; i < sortingGameState.userOrderObjects.length; i++) {
+            if (sortingGameState.userOrderObjects[i].id === sortingGameState.originalWordObjects[i].id) {
+                correctCount++;
+            } else {
+                break;
+            }
+        }
+
+        const wrongPart = sortingGameState.userOrderObjects.slice(correctCount);
+        sortingGameState.userOrderObjects.splice(correctCount);
+        sortingGameState.shuffledWordObjects.push(...wrongPart);
+
+        renderSortingQuestion();
     }
 }
 
@@ -4810,11 +5096,30 @@ function generateSortingQuestion(isNewQuestion = true) {
         pinyinSyllables = sentence["拼音"].split(/[\s-]+/).filter(w => w.trim() !== "");
     }
 
-    const hakkaChars = Array.from(sentence["客語"]);
-    const baseWordInfo = hakkaChars.map((char, index) => ({
-        hakka: char,
+    // --- MODIFICATION START ---
+    let hakkaSegments;
+    let rawHakkaText = sentence["客語"];
+
+    // 整合您提供的邏輯：如果客語字串沒有空格且包含特殊注音字元，則為其加上空格再分割。
+    if (rawHakkaText.split(/\s+/).length === 1 && /[\uE166-\uE24B]/.test(rawHakkaText)) {
+        let processedText = rawHakkaText.replace(/([\uE166-\uE24B]+)(?=\S|$)/g, "$1 ").trim();
+        hakkaSegments = processedText.split(/\s+/);
+    } 
+    // 如果字串本身已有空格，則直接按空格分割。
+    else if (rawHakkaText.includes(' ')) {
+        hakkaSegments = rawHakkaText.split(/\s+/);
+    }
+    // 其他情況（如無空格的普通漢字），則按單一字元分割。
+    else {
+        hakkaSegments = Array.from(rawHakkaText);
+    }
+
+    const baseWordInfo = hakkaSegments.map((segment, index) => ({
+        hakka: segment,
         pinyin: pinyinSyllables[index] || ''
     }));
+    // --- MODIFICATION END ---
+
 
     switch (type) {
         case "hakka-pinyin":
@@ -4872,14 +5177,19 @@ function renderSortingQuestion() {
     const questionNumber = sortingGameState.total;
 
     sortingArea.innerHTML = `
-        <div class="text-center mb-8">
-            <div class="flex items-center justify-center gap-4 mb-6">
-                <button onclick="playAudio('${sortingGameState.currentSentence["音檔"]}', this.querySelector('.material-icons'))" 
-                        class="text-gray-800 hover:bg-gray-100 p-2 rounded transition-colors">
-                    <span class="material-icons">volume_up</span>
-                </button>
-                <div id="sortingQuestion" class="text-2xl font-bold text-indigo-800 cursor-pointer" style="font-size: ${userSettings.fontSize + 4}px">
-                    <span class="question-number">${questionNumber}. </span><span class="question-text">${sortingGameState.questionText}</span>
+        <div class="mb-8">
+            <div class="flex items-center justify-center text-center mb-6">
+                <div class="flex flex-col md:flex-row items-center gap-y-2 md:gap-x-4">
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button onclick="playAudio('${sortingGameState.currentSentence["音檔"]}', this.querySelector('.material-icons'))" 
+                                class="text-gray-800 hover:bg-gray-100 p-2 rounded transition-colors">
+                            <span class="material-icons">volume_up</span>
+                        </button>
+                        <span class="question-number text-2xl font-bold text-indigo-800" style="font-size: ${userSettings.fontSize + 4}px">${questionNumber}.</span>
+                    </div>
+                    <div id="sortingQuestion" class="text-2xl font-bold text-indigo-800 cursor-pointer w-full" style="font-size: ${userSettings.fontSize + 4}px">
+                        <span class="question-text">${sortingGameState.questionText}</span>
+                    </div>
                 </div>
             </div>
             
@@ -4981,94 +5291,7 @@ function removeFromTarget(targetIndex) {
 }
 
 
-function checkSortingAnswer() {
-    if (sortingGameState.userOrderObjects.length !== sortingGameState.originalWordObjects.length) {
-        showResult("⚠️", "提醒", "請完成排列");
-        return;
-    }
 
-    // 透過比較每個物件的唯一 ID 來檢查順序是否正確
-    const isCorrect = sortingGameState.userOrderObjects.every((obj, index) => obj.id === sortingGameState.originalWordObjects[index].id);
-
-    if (isCorrect) {
-        sortingGameState.correct++;
-        sortingGameState.score += 100;
-        document.getElementById("sortingCorrect").textContent = sortingGameState.correct;
-        document.getElementById("sortingScore").textContent = sortingGameState.score;
-
-        const targetDiv = document.getElementById("sortingTarget");
-        showCelebration(targetDiv);
-        document.querySelector('#sortingArea button[onclick="checkSortingAnswer()"]').disabled = true;
-
-        targetDiv.querySelectorAll('.sorting-word').forEach(wordEl => {
-            wordEl.classList.remove('bg-indigo-500', 'cursor-pointer');
-            wordEl.classList.add('bg-green-600', 'cursor-default');
-            wordEl.onclick = null;
-        });
-
-        const wordBankContainer = document.getElementById('sortingWordBankContainer');
-        const sentence = sortingGameState.currentSentence;
-        const type = document.getElementById("sortingType").value;
-        let revealedText = '';
-        
-        // 輔助函數，用於處理拼音/注音轉換
-        const getPhonetic = (text) => userSettings.phoneticSystem === 'zhuyin' ? convertPinyinToZhuyin(text) : text;
-
-        if (type.includes('hakka') && type.includes('pinyin')) {
-            revealedText = sentence['華語'];
-        } else if (type.includes('chinese') && type.includes('pinyin')) {
-            revealedText = sentence['客語'];
-        } else if (type.includes('chinese') && type.includes('hakka')) {
-            // 當第三語言是拼音時，也需要根據用戶設定轉換為注音
-            revealedText = getPhonetic(sentence['拼音']);
-        }
-
-        if (revealedText && wordBankContainer) {
-            wordBankContainer.innerHTML = `
-                <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center transition-all duration-300 w-full animate-pulse">
-                    <p class="text-green-900 mt-1" style="font-size: ${userSettings.fontSize + 2}px">${revealedText}</p>
-                </div>
-            `;
-        }
-
-        const condition = document.getElementById("sortingCondition").value;
-        if (condition.startsWith("correct")) {
-            const target = Number.parseInt(condition.replace("correct", ""));
-            if (sortingGameState.correct >= target) {
-                setTimeout(() => endSortingGame(`恭喜完成目標！\n答對 ${target} 題`), 2000);
-                return;
-            }
-        }
-        setTimeout(() => generateSortingQuestion(), 2000);
-
-    } else {
-        sortingGameState.incorrect++;
-        sortingGameState.score = Math.max(0, sortingGameState.score - 20);
-        document.getElementById("sortingIncorrect").textContent = sortingGameState.incorrect;
-        document.getElementById("sortingScore").textContent = sortingGameState.score;
-        
-        const playSoundCheckbox = document.getElementById('sortingPlaySound');
-        if (playSoundCheckbox && playSoundCheckbox.checked) {
-            playAudio(sortingGameState.currentSentence["音檔"]);
-        }
-        
-        // 找出答錯的部分並將它們移回選項區
-        let correctCount = 0;
-        for (let i = 0; i < sortingGameState.userOrderObjects.length; i++) {
-            if (sortingGameState.userOrderObjects[i].id === sortingGameState.originalWordObjects[i].id) {
-                correctCount++;
-            } else {
-                break;
-            }
-        }
-
-        const wrongPart = sortingGameState.userOrderObjects.slice(correctCount);
-        sortingGameState.userOrderObjects.splice(correctCount);
-        sortingGameState.shuffledWordObjects.push(...wrongPart);
-
-        renderSortingQuestion();
-    }
-}
 
 /**
  * 儲存遊戲結果到 Local Storage
@@ -5456,7 +5679,40 @@ function setStickyTopPosition() {
     }
 }
 
+/**
+ * 填充頭像 Emoji 選擇器並設定點擊事件
+ * @param {string} currentAvatar - 當前使用者的頭像
+ */
+function populateEmojiSelector(currentAvatar) {
+    const emojiSelector = document.getElementById("emojiSelector");
+    if (!emojiSelector) return;
 
+    emojiSelector.innerHTML = ""; // 清空舊內容
+
+    avatarEmojis.forEach(emoji => {
+        const emojiEl = document.createElement("div");
+        emojiEl.className = "emoji-option";
+        emojiEl.textContent = emoji;
+        emojiEl.dataset.avatar = emoji; // 將 emoji 存儲在 data 屬性中
+
+        if (emoji === currentAvatar) {
+            emojiEl.classList.add("selected-emoji");
+        }
+
+        emojiEl.onclick = () => {
+            // 移除所有選項的選中樣式
+            emojiSelector.querySelectorAll('.emoji-option').forEach(el => {
+                el.classList.remove('selected-emoji');
+            });
+            // 為被點擊的選項加上樣式
+            emojiEl.classList.add('selected-emoji');
+        };
+
+        emojiSelector.appendChild(emojiEl);
+    });
+}
+
+// 設置事件監聽器
 // 設置事件監聽器
 function setupEventListeners() {
     const mainTitle = document.getElementById("mainTitle");
@@ -5560,13 +5816,15 @@ function setupEventListeners() {
 		document.getElementById("userDropdown").classList.add("hidden");
 		document.getElementById("editName").value = currentUser.name;
 		document.getElementById("editId").value = currentUser.id;
-		document.getElementById("editAvatar").value = currentUser.avatar;
+		populateEmojiSelector(currentUser.avatar); // <-- 此處正確使用 currentUser.avatar
 		document.getElementById("userModal").classList.remove("hidden");
 	}
     document.getElementById("saveProfile").onclick = () => {
         const newName = document.getElementById("editName").value.trim();
         const newId = document.getElementById("editId").value.trim();
-        const newAvatar = document.getElementById("editAvatar").value.trim();
+        const selectedEmojiEl = document.querySelector('#emojiSelector .selected-emoji');
+        const newAvatar = selectedEmojiEl ? selectedEmojiEl.dataset.avatar : currentUser.avatar;
+
         if (newName && newId && newAvatar) {
             currentUser.name = newName;
             currentUser.id = newId;
@@ -5618,7 +5876,7 @@ function setupEventListeners() {
 			// 清空輸入框並顯示登入視窗
 			document.getElementById("editName").value = "";
 			document.getElementById("editId").value = "";
-			document.getElementById("editAvatar").value = "";
+			populateEmojiSelector("😀"); // <-- 在這裡為訪客模式設定預設 Emoji
 			document.getElementById("userModal").classList.remove("hidden");
 		} else {
 			// 登入狀態下，此按鈕為「登出」
@@ -5671,7 +5929,7 @@ function setupEventListeners() {
 			userDropdownDetail.classList.add("hidden");
 			document.getElementById("editName").value = currentUser.name;
 			document.getElementById("editId").value = currentUser.id;
-			document.getElementById("editAvatar").value = currentUser.avatar;
+			populateEmojiSelector(currentUser.avatar); // <-- 此處正確使用 currentUser.avatar
 			document.getElementById("userModal").classList.remove("hidden");
 		}
 	document.getElementById("logoutDetail").onclick = () => {
@@ -5681,7 +5939,7 @@ function setupEventListeners() {
 			// 訪客狀態下，此按鈕為「登入」
 			document.getElementById("editName").value = "";
 			document.getElementById("editId").value = "";
-			document.getElementById("editAvatar").value = "";
+			populateEmojiSelector("😀"); // <-- 在這裡為訪客模式設定預設 Emoji
 			document.getElementById("userModal").classList.remove("hidden");
 		} else {
 			// 登入狀態下，此按鈕為「登出」
@@ -5704,19 +5962,20 @@ function setupEventListeners() {
     })
 
 
+
 document.getElementById("goHome").onclick = () => {
     stopAllTimers();
-    
+
     selectedCategories.clear();
     isMultiSelectMode = false;
-	isLearningSelectMode = false
-    
+    isLearningSelectMode = false;
+
     Object.keys(categories).forEach((key) => {
-      if ((key.endsWith("主題") && !isNaN(parseInt(key))) || key === "星號") {
-        delete categories[key];
-      }
+        if ((key.endsWith("主題") && !isNaN(parseInt(key))) || key === "星號") {
+            delete categories[key];
+        }
     });
-    
+
     parseCatalog();
 
     if (lastVisitedTab && catalog[lastVisitedTab]) {
@@ -5725,19 +5984,29 @@ document.getElementById("goHome").onclick = () => {
         currentCatalogTab = Object.keys(catalog).find(tab => tab !== '收藏') || (Object.keys(catalog).length > 0 ? Object.keys(catalog)[0] : "");
     }
     lastVisitedTab = "";
-    
-    if(history.pushState) {
-        history.pushState({}, '', window.location.pathname);
+
+    // --- Start of Fix ---
+    if (history.pushState) {
+        const tabKeys = Object.keys(catalog);
+        const tabIndex = tabKeys.indexOf(currentCatalogTab) + 1;
+        let newUrl = window.location.pathname;
+
+        if (tabIndex > 0) {
+            newUrl += `?tab=${tabIndex}`;
+        }
+        history.pushState({}, '', newUrl);
     }
+    // --- End of Fix ---
+
     document.getElementById("categoryDetail").classList.add("hidden");
-	document.getElementById("learningHistory").classList.add("hidden"); 
+    document.getElementById("learningHistory").classList.add("hidden");
     document.getElementById("mainMenu").classList.remove("hidden");
-    
+
     renderCatalogTabs();
     renderCategoryList();
     setStickyTopPosition();
     window.scrollTo(0, 0);
-  }
+}
 
     const ensureSentencesAreSelected = () => {
         if (selectedSentences.size === 0) {
@@ -5801,7 +6070,6 @@ document.getElementById("goHome").onclick = () => {
     setStickyTopPosition();
     window.addEventListener('resize', setStickyTopPosition);
 }
-
 
 // 停止所有計時器
 function stopAllTimers() {
@@ -6208,6 +6476,48 @@ function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+/**
+ * 【更新】觸發彩色紙片慶祝特效
+ * @param {number} particleCount - 要產生的紙片數量
+ */
+function triggerStreakCelebration(particleCount = 50) {
+    const colors = config.CONFETTI_COLORS;
+    if (!colors || colors.length === 0) return;
+
+    for (let i = 0; i < particleCount; i++) {
+        const confettiElement = document.createElement("div");
+        confettiElement.className = "confetti";
+
+        // 隨機選擇形狀
+        const shape = Math.random();
+        if (shape < 0.3) {
+            confettiElement.classList.add('square');
+        } else if (shape < 0.6) {
+            confettiElement.classList.add('triangle');
+        } // 否則為預設的圓形
+
+        confettiElement.style.setProperty('--confetti-color', colors[Math.floor(Math.random() * colors.length)]);
+
+        // 隨機設定水平偏移量、落下距離和旋轉角度
+        const randomX = (Math.random() - 0.5) * window.innerWidth * 0.8; // 寬度 80% 的範圍
+        const randomY = window.innerHeight + Math.random() * 200; // 落在畫面下方並延伸
+        const randomRotate = Math.random() * 720 - 360; // -360deg 到 360deg
+        
+        confettiElement.style.setProperty('--confetti-x', `${randomX}px`);
+        confettiElement.style.setProperty('--confetti-y', `${randomY}px`);
+        confettiElement.style.setProperty('--confetti-rotate', `${randomRotate}deg`);
+        
+        // 設置隨機的動畫延遲，讓紙片陸續落下
+        confettiElement.style.animationDelay = `${Math.random() * 1}s`; // 延遲 0 到 1 秒
+
+        document.body.appendChild(confettiElement);
+
+        // 動畫結束後移除元素
+        setTimeout(() => {
+            confettiElement.remove();
+        }, 3000); // 應比動畫時間 2.5s 稍長，確保完全結束
+    }
 }
 
 

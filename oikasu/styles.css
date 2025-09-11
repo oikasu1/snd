@@ -969,3 +969,87 @@
         margin-top: 0.5rem;
     }
 }
+
+
+
+/* --- 新增：彩色紙片慶祝特效 (Confetti Celebration) --- */
+
+.confetti {
+    position: fixed;
+    top: -10px; /* 從螢幕上方開始 */
+    left: 50%; /* 水平居中 */
+    width: 10px;
+    height: 10px;
+    background-color: var(--confetti-color); /* 顏色由 JS 動態設定 */
+    border-radius: 50%; /* 圓形紙片 */
+    pointer-events: none;
+    z-index: 2000;
+    opacity: 0;
+    animation: confettiFall 2.5s ease-out forwards;
+}
+
+/* 額外設計一些方形和三角形的紙片 */
+.confetti.square {
+    border-radius: 0;
+}
+
+.confetti.triangle {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 10px solid var(--confetti-color);
+    background-color: transparent; /* 三角形不需要背景色 */
+}
+
+@keyframes confettiFall {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 0) rotateZ(0deg) scale(0.5);
+    }
+    10% {
+        opacity: 1; /* 快速顯現 */
+    }
+    100% {
+        opacity: 0;
+        /* 向下移動，並隨機水平飄移和旋轉 */
+        transform: translate(var(--confetti-x), var(--confetti-y)) rotateZ(var(--confetti-rotate)) scale(1);
+    }
+}
+
+/* --- 使用者頭像 Emoji 選擇器樣式 --- */
+.emoji-option {
+    cursor: pointer;
+    border-radius: 0.5rem; /* rounded-lg */
+    padding: 0.25rem; /* 調整 padding，讓邊框有更好的空間 */
+    font-size: 1.2rem; /* text-2xl */
+    line-height: 1; /* 確保行高為 1，避免額外的垂直空間 */
+    text-align: center;
+
+    /* 確保 emoji 在容器內垂直和水平居中 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+    
+    border: 1px solid transparent;
+    box-sizing: border-box;
+    
+    width: 1.6rem;
+    height: 1.6rem;
+}
+
+.emoji-option:hover {
+    background-color: #e5e7eb; /* bg-gray-200 */
+    transform: scale(1.2);
+    cursor: default;
+}
+
+.emoji-option.selected-emoji {
+    background-color: #dbeafe; /* bg-blue-100 */
+    transform: scale(1);
+    border: 1.5px solid #3b82f6; /* 藍色外框 */
+}
