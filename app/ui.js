@@ -754,9 +754,10 @@
     parseInputToEntry()
   })
 
+  // ------------------ 修改開始 ------------------
   btnPlay?.addEventListener("click", () => {
-    // 若當前是由頂部觸發的播放，再按一次即停止
-    if (active && active.kind === "entry" && active.fromTop) {
+    // 1. 若當前是由頂部觸發的播放，再按一次即停止
+    if (active && active.fromTop) {
       stopActive("top-toggle-off")
       return
     }
@@ -764,7 +765,7 @@
     const lang = elLang.value
     const input = (elInput.value || "").trim()
 
-    // 檢查是否為空
+    // 2. 檢查是否為空，若為空但有舊結果，播放舊結果
     if (!input) {
       if (order.length > 0) {
         playEntry(order[0], { fromTop: true })
@@ -772,55 +773,43 @@
       return
     }
 
-    // 檢查完整輸入是否已經解析過
+    // 3. 檢查完整輸入是否已經解析過（若列表已有此內容，直接播放該區塊，以保留高亮功能）
     if (isInputAlreadyParsed(lang, input)) {
       console.log("完整輸入內容已經解析過，直接播放最新的解析結果")
+      // 假設最新的那一筆(order[0])就是剛才輸入的（基於 isInputAlreadyParsed 的簡單判斷）
       if (order.length > 0) {
         playEntry(order[0], { fromTop: true })
       }
       return
     }
 
-    // 按換行分割段落，過濾空行
-    const paragraphs = input
-      .split(/\r?\n/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0)
+    // 4. 【修改重點】若為新內容，不產生 Tokens，直接播放原始文字
+    // 先停止當前活動
+    stopActive("play-raw-text")
 
-    if (paragraphs.length === 0) {
-      if (order.length > 0) {
-        playEntry(order[0], { fromTop: true })
-      }
-      return
-    }
+    const session = ++playSession
+    // 設定 active 狀態，標記 kind 為 'raw' 代表沒有對應的 DOM ID
+    active = { id: session, kind: "raw", fromTop: true }
+    
+    // 讓按鈕變成停止圖示
+    setTopPlayState(true)
 
-    // 批次處理所有段落（不檢查個別段落重複）
-    const createdEntries = []
-    for (const paragraph of paragraphs) {
-      try {
-        const { tokens } = window.PinyinAudio.resolve(lang, paragraph, { skipUnknown: true })
-        const entry = createEntry({ lang, input: paragraph, tokens, save: false })
-        if (entry) {
-          createdEntries.push(entry)
+    // 建立一個虛擬元素傳給播放器（因為我們不需要更新列表上的小圖示）
+    const virtualSpeaker = document.createElement("div")
+
+    window.PinyinAudio.play(virtualSpeaker, lang, input, {
+      skipUnknown: true,
+      onStateChange: (type) => {
+        // 確保回調對應當前播放 Session
+        if (!active || active.id !== session) return
+
+        if (type === "endedAll" || type === "stopped") {
+          // 播放結束或被中斷時，恢復按鈕狀態
+          setTopPlayState(false)
+          active = null
         }
-      } catch (e) {
-        console.warn(`解析段落 "${paragraph}" 時發生錯誤:`, e?.message || e)
-      }
-    }
-
-    // 批次插入 DOM（按行的順序）
-    if (createdEntries.length > 0) {
-      insertEntriesInOrder(createdEntries)
-      recordParseHistory(lang, input)
-    }
-
-    // 播放第一個創建的條目（第一行）
-    if (createdEntries.length > 0) {
-      playEntry(createdEntries[0].id, { fromTop: true })
-    } else if (order.length > 0) {
-      // 如果沒有創建新條目，播放最新的解析結果
-      playEntry(order[0], { fromTop: true })
-    }
+      },
+    })
   })
 
   // textarea 清空按鈕

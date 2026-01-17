@@ -4,7 +4,19 @@
  * - Provides resolve(), play(), preload(), holo(), kasu(), p().
  * - Reads large seeds from window.PinyinAudioSeeds (separate seeds.js).
  * - Fixes regex language detection, avoids global state, ensures safe array mapping, and cleans audio listeners.
+ * - 為了能播放音檔，請在head插入 <script src="https://oikasu1.github.io/snd/snd.js"></script>
+音檔播放，請使用app.js內的函數 zhaoan(this, url)，方式如 onclick = "holo(this, url)"，其中url就是 臺羅，如 holo(this, 'sún-ku')
+
+
+ * - 為了能播放音檔，請在head插入 <script src="https://oikasu1.github.io/snd/app.js"></script>
+音檔播放，請使用app.js內的函數 windows.PinyinAudio.kasu(this, url)，方式如 onclick = "windows.PinyinAudio.kasu(this, url)"，其中url就是 拼音，如 windows.PinyinAudio.kasu(this, 'tai') 或 windows.PinyinAudio.kasu(this, 'tai-gaˇ')
  */
+
+
+window.holo = (...args) => PinyinAudio.holo(...args);
+window.kasu = (...args) => PinyinAudio.kasu(...args);
+
+
 ;((root, factory) => {
   if (typeof module === "object" && module.exports) {
     module.exports = factory(root || globalThis)
