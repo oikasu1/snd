@@ -13,6 +13,15 @@
  */
 
 
+(function() {
+  // 避免重複引入 (檢查 src 是否包含檔名即可)
+  if (document.querySelector('script[src*="data-pinyin2pinyin.js"]')) return;  
+  const script = document.createElement('script');
+  script.src = 'https://gnisew.github.io/tools/ruby/data-pinyin2pinyin.js'; 
+  script.async = false;
+  document.head.appendChild(script);
+})();
+
 window.holo = (...args) => PinyinAudio.holo(...args);
 window.kasu = (...args) => PinyinAudio.kasu(...args);
 
@@ -480,18 +489,45 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
   // Hakka 工廠：支援 origins 與快取
   const ORIGIN_DIALECT = "dialect"
   const ORIGIN_HAKKA = "hakka"
+const HAKKA_LANGS = new Set([
+    "kasu", "zhao", "zhaoan", 
+    "xiien", "sixian", 
+    "hoiliug", "hailu", 
+    "taipu", "dapu", 
+    "ngiaupin", "raoping"
+  ])
+
+  // 輔助：安全呼叫外部轉換函數
+  function safeToZvs(t) {
+    if (typeof window.hakkaPinyinZvs === 'function') {
+      return window.hakkaPinyinZvs(t);
+    }
+    // 若無引入外部檔，回退到原本的邏輯 (視原本 app.js 實作而定，這裡簡單回傳 t 或呼叫內部函數)
+    return replaceToneToZvsxf_keepPunct(t); 
+  }
+
+  function safeToTone(t) {
+    if (typeof window.hakkaPinyinTone === 'function') {
+      return window.hakkaPinyinTone(t);
+    }
+    return t;
+  }
+
+  // 修改 makeHakkaConfig，讓 preprocess 使用 safeToZvs
   function makeHakkaConfig({
     match,
     dictGetter,
     toneToBian,
-    dialectBase, // 'sixian' | 'hailu' | 'dapu' | 'raoping'
-    splitMode, // 'symbols' | 'space'
-    addHyphenOnSpace, // boolean
+    dialectBase,
+    splitMode,
+    addHyphenOnSpace,
     getVersion,
     cache,
   }) {
     function preprocess(s) {
-      let out = replaceToneToZvsxf_keepPunct(s || "")
+      // 需求：播放與解析前，先轉為純字母格式 (ZVS)
+      let out = safeToZvs(s || "");
+      
       if (addHyphenOnSpace) {
         out = out
           .replace(/[_\s]+/g, "-")
@@ -501,67 +537,68 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
       return out
     }
     function computeTokensWithOrigins(s) {
-      const parts =
+	const parts =
         splitMode === "symbols" ? splitBySymbolsForZhao((s || "").replace(/-+/g, "-")) : splitBySpaceAndPunct(s || "")
-      const tokens = []
-      const origins = []
-      const dict = dictGetter()
-      for (const part of parts) {
-        const base = String(part)
-          .replace(/_/g, "-")
-          .replace(/-+/g, "-")
-          .replace(/^-+|-+$/g, "")
-          .toLowerCase()
-        if (!base) continue
+        const tokens = []
+        const origins = []
+        const dict = dictGetter()
+        for (const part of parts) {
+            const base = String(part)
+            .replace(/_/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .toLowerCase()
+            if (!base) continue
 
-        if (dict[base] !== undefined) {
-          tokens.push(base)
-          origins.push(ORIGIN_DIALECT)
-          continue
-        }
+            if (dict[base] !== undefined) {
+            tokens.push(base)
+            origins.push(ORIGIN_DIALECT)
+            continue
+            }
 
-        // fallback sandhi → single syllables
-        let sandhi = toneToBian(base)
-        sandhi = String(sandhi)
-          .replace(/ˇ/g, "v")
-          .replace(/⁺/g, "f")
-          .replace(/[_\s]+/g, "-")
-          .replace(/-+/g, "-")
-          .replace(/^-+|-+$/g, "")
-          .toLowerCase()
-        if (!sandhi) continue
+            // fallback sandhi
+            let sandhi = toneToBian(base)
+            sandhi = String(sandhi)
+            .replace(/ˇ/g, "v")
+            .replace(/⁺/g, "f")
+            .replace(/[_\s]+/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .toLowerCase()
+            if (!sandhi) continue
 
-        if (RE.multi.test(sandhi)) {
-          const parts = sandhi.split(/-+/).filter(Boolean)
-          for (const p of parts) {
-            tokens.push(p)
+            if (RE.multi.test(sandhi)) {
+            const parts = sandhi.split(/-+/).filter(Boolean)
+            for (const p of parts) {
+                tokens.push(p)
+                origins.push(ORIGIN_HAKKA)
+            }
+            } else {
+            tokens.push(sandhi)
             origins.push(ORIGIN_HAKKA)
-          }
-        } else {
-          tokens.push(sandhi)
-          origins.push(ORIGIN_HAKKA)
+            }
         }
-      }
-      return { tokens, origins }
+        return { tokens, origins }
     }
-    const tokenizeWithOrigins = memoizeByVersion(cache, getVersion, computeTokensWithOrigins)
+
+	const tokenizeWithOrigins = memoizeByVersion(cache, getVersion, computeTokensWithOrigins)
     function tokenize(s) {
       const { tokens } = tokenizeWithOrigins(s)
       return tokens
     }
-    function toUrls(tokens, _opts, origins) {
-      const useOrigins = Array.isArray(origins) && origins.length === tokens.length
-      return (tokens || []).map((txt, i) => {
-        if (useOrigins) {
-          return origins[i] === ORIGIN_DIALECT
+
+	function toUrls(tokens, _opts, origins) {
+        const useOrigins = Array.isArray(origins) && origins.length === tokens.length
+        return (tokens || []).map((txt, i) => {
+            if (useOrigins) {
+            return origins[i] === ORIGIN_DIALECT
+                ? `https://oikasu1.github.io/snd/mp3${dialectBase}/${txt}.mp3`
+                : `https://oikasu1.github.io/snd/mp3all/${txt}.mp3`
+            }
+            return RE.multi.test(txt)
             ? `https://oikasu1.github.io/snd/mp3${dialectBase}/${txt}.mp3`
-            : `https://oikasu1.github.io/snd/mp3all/${txt}.mp3`  //`https://oikasu1.github.io/snd/mp3hakka/${txt}.mp3`
-        }
-        // 後備：若無 origins（理論上不會發生），以舊啟發式處理
-        return RE.multi.test(txt)
-          ? `https://oikasu1.github.io/snd/mp3${dialectBase}/${txt}.mp3`
-          : `https://oikasu1.github.io/snd/mp3all/${txt}.mp3` //`https://oikasu1.github.io/snd/mp3hakka/${txt}.mp3`
-      })
+            : `https://oikasu1.github.io/snd/mp3all/${txt}.mp3`
+        })
     }
     return {
       match,
@@ -704,7 +741,7 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
 
     kasu: {
       match: LANG.KASU,
-      preprocess: (s) => replaceToneToZvsxf_keepPunct(s),
+      preprocess: (s) => safeToZvs(s), // 修改：使用 safeToZvs
       tokenize: tokenizeKasuMemo,
       toUrls: (tokens) => toKasuUrls(tokens),
       defaults: { rate: 1, skipStart: 0, skipEnd: 0 },
@@ -713,8 +750,9 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
     zhao: {
       match: LANG.ZHAO,
       preprocess: (s) => {
-        let out = replaceToneToZvsxf_keepPunct(s || "")
-        out = out
+         // 修改：先轉 ZVS，再處理連字號
+         let out = safeToZvs(s || "");
+         out = out
           .replace(/[_\s]+/g, "-")
           .replace(/-+/g, "-")
           .trim()
@@ -727,7 +765,7 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
 
     zhaoan: {
       match: LANG.ZHAOAN,
-      preprocess: (s) => replaceToneToZvsxf_keepPunct(s || ""),
+      preprocess: (s) => safeToZvs(s), // 修改
       tokenize: tokenizeZhaoanMemo,
       toUrls: (tokens) => toKasuUrls(tokens),
       defaults: { rate: 1, skipStart: 0, skipEnd: 0 },
@@ -744,6 +782,7 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
       getVersion: getSixianVersion,
       cache: __tokenizeMemo.xiien,
     }),
+
     sixian: makeHakkaConfig({
       match: LANG.SIXIAN,
       dictGetter: () => dictionarySixian,
@@ -1049,28 +1088,38 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
     },
 
     // Resolve to tokens/urls（支援 origins）
-    resolve(lang, input, options = {}) {
+	resolve(lang, input, options = {}) {
       const cfg = getLangConfig(lang)
       if (!cfg) throw new Error("未知語言: " + lang)
-      const pre = cfg.preprocess(input || "")
+      const pre = cfg.preprocess(input || "") // 這裡已經轉成 ZVS 格式了
 
       let tokens, origins
       if (typeof cfg.tokenizeWithOrigins === "function") {
         const res = cfg.tokenizeWithOrigins(pre)
-        tokens = res.tokens
+        tokens = res.tokens // ZVS tokens
         origins = res.origins
       } else {
-        tokens = cfg.tokenize(pre)
+        tokens = cfg.tokenize(pre) // ZVS tokens
       }
 
-      const urls = cfg.toUrls(tokens, options, origins)
+      const urls = cfg.toUrls(tokens, options, origins) // 用 ZVS tokens 產生正確的 URLs
+
+      // 【新增】如果是指定客語，將 tokens 轉為 Tone 格式供顯示
+      if (HAKKA_LANGS.has(lang)) {
+         tokens = tokens.map(t => safeToTone(t));
+      }
+
       return { tokens, urls, defaults: cfg.defaults }
     },
 
+	// 同樣也要修改 resolveBatch，確保批次解析顯示正確
     resolveBatch(lang, inputs, options = {}) {
       if (!Array.isArray(inputs)) throw new Error("resolveBatch 需要 string[]")
       const cfg = getLangConfig(lang)
       if (!cfg) throw new Error("未知語言: " + lang)
+
+      // 檢查是否為客語
+      const isHakka = HAKKA_LANGS.has(lang);
 
       const groups = []
       let allTokens = []
@@ -1078,14 +1127,14 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
       const hasOrigins = typeof cfg.tokenizeWithOrigins === "function"
 
       for (let i = 0; i < inputs.length; i++) {
-        const pre = cfg.preprocess(inputs[i] || "")
+        const pre = cfg.preprocess(inputs[i] || "") // ZVS
         let localTokens, localOrigins
         if (hasOrigins) {
           const r = cfg.tokenizeWithOrigins(pre)
-          localTokens = r.tokens
+          localTokens = r.tokens // ZVS
           localOrigins = r.origins
         } else {
-          localTokens = cfg.tokenize(pre)
+          localTokens = cfg.tokenize(pre) // ZVS
         }
 
         const start = allTokens.length
@@ -1099,7 +1148,13 @@ window.kasu = (...args) => PinyinAudio.kasu(...args);
         }
       }
 
-      const urls = cfg.toUrls(allTokens, options, allOrigins || undefined)
+      const urls = cfg.toUrls(allTokens, options, allOrigins || undefined) // 用 ZVS 產生 URLs
+
+      // 【新增】如果是客語，將 allTokens 轉為 Tone 格式供顯示
+      // 注意：必須在產生 URL 之後轉，不然 URLs 會錯
+      if (isHakka) {
+         allTokens = allTokens.map(t => safeToTone(t));
+      }
 
       let acc = 0
       const groupUrls = groups.map((g) => {

@@ -95,10 +95,21 @@
   // 產生分享連結（含 lang 與 data）
   function buildShareUrl(lang, data) {
     const u = new URL(location.href)
-    u.search = "" // 清空既有查詢
+    u.search = ""
     const params = new URLSearchParams()
     if (lang) params.set("lang", lang)
-    if (data != null) params.set("data", data)
+    
+    if (data != null) {
+      let finalData = data;
+      const HAKKA_LANGS = ["kasu", "zhao", "zhaoan", "xiien", "sixian", "hoiliug", "hailu", "taipu", "dapu", "ngiaupin", "raoping"];
+      
+      if (HAKKA_LANGS.includes(lang) && typeof window.hakkaPinyinZvs === 'function') {
+        finalData = window.hakkaPinyinZvs(data);
+      }
+      
+      params.set("data", finalData)
+    }
+    
     u.search = params.toString()
     return u.toString()
   }
@@ -122,30 +133,60 @@
       const urlInput = rawInput != null ? rawInput.replace(/\+/g, " ") : null
       const urlData = rawData != null ? rawData.replace(/\+/g, " ") : null
 
+      // 設定語言
       if (urlLang && elLang.querySelector(`option[value="${urlLang}"]`)) {
         elLang.value = urlLang
       }
+      
+      const currentLang = elLang.value;
+      const HAKKA_LANGS = ["kasu", "zhao", "zhaoan", "xiien", "sixian", "hoiliug", "hailu", "taipu", "dapu", "ngiaupin", "raoping"];
+      
+      // 定義處理參數的核心邏輯
+      const processParams = () => {
+          let usedAnyParam = false
+          
+          // input：放入 textarea（舊需求）
+          if (urlInput != null) {
+            elInput.value = urlInput
+            usedAnyParam = true
+          }
+    
+          // data：不放 textarea，直接新增一筆解析結果
+          if (urlData != null) {
+            // 此時 hakkaPinyinTone 應已載入，addEntryFromData 呼叫 resolve 時能正確轉換
+            addEntryFromData(currentLang, urlData)
+            usedAnyParam = true
+            // 當有 data 參數時，自動摺疊輸入區塊以凸顯解析結果
+            setTimeout(() => collapseCard("input-card"), 100)
+          }
+    
+          // 若使用了 input 或 data 參數，載入後把網址恢復成只保留 lang
+          if (usedAnyParam) {
+            setUrlLangOnly(currentLang)
+          }
+      };
 
-      // input：放入 textarea（舊需求）
-      let usedAnyParam = false
-      if (urlInput != null) {
-        elInput.value = urlInput
-        usedAnyParam = true
+      // 檢查是否需要等待轉換庫載入 (針對客語且有 data 參數的情況)
+      // 如果轉換函式還不存在，就啟動輪詢等待
+      if (urlData && HAKKA_LANGS.includes(currentLang) && typeof window.hakkaPinyinTone !== 'function') {
+          console.log("等待拼音轉換庫載入...")
+          let checks = 0;
+          const timer = setInterval(() => {
+              checks++;
+              // 每 50ms 檢查一次，最多等 3 秒 (60次)
+              if (typeof window.hakkaPinyinTone === 'function' || checks > 60) {
+                  clearInterval(timer);
+                  processParams();
+              }
+          }, 50);
+      } else {
+          // 如果不是客語，或者函式已存在，直接執行
+          processParams();
       }
 
-      // data：不放 textarea，直接新增一筆解析結果
-      if (urlData != null) {
-        addEntryFromData(elLang.value, urlData)
-        usedAnyParam = true
-        // 當有 data 參數時，自動摺疊輸入區塊以凸顯解析結果
-        setTimeout(() => collapseCard("input-card"), 100)
-      }
-
-      // 若使用了 input 或 data 參數，載入後把網址恢復成只保留 lang
-      if (usedAnyParam) {
-        setUrlLangOnly(elLang.value)
-      }
-    } catch {}
+    } catch (e) {
+      console.warn("URL 參數處理錯誤:", e)
+    }
   }
 
   // 語言切換 → 立即把 lang 同步到網址（不重載頁面）[^1]
@@ -442,20 +483,25 @@
     const tokensBox = document.createElement("div")
     tokensBox.className = "entry-tokens"
     const tokenSpans = []
+    
     tokens.forEach((t, i) => {
       const span = document.createElement("span")
       span.className = "token"
       span.textContent = t
       span.setAttribute("role", "button")
       span.setAttribute("tabindex", "0")
+      
+      // --- 修改點 1：點擊 Token 播放時，讀取最新的 tokens 資料 ---
       span.addEventListener("click", () => {
         const entry = entries.get(id)
         if (entry && entry.isEditing) {
           enterTokenEditMode(span, id, i)
-        } else {
-          playSingleToken(id, i, t)
+        } else if (entry) {
+          // 這裡改成用 entry.tokens[i] 而不是閉包變數 t
+          playSingleToken(id, i, entry.tokens[i]) 
         }
       })
+      
       span.addEventListener("keydown", (e) => {
         const entry = entries.get(id)
         if (entry && entry.isEditing) {
@@ -469,10 +515,12 @@
         } else {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault()
-            playSingleToken(id, i, t)
+            // 這裡也改成用 entry.tokens[i]
+            if (entry) playSingleToken(id, i, entry.tokens[i])
           }
         }
       })
+      
       tokenSpans.push(span)
       tokensBox.appendChild(span)
     })
@@ -492,10 +540,15 @@
     shareBtn.className = "btn mini ghost entry-share"
     shareBtn.textContent = "分享"
     shareBtn.setAttribute("aria-label", "分享此解析結果")
+    
+    // --- 修改點 2：點擊分享時，讀取最新的 entry.input ---
     shareBtn.addEventListener("click", async () => {
       const entry = entries.get(id)
       if (entry && entry.isEditing) return // 編輯模式下不可點擊
-      const url = buildShareUrl(lang, input)
+      
+      // 使用 entry.lang 和 entry.input (最新的)，而不是函式參數 lang/input (舊的)
+      const url = buildShareUrl(entry.lang, entry.input)
+      
       await shareTextUrl(url)
     })
 
@@ -567,6 +620,7 @@
         stopActive("entry-toggle-off")
         return
       }
+      // 這裡呼叫 playEntry 時本來就是透過 ID 去找 entry，所以會讀到最新的 input，不用改
       playEntry(id)
     })
 
@@ -852,6 +906,12 @@
       // 進入編輯模式
       entry.editBtn.textContent = "完成"
       entry.editBtn.setAttribute("aria-label", "完成編輯")
+      
+      // --- 修改：切換按鈕樣式為顯眼顏色 ---
+      entry.editBtn.classList.remove("ghost")  // 移除透明背景
+      entry.editBtn.classList.add("success")   // 加入實心綠色背景
+      // ----------------------------------
+      
       entry.el.classList.add("edit-mode")
 
       // 禁用其他按鈕
@@ -868,6 +928,12 @@
       // 退出編輯模式
       entry.editBtn.textContent = "編輯"
       entry.editBtn.setAttribute("aria-label", "編輯此解析結果")
+      
+      // --- 修改：還原按鈕樣式 ---
+      entry.editBtn.classList.remove("success") // 移除綠色背景
+      entry.editBtn.classList.add("ghost")      // 還原透明背景
+      // ------------------------
+
       entry.el.classList.remove("edit-mode")
 
       // 恢復其他按鈕
@@ -935,12 +1001,36 @@
     tokenSpan.classList.remove("editing")
     tokenSpan.contentEditable = false
 
-    // 更新 token 內容
-    const newText = tokenSpan.textContent.trim()
+    // 取得使用者輸入的新文字
+    let newText = tokenSpan.textContent.trim()
+    
     if (newText) {
       const entry = entries.get(entryId)
-      if (entry && entry.tokens[tokenIndex] !== undefined) {
-        entry.tokens[tokenIndex] = newText
+      if (entry) {
+        // 需求：編輯完成時，執行 hakkaPinyinZvs (標準化/轉音檔格式)
+        // 但顯示時要用 hakkaPinyinTone (顯示格式)
+        
+        const HAKKA_LANGS = ["kasu", "zhao", "zhaoan", "xiien", "sixian", "hoiliug", "hailu", "taipu", "dapu", "ngiaupin", "raoping"];
+        
+        if (HAKKA_LANGS.includes(entry.lang) && typeof window.hakkaPinyinZvs === 'function') {
+           // 1. 先轉成標準 ZVS (例如使用者輸入 ngaiˇ -> ngaiv)
+           const zvsText = window.hakkaPinyinZvs(newText);
+           
+           // 2. 為了 UI 顯示，再轉回 Tone (ngaiv -> ngaiˇ)
+           if (typeof window.hakkaPinyinTone === 'function') {
+             newText = window.hakkaPinyinTone(zvsText);
+           } else {
+             newText = zvsText;
+           }
+           
+           // 更新 Span 顯示
+           tokenSpan.textContent = newText;
+        }
+
+        // 更新資料
+        if (entry.tokens[tokenIndex] !== undefined) {
+          entry.tokens[tokenIndex] = newText
+        }
       }
     }
 

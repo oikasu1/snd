@@ -136,6 +136,16 @@ body {
   border-color: #bae6fd;
   color: #0c4a6e;
 }
+.btn.success {
+  background: var(--accent); /* 使用原本定義的薄荷綠 */
+  color: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+.btn.success:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+}
 .btn:hover {
   filter: brightness(1.03);
 }
